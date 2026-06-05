@@ -5,9 +5,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.llm_service import LLMService
+from app.services.query_intent import QueryIntentService
 from app.services.vector_store import VectorStoreService
 
 router = APIRouter()
+
+RELEVANCE_THRESHOLD = 0.25
 
 
 class ChatRequest(BaseModel):
@@ -18,30 +21,126 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 def chat(request: ChatRequest):
+    intent = QueryIntentService().classify(
+        request.query,
+        has_url=bool(request.url),
+    )
+
+    if intent["retrieval_scope"] == "none":
+        return _no_retrieval_response(intent)
+
     vector_store = VectorStoreService()
     page_chunks = []
     global_chunks = []
 
-    if request.url:
+    if intent["retrieval_scope"] == "page_first":
         page_chunks = vector_store.query(
             request.query,
             metadata_filter={"url": request.url},
         )
+        relevant_page_chunks = _high_relevance_chunks(page_chunks)
 
-        if len(page_chunks) < 2:
+        if len(relevant_page_chunks) < 2:
             global_chunks = vector_store.query(request.query)
     else:
         global_chunks = vector_store.query(request.query)
 
-    chunks = _rank_chunks(request.query, _merge_chunks(page_chunks, global_chunks))
-    source_type = _source_type(page_chunks, global_chunks)
-    answer = _build_answer(request.query, chunks, source_type)
+    ranked_chunks = _rank_chunks(
+        request.query,
+        _merge_chunks(page_chunks, global_chunks),
+    )
+    relevant_chunks = _high_relevance_chunks(ranked_chunks)
+    answer, source_type, selected_chunks = _answer_with_policy(
+        request.query,
+        intent["fallback_policy"],
+        relevant_chunks,
+        page_chunks,
+        global_chunks,
+    )
 
     return {
         "answer": answer,
-        "sources": _build_sources(chunks),
+        "sources": _build_sources(selected_chunks),
         "source_type": source_type,
+        "intent": intent["intent"],
+        "intent_reason": intent["reason"],
+        "retrieval_scope": intent["retrieval_scope"],
+        "fallback_policy": intent["fallback_policy"],
     }
+
+
+def _no_retrieval_response(intent: dict) -> dict:
+    if intent["fallback_policy"] == "ask_for_page":
+        answer = "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。"
+        source_type = "need_page_context"
+    elif intent["fallback_policy"] == "unsupported_action":
+        answer = "当前版本还不支持这个操作。"
+        source_type = "unsupported_action"
+    else:
+        answer = "当前请求无法处理。"
+        source_type = "unsupported_action"
+
+    return {
+        "answer": answer,
+        "sources": [],
+        "source_type": source_type,
+        "intent": intent["intent"],
+        "intent_reason": intent["reason"],
+        "retrieval_scope": intent["retrieval_scope"],
+        "fallback_policy": intent["fallback_policy"],
+    }
+
+
+def _answer_with_policy(
+    query: str,
+    fallback_policy: str,
+    relevant_chunks: list[dict],
+    page_chunks: list[dict],
+    global_chunks: list[dict],
+) -> tuple[str, str, list[dict]]:
+    source_type = _source_type(page_chunks, global_chunks, relevant_chunks)
+
+    if relevant_chunks:
+        prefix = ""
+        if fallback_policy == "no_guess_realtime":
+            prefix = "以下回答基于知识库中已保存内容，可能不是实时最新。\n\n"
+        return prefix + _build_context_answer(query, relevant_chunks), source_type, relevant_chunks
+
+    if fallback_policy == "llm_allowed":
+        return (
+            _build_general_answer(
+                query,
+                "知识库中未找到足够相关内容，以下是通用回答",
+            ),
+            "llm_fallback",
+            [],
+        )
+
+    if fallback_policy == "knowledge_then_llm":
+        return (
+            _build_general_answer(
+                query,
+                "知识库中未找到足够相关内容，以下是通用回答",
+            ),
+            "llm_fallback",
+            [],
+        )
+
+    if fallback_policy == "no_guess_realtime":
+        return (
+            "这个问题需要实时信息。当前系统尚未接入实时工具，知识库中也没有足够相关内容。",
+            "unsupported_realtime",
+            [],
+        )
+
+    if fallback_policy == "no_llm_general_answer":
+        return "没有在知识库中找到相关内容。", "no_knowledge_found", []
+
+    return "当前请求无法处理。", "unsupported_action", []
+
+
+def _high_relevance_chunks(chunks: list[dict]) -> list[dict]:
+    return [chunk for chunk in chunks if chunk.get("score", 0) >= RELEVANCE_THRESHOLD]
 
 
 def _merge_chunks(primary_chunks: list[dict], secondary_chunks: list[dict]) -> list[dict]:
@@ -84,30 +183,44 @@ def _query_terms(query: str) -> list[str]:
     return [term for term in terms if len(term) >= 2]
 
 
-def _source_type(page_chunks: list[dict], global_chunks: list[dict]) -> str:
-    if page_chunks:
+def _source_type(
+    page_chunks: list[dict],
+    global_chunks: list[dict],
+    relevant_chunks: list[dict],
+) -> str:
+    if not relevant_chunks:
+        return "llm_fallback"
+
+    has_page = any(chunk in relevant_chunks for chunk in page_chunks)
+    has_global = any(chunk in relevant_chunks for chunk in global_chunks)
+
+    if has_page and has_global:
+        return "mixed"
+    if has_page:
         return "page"
-    if global_chunks:
-        return "knowledge_base"
-    return "llm_fallback"
+    return "knowledge_base"
 
 
-def _build_answer(query: str, chunks: list[dict], source_type: str) -> str:
-    llm = LLMService()
-
+def _build_general_answer(query: str, reason: str) -> str:
     try:
-        if chunks:
-            context_chunks = [
-                f"[片段{index + 1}]\n{chunk['content']}"
-                for index, chunk in enumerate(chunks)
-            ]
-            answer = llm.answer(question=query, context_chunks=context_chunks)
-        else:
-            answer = llm.answer_without_context(
-                question=query,
-                reason="知识库中未找到相关内容，本回答未基于知识库内容",
-            )
+        answer = LLMService().answer_without_context(
+            question=query,
+            reason=reason,
+        )
+        if answer.startswith("LLM unavailable"):
+            return "LLM unavailable"
+        return answer
+    except Exception:
+        return "LLM unavailable"
 
+
+def _build_context_answer(query: str, chunks: list[dict]) -> str:
+    try:
+        context_chunks = [
+            f"[片段{index + 1}]\n{chunk['content']}"
+            for index, chunk in enumerate(chunks)
+        ]
+        answer = LLMService().answer(question=query, context_chunks=context_chunks)
         if answer.startswith("LLM unavailable"):
             return "LLM unavailable"
         return answer
