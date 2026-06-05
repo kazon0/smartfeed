@@ -15,7 +15,8 @@ class VectorStoreService:
     def __init__(self) -> None:
         self.client = chromadb.PersistentClient(path=self.PERSIST_DIR)
         self.collection = self.client.get_or_create_collection(
-            name=self.COLLECTION_NAME
+            name=self.COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
         )
         self.embedding_model = self._load_embedding_model()
 
@@ -61,14 +62,15 @@ class VectorStoreService:
         metadatas = result.get("metadatas", [[]])[0]
         distances = result.get("distances", [[]])[0]
 
-        return [
+        results = [
             {
                 "content": document,
                 "metadata": metadata,
-                "distance": distance,
+                "score": self._distance_to_score(distance),
             }
             for document, metadata, distance in zip(documents, metadatas, distances)
         ]
+        return sorted(results, key=lambda item: item["score"], reverse=True)
 
     def _load_embedding_model(self):
         if self.__class__._embedding_model_loaded:
@@ -101,6 +103,9 @@ class VectorStoreService:
             counter += 1
 
         return vector[: self.EMBEDDING_DIMENSION]
+
+    def _distance_to_score(self, distance: float) -> float:
+        return float(1 - distance)
 
     def _build_chunk_id(self, chunk: str, index: int, metadata: dict) -> str:
         source = metadata.get("url", "")

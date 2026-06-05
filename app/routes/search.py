@@ -13,4 +13,7 @@ class SearchRequest(BaseModel):
 @router.post("/search")
 def search_articles(request: SearchRequest):
     results = VectorStoreService().query(request.query)
-    return {"results": results}
+    return {
+        "query": request.query,
+        "results": results,
+    }
