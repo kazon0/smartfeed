@@ -46,17 +46,35 @@ class VectorStoreService:
         )
         return len(clean_chunks)
 
-    def query(self, text: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def delete_by_url(self, url: str) -> None:
+        if not url:
+            return
+
+        result = self.collection.get(where={"url": url})
+        ids = result.get("ids", [])
+        if ids:
+            self.collection.delete(ids=ids)
+
+    def query(
+        self,
+        text: str,
+        top_k: int = 5,
+        metadata_filter: dict | None = None,
+    ) -> list[dict[str, Any]]:
         query_text = text.strip()
         if not query_text:
             return []
 
         query_embedding = self._embed([query_text])[0]
-        result = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        query_args = {
+            "query_embeddings": [query_embedding],
+            "n_results": top_k,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if metadata_filter:
+            query_args["where"] = metadata_filter
+
+        result = self.collection.query(**query_args)
 
         documents = result.get("documents", [[]])[0]
         metadatas = result.get("metadatas", [[]])[0]

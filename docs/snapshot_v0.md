@@ -8,12 +8,20 @@
   - 定义位置：`app/main.py`
   - 返回：`{"status": "ok"}`
 
+- `GET /debug`
+  - 定义位置：`app/routes/debug.py`
+  - 返回开发调试 HTML 页面。
+  - 页面可调用现有 `/upload` 和 `/chat`。
+  - 页面展示 parser、stored chunks、summary、chunks、answer、sources。
+
 - `POST /upload`
   - 定义位置：`app/routes/upload.py`
   - 输入：`{"url": "..."}`
   - 当前流程：
     - 调用 `WebParserService.prepare(url)` 抓取并解析网页。
-    - 解析成功后读取 `data["chunks"]`。
+    - 解析成功后检查 `data["chunks"]`。
+    - 如果 chunks 为空，返回 failed，不写入 ChromaDB，不调用 summary。
+    - 如果 chunks 非空，先调用 `VectorStoreService.delete_by_url(url)` 删除同 URL 旧 chunks。
     - 调用 `VectorStoreService.add_chunks(chunks, metadata)` 写入 ChromaDB。
     - 调用 `LLMService.summarize(data["content"])` 生成中文 summary。
   - 返回字段：
@@ -31,25 +39,50 @@
     - `query`
     - `results`
 
+- `POST /chat`
+  - 定义位置：`app/routes/chat.py`
+  - 输入：
+    - `query`
+    - `url` 可选
+    - `mode` 保留，默认 `global`
+  - 当前流程：
+    - 如果传入 `url`，先按 `metadata.url` 检索当前网页 chunks。
+    - 如果当前网页 chunks 少于 2 个，再补充全局知识库检索。
+    - 如果未传入 `url`，直接全局检索。
+    - 对检索 chunks 做轻量关键词重排。
+    - 调用 `LLMService.answer()` 基于 chunks 生成回答。
+    - 如果没有 chunks，调用 `LLMService.answer_without_context()` 生成兜底回答。
+  - 返回字段：
+    - `answer`
+    - `sources`
+    - `source_type`
+
 ### services 层
 
 - `app/services/web_parser.py`
   - 服务类：`WebParserService`
   - 当前能力：
+    - 优先使用 Jina Reader：`https://r.jina.ai/{url}`。
+    - Jina 不可用、返回异常或没有 chunks 时，fallback 到原 HTML 解析。
     - 使用 `requests.Session` 请求网页。
     - 设置 `User-Agent`、`Accept`、`Accept-Language` 请求头。
     - 使用 `response.apparent_encoding` 处理页面编码。
-    - 使用 `BeautifulSoup(html, "html.parser")` 解析 HTML。
-    - 删除 `script`、`style`、`noscript`。
-    - 优先提取 `<article>`，否则使用 `<body>`。
-    - 清洗正文文本，去除空行。
+    - Jina 路径会解析 `Title:` 和 `Markdown Content:`。
+    - Jina 路径会清理 Markdown 图片、链接、标题标记和格式符号。
+    - HTML fallback 路径使用 `BeautifulSoup(html, "html.parser")`。
+    - HTML fallback 路径删除 `script`、`style`、`noscript`、`nav`、`header`、`footer`、`aside`、`form`、`iframe`。
+    - HTML fallback 路径优先提取 `article`、`main`、content/article/detail 相关容器。
+    - 清洗正文文本，去除空行、重复行、明显 CSS/JS/JSON 行、备案版权导航类内容。
     - 按 `500` 字符 chunk size 和 `50` 字符 overlap 切分正文。
+    - 过滤明显噪声 chunk。
   - 成功输出：
     - `url`
     - `title`
     - `content`
     - `chunks`
-    - `metadata`
+    - `metadata.source`
+    - `metadata.parser`，值为 `jina` 或 `html_fallback`
+    - `metadata.length`
   - 失败输出：
     - `error`
     - `url`
@@ -61,7 +94,9 @@
     - 使用 collection：`smartfeed`。
     - collection metadata 设置为 cosine：`{"hnsw:space": "cosine"}`。
     - `add_chunks(chunks, metadata)` 写入 chunks、embeddings、metadata。
-    - `query(text, top_k=5)` 执行语义检索。
+    - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
+    - `query(text, top_k=5, metadata_filter=None)` 执行语义检索。
+    - query 支持可选 Chroma metadata filter。
     - 优先使用 `sentence-transformers` 的 `all-MiniLM-L6-v2`。
     - embedding 模型不可用时使用确定性的 mock embedding。
     - 检索结果返回 `content`、`metadata`、`score`。
@@ -70,37 +105,50 @@
   - 服务类：`LLMService`
   - 当前能力：
     - 使用 DeepSeek Chat Completions API。
+    - 使用 `python-dotenv` 加载 `.env`。
     - 从环境变量 `DEEPSEEK_API_KEY` 读取 API Key。
     - `summarize(text)` 生成 100 到 200 字中文总结。
     - `answer(question, context_chunks)` 基于 context chunks 生成自然语言回答。
+    - `answer_without_context(question, reason)` 在无知识库内容时生成兜底回答。
     - DeepSeek 调用不可用时返回 `LLM unavailable: ...` 字符串。
 
 ## 2. 当前数据流
 
-URL → HTML → text → chunks → embedding → ChromaDB → search results
+URL → Jina Reader 或 HTML fallback → text → chunks → embedding → ChromaDB → search/chat results
 
 ## 3. 当前 RAG + LLM 流程
 
 ### `/upload`
 
-URL → HTML → text → chunks → embedding → ChromaDB → DeepSeek summary → response
+URL → parse → clean text → chunks → delete old chunks by URL → embedding → ChromaDB → DeepSeek summary → response
 
 ### `/search`
 
 query → embedding → ChromaDB topK chunks → search results
 
-当前系统已经从纯 RAG 检索系统变为 RAG + LLM 理解系统：`/upload` 同时完成网页解析、chunk 入库和 DeepSeek summary 生成；`/search` 完成基于 ChromaDB 的语义检索。
+### `/chat`
+
+query + optional url → page retrieval / global retrieval → keyword rerank → context chunks → DeepSeek answer → sources + source_type
+
+### `/debug`
+
+browser page → calls `/upload` and `/chat` → displays parser, chunks, summary, answer and sources
 
 ## 4. 已完成能力清单
 
 - FastAPI 应用入口已创建。
 - `GET /` 健康检查已实现。
+- `GET /debug` 开发调试页已实现。
 - `POST /upload` 网页上传入口已实现。
-- 网页 HTML 获取已实现。
+- Jina Reader 优先解析已实现。
+- HTML fallback 解析已实现。
 - 网页标题提取已实现。
 - 网页正文提取已实现。
+- parser 类型返回已实现。
 - 文本清洗已实现。
 - 正文 chunking 已实现。
+- 噪声 chunk 过滤已实现。
+- 同 URL 覆盖更新已实现。
 - ChromaDB 持久化向量存储已实现。
 - `smartfeed` collection 已实现。
 - chunks 写入向量库已实现。
@@ -109,9 +157,16 @@ query → embedding → ChromaDB topK chunks → search results
 - `POST /search` 语义检索接口已实现。
 - search 返回 `query` 和 `results` 已实现。
 - search results 返回 `content`、`metadata`、`score` 已实现。
+- `POST /chat` 问答接口已实现。
+- chat 支持可选 url 优先检索当前网页已实现。
+- chat 全局知识库检索已实现。
+- chat sources 返回已实现。
+- chat source_type 返回已实现。
 - DeepSeek API 调用封装已实现。
+- `.env` API Key 加载已实现。
 - `LLMService.summarize(text)` 已实现。
 - `LLMService.answer(question, context_chunks)` 已实现。
+- `LLMService.answer_without_context(question, reason)` 已实现。
 - `/upload` 返回 `summary` 字段已实现。
 
 ## 5. 当前系统边界
@@ -119,21 +174,27 @@ query → embedding → ChromaDB topK chunks → search results
 ### 当前能做什么
 
 - 接收网页 URL。
-- 抓取网页 HTML。
+- 优先通过 Jina Reader 获取网页正文。
+- 在 Jina 不可用时使用 HTML fallback。
 - 解析网页标题和正文。
+- 标记本次解析使用的 parser。
 - 将正文切分为 chunks。
 - 将 chunks 转为 embedding。
+- 按 URL 删除旧 chunks 并写入新 chunks。
 - 将 chunks、metadata、embedding 存入本地 ChromaDB。
 - 调用 DeepSeek 为网页正文生成中文 summary。
 - 接收自然语言 query。
 - 将 query 转为 embedding。
 - 从 ChromaDB 中检索 topK 相关 chunks。
-- 返回检索结果的正文片段、metadata 和 score。
+- 基于检索 chunks 调用 DeepSeek 生成回答。
+- 返回回答来源 sources 和 source_type。
+- 通过 `/debug` 页面进行开发验证。
 
 ### 当前不能保证什么
 
 - 不能保证所有反爬网页都能抓取成功。
-- 不能保证需要 JavaScript 渲染正文的网站能被解析完整。
+- 不能保证 Jina Reader 对所有网站都可用。
+- 不能保证需要 JavaScript 渲染正文的网站能被 HTML fallback 完整解析。
 - 不能保证 DeepSeek API 在未配置 `DEEPSEEK_API_KEY` 时可用。
 - 不能保证 mock embedding 下的语义检索质量与真实 embedding 一致。
 
@@ -142,6 +203,7 @@ query → embedding → ChromaDB topK chunks → search results
 - Backend framework：FastAPI
 - ASGI server：Uvicorn
 - HTTP client：requests
+- Primary web reader：Jina Reader `https://r.jina.ai/`
 - HTML parser：BeautifulSoup / beautifulsoup4
 - Vector database：ChromaDB
 - Embedding：sentence-transformers
@@ -150,6 +212,7 @@ query → embedding → ChromaDB topK chunks → search results
 - LLM provider：DeepSeek
 - LLM API：Chat Completions
 - LLM model：deepseek-chat
+- Env loader：python-dotenv
 - LLM API key env：`DEEPSEEK_API_KEY`
 - Persistence path：`chroma_db`
 - Python package list：`requirements.txt`

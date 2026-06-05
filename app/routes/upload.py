@@ -19,12 +19,22 @@ def upload_article(request: UploadRequest):
     summary = ""
 
     if "error" not in data:
+        if not data["chunks"]:
+            return {
+                "status": "failed",
+                "error": "No readable article content extracted",
+                "url": request.url,
+                "stored_chunks": 0,
+            }
+
         metadata = {
             **data["metadata"],
             "url": data["url"],
             "title": data["title"],
         }
-        stored_chunks = VectorStoreService().add_chunks(data["chunks"], metadata)
+        vector_store = VectorStoreService()
+        vector_store.delete_by_url(data["url"])
+        stored_chunks = vector_store.add_chunks(data["chunks"], metadata)
         summary = LLMService().summarize(data["content"])
 
     return {

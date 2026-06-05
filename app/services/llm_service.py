@@ -1,6 +1,9 @@
 import os
 
+from dotenv import load_dotenv
 import requests
+
+load_dotenv()
 
 
 class LLMService:
@@ -26,9 +29,20 @@ class LLMService:
         context = "\n\n".join(chunk.strip() for chunk in context_chunks if chunk.strip())
         prompt = (
             "你是 SmartFeed 的知识库问答助手。"
-            "请只基于下面提供的 context 回答问题，不允许编造。"
-            "如果 context 中没有足够信息，请直接说明无法从当前知识库内容中确定。\n\n"
+            "下面的 context 是向量检索返回的知识库片段，可能包含噪声。"
+            "请先在 context 中寻找与 question 相关的片段。"
+            "只要 context 中存在相关信息，就必须基于这些相关片段回答，不要说没有找到。"
+            "不要使用 context 之外的信息补充细节。"
+            "只有当所有 context 片段都与问题无关时，才说明无法从当前知识库内容中确定。\n\n"
             f"context:\n{context}\n\n"
+            f"question:\n{question.strip()}"
+        )
+        return self._chat(prompt)
+
+    def answer_without_context(self, question: str, reason: str) -> str:
+        prompt = (
+            f"请先明确说明：{reason}。"
+            "然后可以使用通用知识回答用户问题，回答应简洁、准确。\n\n"
             f"question:\n{question.strip()}"
         )
         return self._chat(prompt)
