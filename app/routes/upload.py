@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
 
 router = APIRouter()
@@ -13,7 +14,18 @@ class UploadRequest(BaseModel):
 @router.post("/upload")
 def upload_article(request: UploadRequest):
     data = WebParserService().prepare(request.url)
+    stored_chunks = 0
+
+    if "error" not in data:
+        metadata = {
+            **data["metadata"],
+            "url": data["url"],
+            "title": data["title"],
+        }
+        stored_chunks = VectorStoreService().add_chunks(data["chunks"], metadata)
+
     return {
         "status": "received",
         "data": data,
+        "stored_chunks": stored_chunks,
     }
