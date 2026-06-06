@@ -34,7 +34,11 @@ def upload_article(request: UploadRequest):
         }
         vector_store = VectorStoreService()
         vector_store.delete_by_url(data["url"])
-        stored_chunks = vector_store.add_chunks(data["chunks"], metadata)
+        stored_chunks = vector_store.add_chunks(
+            data["chunks"],
+            metadata,
+            data.get("chunk_metadata"),
+        )
         summary = LLMService().summarize(data["content"])
 
     return {

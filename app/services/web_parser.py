@@ -71,14 +71,17 @@ class WebParserService:
                 return None
 
             title, raw_content = self._parse_jina_text(response.text)
-            content = self._clean_markdown_text(raw_content)
-            chunks = self._chunk_text(content)
+            sections = self._extract_markdown_sections(raw_content, title)
+            content = self._sections_to_text(sections)
+            chunks, chunk_metadata = self._chunk_sections(sections)
 
             return {
                 "url": url,
                 "title": title,
                 "content": content,
                 "chunks": chunks,
+                "sections": sections,
+                "chunk_metadata": chunk_metadata,
                 "metadata": {
                     "source": "web",
                     "parser": "jina",
@@ -102,14 +105,17 @@ class WebParserService:
             soup = BeautifulSoup(response.text, "html.parser")
 
             title = self._extract_title(soup)
-            content = self._extract_content(soup)
-            chunks = self._chunk_text(content)
+            sections = self._extract_html_sections(soup, title)
+            content = self._sections_to_text(sections)
+            chunks, chunk_metadata = self._chunk_sections(sections)
 
             return {
                 "url": url,
                 "title": title,
                 "content": content,
                 "chunks": chunks,
+                "sections": sections,
+                "chunk_metadata": chunk_metadata,
                 "metadata": {
                     "source": "web",
                     "parser": "html_fallback",
@@ -171,10 +177,80 @@ class WebParserService:
         lines = self._clean_lines(text)
         return "\n".join(lines)
 
+    def _extract_markdown_sections(self, text: str, title: str) -> list[dict]:
+        sections = []
+        current_title = title or "正文"
+        current_lines = []
+
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            heading_match = re.match(r"^(#{1,6})\s+(.+)$", line)
+            if heading_match:
+                self._append_section(sections, current_title, current_lines)
+                current_title = self._clean_markdown_inline(heading_match.group(2))
+                current_lines = []
+                continue
+
+            cleaned_line = self._clean_markdown_inline(line)
+            if cleaned_line:
+                current_lines.append(cleaned_line)
+
+        self._append_section(sections, current_title, current_lines)
+        return self._normalize_sections(sections, title)
+
+    def _clean_markdown_inline(self, line: str) -> str:
+        line = re.sub(r"!\[[^\]]*]\([^)]*\)", "", line)
+        line = re.sub(r"\[([^\]]+)]\([^)]*\)", r"\1", line)
+        line = re.sub(r"^[-*+]\s+", "", line)
+        line = re.sub(r"^\d+[.)]\s+", "", line)
+        line = re.sub(r"[*_>]+", "", line)
+        return line.strip()
+
     def _extract_title(self, soup: BeautifulSoup) -> str:
         if soup.title and soup.title.string:
             return soup.title.string.strip()
         return ""
+
+    def _extract_html_sections(self, soup: BeautifulSoup, title: str) -> list[dict]:
+        for tag in soup(["script", "style", "noscript", "nav", "header", "footer", "aside", "form", "iframe"]):
+            tag.decompose()
+
+        for tag in soup.find_all(self._is_noise_node):
+            tag.decompose()
+
+        content_root = self._find_content_root(soup)
+        sections = []
+        current_title = title or "正文"
+        current_lines = []
+
+        for node in content_root.find_all(["h1", "h2", "h3", "h4", "p", "li", "pre", "code"], recursive=True):
+            text = node.get_text(separator="\n", strip=True)
+            if not text:
+                continue
+
+            if node.name in ("h1", "h2", "h3", "h4"):
+                self._append_section(sections, current_title, current_lines)
+                current_title = text.strip()
+                current_lines = []
+            else:
+                current_lines.extend(text.splitlines())
+
+        self._append_section(sections, current_title, current_lines)
+
+        if not sections:
+            text = content_root.get_text(separator="\n", strip=True)
+            sections = [
+                {
+                    "index": 0,
+                    "title": title or "正文",
+                    "content": "\n".join(self._clean_lines(text)),
+                }
+            ]
+
+        return self._normalize_sections(sections, title)
 
     def _extract_content(self, soup: BeautifulSoup) -> str:
         for tag in soup(["script", "style", "noscript", "nav", "header", "footer", "aside", "form", "iframe"]):
@@ -188,6 +264,65 @@ class WebParserService:
 
         lines = self._clean_lines(text)
         return "\n".join(lines)
+
+    def _append_section(self, sections: list[dict], title: str, lines: list[str]) -> None:
+        content_lines = self._clean_lines("\n".join(lines))
+        content = "\n".join(content_lines)
+        if not content:
+            return
+
+        sections.append(
+            {
+                "index": len(sections),
+                "title": title.strip() or "正文",
+                "content": content,
+            }
+        )
+
+    def _normalize_sections(self, sections: list[dict], fallback_title: str) -> list[dict]:
+        normalized = []
+        for section in sections:
+            content = section.get("content", "").strip()
+            if not content:
+                continue
+            normalized.append(
+                {
+                    "index": len(normalized),
+                    "title": section.get("title", "").strip() or fallback_title or "正文",
+                    "content": content,
+                }
+            )
+        return normalized
+
+    def _sections_to_text(self, sections: list[dict]) -> str:
+        parts = []
+        for section in sections:
+            title = section.get("title", "").strip()
+            content = section.get("content", "").strip()
+            if title:
+                parts.append(title)
+            if content:
+                parts.append(content)
+        return "\n".join(parts)
+
+    def _chunk_sections(self, sections: list[dict]) -> tuple[list[str], list[dict]]:
+        chunks = []
+        chunk_metadata = []
+
+        for section in sections:
+            section_text = section.get("content", "")
+            section_chunks = self._chunk_text(section_text)
+            for section_chunk_index, chunk in enumerate(section_chunks):
+                chunks.append(chunk)
+                chunk_metadata.append(
+                    {
+                        "section_index": section.get("index", 0),
+                        "section_title": section.get("title", ""),
+                        "section_chunk_index": section_chunk_index,
+                    }
+                )
+
+        return chunks, chunk_metadata
 
     def _chunk_text(self, text: str) -> list[str]:
         if not text:

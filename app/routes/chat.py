@@ -376,6 +376,12 @@ def _format_context_chunk(index: int, chunk: dict) -> str:
         header += f" url: {url}"
     if chunk_index is not None:
         header += f" chunk_index: {chunk_index}"
+    section_title = metadata.get("section_title", "")
+    section_index = metadata.get("section_index")
+    if section_title:
+        header += f" section_title: {section_title}"
+    if section_index is not None:
+        header += f" section_index: {section_index}"
     return f"{header}\n{chunk.get('content', '')}"
 
 
@@ -396,8 +402,10 @@ def _group_source_chunks(chunks: list[dict]) -> list[dict]:
         metadata = chunk.get("metadata", {})
         url = metadata.get("url", "")
         title = metadata.get("title", "")
+        section_title = metadata.get("section_title", "")
+        section_index = metadata.get("section_index")
         chunk_index = metadata.get("chunk_index")
-        source_key = (url, title)
+        source_key = (url, title, section_index, section_title)
         is_contiguous = (
             current_source is not None
             and source_key == previous_key
@@ -412,6 +420,8 @@ def _group_source_chunks(chunks: list[dict]) -> list[dict]:
                 "url": url,
                 "title": title,
                 "display_title": display_title,
+                "section_title": section_title,
+                "section_index": section_index,
                 "chunk_index": chunk_index,
                 "chunk_indexes": [],
                 "score": chunk.get("score", 0),

@@ -51,6 +51,56 @@ def test_web_parser_non_article_page_returns_empty_chunks(monkeypatch):
     assert result["chunks"] == []
 
 
+def test_web_parser_jina_extracts_sections(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        text = """
+Title: 算法文章
+URL Source: https://example.com/algorithms
+Markdown Content:
+# 排序算法
+冒泡排序用于比较相邻元素。
+快速排序使用基准元素分治。
+
+# 搜索算法
+二分查找适用于有序数组。
+"""
+        apparent_encoding = "utf-8"
+        encoding = "utf-8"
+
+    parser = WebParserService()
+    monkeypatch.setattr(parser.session, "get", lambda url, timeout: FakeResponse())
+
+    result = parser.prepare("https://example.com/algorithms")
+
+    assert result["metadata"]["parser"] == "jina"
+    assert [section["title"] for section in result["sections"]] == ["排序算法", "搜索算法"]
+    assert result["chunk_metadata"][0]["section_title"] == "排序算法"
+    assert "冒泡排序" in result["content"]
+
+
+def test_vector_store_add_chunks_keeps_section_metadata():
+    captured = {}
+
+    class FakeCollection:
+        def upsert(self, **kwargs):
+            captured.update(kwargs)
+
+    service = VectorStoreService.__new__(VectorStoreService)
+    service.collection = FakeCollection()
+    service.embedding_model = None
+
+    stored = service.add_chunks(
+        ["冒泡排序内容"],
+        {"url": "https://example.com", "title": "算法文章"},
+        [{"section_index": 1, "section_title": "排序算法"}],
+    )
+
+    assert stored == 1
+    assert captured["metadatas"][0]["section_index"] == 1
+    assert captured["metadatas"][0]["section_title"] == "排序算法"
+
+
 def test_vector_store_delete_by_url_does_not_crash():
     class FakeCollection:
         def get(self, where):
@@ -410,17 +460,35 @@ def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypa
             return [
                 {
                     "content": "方法1：枚举。",
-                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 0},
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 0,
+                        "section_title": "排序算法",
+                        "chunk_index": 0,
+                    },
                     "score": 1.0,
                 },
                 {
                     "content": "方法2：动态规划。",
-                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 1},
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 1,
+                        "section_title": "动态规划",
+                        "chunk_index": 1,
+                    },
                     "score": 1.0,
                 },
                 {
                     "content": "方法3：贪心。",
-                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 2},
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 2,
+                        "section_title": "贪心算法",
+                        "chunk_index": 2,
+                    },
                     "score": 1.0,
                 },
             ]
@@ -447,8 +515,12 @@ def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypa
 
     assert response.status_code == 200
     assert data["source_type"] == "page"
-    assert data["sources"][0]["chunk_indexes"] == [0, 1, 2]
+    assert len(data["sources"]) == 3
+    assert data["sources"][0]["section_title"] == "排序算法"
+    assert data["sources"][1]["section_title"] == "动态规划"
+    assert data["sources"][2]["section_title"] == "贪心算法"
     assert data["sources"][0]["source_summary"] == "这段来源包含算法方法列表。"
+    assert "section_title: 排序算法" in "\n".join(captured_context)
     assert "方法1" in "\n".join(captured_context)
     assert "方法2" in "\n".join(captured_context)
     assert "方法3" in "\n".join(captured_context)

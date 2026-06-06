@@ -20,7 +20,12 @@ class VectorStoreService:
         )
         self.embedding_model = self._load_embedding_model()
 
-    def add_chunks(self, chunks: list[str], metadata: dict) -> int:
+    def add_chunks(
+        self,
+        chunks: list[str],
+        metadata: dict,
+        chunk_metadata: list[dict] | None = None,
+    ) -> int:
         clean_chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
         if not clean_chunks:
             return 0
@@ -33,6 +38,7 @@ class VectorStoreService:
         metadatas = [
             {
                 **self._normalize_metadata(metadata),
+                **self._normalize_metadata(self._chunk_metadata_at(chunk_metadata, index)),
                 "chunk_index": index,
             }
             for index in range(len(clean_chunks))
@@ -45,6 +51,11 @@ class VectorStoreService:
             metadatas=metadatas,
         )
         return len(clean_chunks)
+
+    def _chunk_metadata_at(self, chunk_metadata: list[dict] | None, index: int) -> dict:
+        if not chunk_metadata or index >= len(chunk_metadata):
+            return {}
+        return chunk_metadata[index] or {}
 
     def delete_by_url(self, url: str) -> None:
         if not url:

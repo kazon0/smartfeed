@@ -61,6 +61,8 @@ Expected result:
 - `data.metadata.parser` should be visible.
 - `stored_chunks` should be `0` or greater.
 - If content is readable, chunks should be displayed.
+- If content is readable, `data.sections` should be present.
+- `data.chunk_metadata` should align with `data.chunks` and include section fields when sections are available.
 
 ## 3. Upload a Chinese Article Page
 
@@ -79,6 +81,7 @@ Expected result:
 - `data.metadata.parser` should be `jina` or `html_fallback`.
 - `summary` should be present.
 - Chunks should not be dominated by CSS, JSON, footer, hot search, or navigation text.
+- `data.sections` should group readable text by article heading when headings are available.
 
 ## 4. Test /chat With URL
 
@@ -95,7 +98,7 @@ Expected result:
 - `retrieval_scope` should be `page_first`.
 - `sources` should include the provided URL.
 - Consecutive chunks from the same article may be merged into one source.
-- Merged sources should include `display_title`, `chunk_indexes`, `source_summary` when available, and `content_preview`.
+- Merged sources should include `display_title`, `section_title` when available, `chunk_indexes`, `source_summary` when available, and `content_preview`.
 - Frontend should treat `content_preview` as expandable evidence/debug text, not the primary source card content.
 - `answer` should be generated from retrieved chunks, unless DeepSeek is unavailable.
 
@@ -114,6 +117,7 @@ Expected result:
 - `source_type` should be `page` if the URL has uploaded chunks.
 - The system should use current-page context instead of relying only on a few vector topK chunks.
 - `sources` should include merged citation blocks from the same URL.
+- `sources` should be grouped by article section when section metadata is available.
 - `answer` should try to organize the methods, algorithms, steps, or list items found in the page context.
 - The answer should naturally reference the current page or article title instead of exposing raw source numbers to users.
 

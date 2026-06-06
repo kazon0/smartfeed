@@ -73,7 +73,21 @@ Successful ingestion:
     "url": "https://example.com",
     "title": "Example Domain",
     "content": "Readable article text...",
+    "sections": [
+      {
+        "index": 0,
+        "title": "Section title",
+        "content": "Section text..."
+      }
+    ],
     "chunks": ["chunk 1", "chunk 2"],
+    "chunk_metadata": [
+      {
+        "section_index": 0,
+        "section_title": "Section title",
+        "section_chunk_index": 0
+      }
+    ],
     "metadata": {
       "source": "web",
       "parser": "jina",
@@ -152,6 +166,9 @@ Runs semantic search against the ChromaDB knowledge base.
         "length": 1234,
         "url": "https://example.com",
         "title": "Example Domain",
+        "section_index": 0,
+        "section_title": "Section title",
+        "section_chunk_index": 0,
         "chunk_index": 0
       },
       "score": 0.82
@@ -217,6 +234,8 @@ Page-preferred chat:
       "url": "https://example.com",
       "title": "Example Domain",
       "display_title": "Example Domain",
+      "section_title": "Section title",
+      "section_index": 0,
       "chunk_index": 0,
       "chunk_indexes": [0, 1, 2],
       "score": 0.82,
@@ -287,7 +306,7 @@ When `url` is provided, SmartFeed treats the request as current-page chat:
 - Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use the ingested chunks for that URL as page context.
 - More specific questions still retrieve matching chunks first, then expand neighboring chunks.
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
-- `sources` are display-oriented citation blocks. Consecutive chunks from the same article are merged, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
+- `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
 - `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.
 
 ### curl

@@ -23,7 +23,7 @@
     - 解析成功后检查 `data["chunks"]`。
     - 如果 chunks 为空，返回 failed，不写入 ChromaDB，不调用 summary。
     - 如果 chunks 非空，先调用 `VectorStoreService.delete_by_url(url)` 删除同 URL 旧 chunks。
-    - 调用 `VectorStoreService.add_chunks(chunks, metadata)` 写入 ChromaDB。
+    - 调用 `VectorStoreService.add_chunks(chunks, metadata, chunk_metadata)` 写入 ChromaDB。
     - 调用 `LLMService.summarize(data["content"])` 生成中文 summary。
   - 返回字段：
     - `status`
@@ -61,8 +61,9 @@
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
     - 传给 LLM 的 context 使用 `[1]`、`[2]`、`[3]` 形式的来源编号。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
-    - 返回 sources 时会合并同一 URL 下连续 chunks，形成更适合前端展示的引用块。
+    - 返回 sources 时会合并同一 URL、同一 section 下连续 chunks，形成更适合前端展示的引用块。
     - sources 包含 `display_title`，用于前端展示更干净的文章标题。
+    - sources 包含 `section_title` 和 `section_index`，用于展示来源章节。
     - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
     - sources 保留 `content_preview`，用于调试或展开查看依据，不作为默认主展示内容。
   - 返回字段：
@@ -85,18 +86,23 @@
     - 设置 `User-Agent`、`Accept`、`Accept-Language` 请求头。
     - 使用 `response.apparent_encoding` 处理页面编码。
     - Jina 路径会解析 `Title:` 和 `Markdown Content:`。
-    - Jina 路径会清理 Markdown 图片、链接、标题标记和格式符号。
+    - Jina 路径会基于 Markdown heading 提取 `sections`。
+    - Jina 路径会清理 Markdown 图片、链接和格式符号。
     - HTML fallback 路径使用 `BeautifulSoup(html, "html.parser")`。
     - HTML fallback 路径删除 `script`、`style`、`noscript`、`nav`、`header`、`footer`、`aside`、`form`、`iframe`。
     - HTML fallback 路径优先提取 `article`、`main`、content/article/detail 相关容器。
+    - HTML fallback 路径会基于 `h1` 到 `h4`、段落、列表和代码节点提取 `sections`。
     - 清洗正文文本，去除空行、重复行、明显 CSS/JS/JSON 行、备案版权导航类内容。
     - 按 `500` 字符 chunk size 和 `50` 字符 overlap 切分正文。
+    - 每个 chunk 会生成对应 `chunk_metadata`，包含 `section_index`、`section_title`、`section_chunk_index`。
     - 过滤明显噪声 chunk。
   - 成功输出：
     - `url`
     - `title`
     - `content`
+    - `sections`
     - `chunks`
+    - `chunk_metadata`
     - `metadata.source`
     - `metadata.parser`，值为 `jina` 或 `html_fallback`
     - `metadata.length`
@@ -110,7 +116,8 @@
     - 使用 `chromadb.PersistentClient(path="chroma_db")`。
     - 使用 collection：`smartfeed`。
     - collection metadata 设置为 cosine：`{"hnsw:space": "cosine"}`。
-    - `add_chunks(chunks, metadata)` 写入 chunks、embeddings、metadata。
+    - `add_chunks(chunks, metadata, chunk_metadata=None)` 写入 chunks、embeddings、metadata。
+    - 写入时会将通用 metadata 和每个 chunk 的 `section_index`、`section_title`、`section_chunk_index` 合并。
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
     - `list_sources(limit=10)` 返回已保存文章来源列表。
@@ -152,13 +159,13 @@
 
 ## 2. 当前数据流
 
-URL → Jina Reader 或 HTML fallback → text → chunks → embedding → ChromaDB → search/chat results
+URL → Jina Reader 或 HTML fallback → text → sections → chunks + chunk metadata → embedding → ChromaDB → search/chat results
 
 ## 3. 当前 RAG + LLM 流程
 
 ### `/upload`
 
-URL → parse → clean text → chunks → delete old chunks by URL → embedding → ChromaDB → DeepSeek summary → response
+URL → parse → clean text → sections → chunks + section metadata → delete old chunks by URL → embedding → ChromaDB → DeepSeek summary → response
 
 ### `/search`
 
@@ -182,9 +189,11 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - HTML fallback 解析已实现。
 - 网页标题提取已实现。
 - 网页正文提取已实现。
+- 网页 sections 结构化提取已实现。
 - parser 类型返回已实现。
 - 文本清洗已实现。
 - 正文 chunking 已实现。
+- chunk 与 section metadata 关联已实现。
 - 噪声 chunk 过滤已实现。
 - 同 URL 覆盖更新已实现。
 - ChromaDB 持久化向量存储已实现。
@@ -209,6 +218,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat sources 返回已实现。
 - chat sources 连续 chunk 合并展示已实现。
 - chat sources 返回 `display_title` 已实现。
+- chat sources 返回 `section_title` 和 `section_index` 已实现。
 - chat sources 返回 `source_summary` 已实现。
 - chat sources 返回 `content_preview` 已实现，当前长度最多为前 1200 字。
 - chat sources 返回 `chunk_indexes` 已实现。
@@ -236,6 +246,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 解析网页标题和正文。
 - 标记本次解析使用的 parser。
 - 将正文切分为 chunks。
+- 将正文按标题结构组织为 sections。
+- 将 chunks 关联到对应 section metadata。
 - 将 chunks 转为 embedding。
 - 按 URL 删除旧 chunks 并写入新 chunks。
 - 将 chunks、metadata、embedding 存入本地 ChromaDB。
