@@ -145,6 +145,19 @@ def test_chat_article_reference_with_url_uses_page_first(monkeypatch):
                 ]
             return []
 
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "这篇文章介绍了 RAG 的基本流程。",
+                    "metadata": {
+                        "url": url,
+                        "title": "RAG",
+                        "chunk_index": 0,
+                    },
+                    "score": 1.0,
+                }
+            ]
+
     class FakeLLMService:
         def answer(self, question, context_chunks):
             return "page answer"
@@ -221,3 +234,255 @@ def test_chat_unsupported_action_returns_directly(monkeypatch):
     assert data["intent"] == "unsupported_action"
     assert data["source_type"] == "unsupported_action"
     assert data["answer"] == "当前版本还不支持这个操作。"
+
+
+def test_chat_sources_use_content_preview(monkeypatch):
+    long_content = "人工智能" * 80
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [
+                {
+                    "content": long_content,
+                    "metadata": {
+                        "url": "https://example.com/ai",
+                        "title": "AI",
+                        "chunk_index": 0,
+                    },
+                    "score": 0.9,
+                }
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            assert context_chunks[0].startswith("[1] title: AI")
+            return "根据来源[1]，这是回答。"
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "什么是人工智能"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert "content" not in data["sources"][0]
+    assert data["sources"][0]["display_title"] == "AI"
+    assert data["sources"][0]["content_preview"] == long_content[:1200]
+    assert len(data["sources"][0]["content_preview"]) == 320
+
+
+def test_chat_with_missing_page_returns_suggestions_not_page_answer(monkeypatch):
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return []
+            raise AssertionError("missing page should not query global chunks for answer")
+
+        def list_sources(self, limit=10):
+            return [
+                {
+                    "url": "https://example.com/saved",
+                    "title": "Saved Article",
+                    "chunk_index": None,
+                    "score": None,
+                    "content_preview": "",
+                }
+            ]
+
+        def get_chunks_by_url(self, url):
+            return []
+
+    class FakeLLMService:
+        def answer(self, *args, **kwargs):
+            raise AssertionError("missing page should not call LLM answer")
+
+        def answer_without_context(self, *args, **kwargs):
+            raise AssertionError("missing page should not call LLM fallback")
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={"query": "这篇文章讲了什么", "url": "https://example.com/not-uploaded"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page_not_found_with_suggestions"
+    assert data["answer"].startswith("当前网页没有找到可用于回答的内容")
+    assert data["sources"][0]["url"] == "https://example.com/saved"
+
+
+def test_chat_page_answer_expands_neighbor_chunks(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return [
+                    {
+                        "content": "方法2：使用位运算 n &= n - 1。",
+                        "metadata": {
+                            "url": "https://example.com/code",
+                            "title": "Code",
+                            "chunk_index": 1,
+                        },
+                        "score": 0.9,
+                    }
+                ]
+            return []
+
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "方法1：逐位判断最低位是否为1。",
+                    "metadata": {"url": url, "title": "Code", "chunk_index": 0},
+                    "score": 1.0,
+                },
+                {
+                    "content": "方法2：使用位运算 n &= n - 1。",
+                    "metadata": {"url": url, "title": "Code", "chunk_index": 1},
+                    "score": 1.0,
+                },
+                {
+                    "content": "方法3：查表法提前缓存0到255的结果。",
+                    "metadata": {"url": url, "title": "Code", "chunk_index": 2},
+                    "score": 1.0,
+                },
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据来源[1]、[2]、[3]回答。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源汇总了三种位计数方法。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "这个算法怎么解",
+            "url": "https://example.com/code",
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page"
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["display_title"] == "Code"
+    assert data["sources"][0]["chunk_indexes"] == [0, 1, 2]
+    assert data["sources"][0]["source_note"] == "这段来源汇总了三种位计数方法。"
+    assert data["sources"][0]["source_summary"] == "这段来源汇总了三种位计数方法。"
+    assert "方法1" in data["sources"][0]["content_preview"]
+    assert "方法2" in data["sources"][0]["content_preview"]
+    assert "方法3" in data["sources"][0]["content_preview"]
+    assert "方法1" in "\n".join(captured_context)
+    assert "方法2" in "\n".join(captured_context)
+    assert "方法3" in "\n".join(captured_context)
+
+
+def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return [
+                    {
+                        "content": "局部片段，没有完整列表。",
+                        "metadata": {
+                            "url": "https://example.com/algorithms",
+                            "title": "Algorithms",
+                            "chunk_index": 5,
+                        },
+                        "score": 0.1,
+                    }
+                ]
+            return []
+
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "方法1：枚举。",
+                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 0},
+                    "score": 1.0,
+                },
+                {
+                    "content": "方法2：动态规划。",
+                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 1},
+                    "score": 1.0,
+                },
+                {
+                    "content": "方法3：贪心。",
+                    "metadata": {"url": url, "title": "Algorithms", "chunk_index": 2},
+                    "score": 1.0,
+                },
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据来源整理：方法1、方法2、方法3。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源包含算法方法列表。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "十种算法有哪些",
+            "url": "https://example.com/algorithms",
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page"
+    assert data["sources"][0]["chunk_indexes"] == [0, 1, 2]
+    assert data["sources"][0]["source_summary"] == "这段来源包含算法方法列表。"
+    assert "方法1" in "\n".join(captured_context)
+    assert "方法2" in "\n".join(captured_context)
+    assert "方法3" in "\n".join(captured_context)
+
+
+def test_chat_source_display_title_removes_tencent_suffix(monkeypatch):
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [
+                {
+                    "content": "算法内容",
+                    "metadata": {
+                        "url": "https://cloud.tencent.com/developer/article/1",
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "chunk_index": 0,
+                    },
+                    "score": 0.9,
+                }
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            assert "title: 程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云" in context_chunks[0]
+            return "根据《程序员应该知道的十个基础算法》，回答。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这篇文章列出了程序员常见基础算法。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "基础算法有哪些"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["sources"][0]["display_title"] == "程序员应该知道的十个基础算法"
+    assert data["sources"][0]["source_summary"] == "这篇文章列出了程序员常见基础算法。"

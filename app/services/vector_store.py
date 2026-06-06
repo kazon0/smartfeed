@@ -55,6 +55,56 @@ class VectorStoreService:
         if ids:
             self.collection.delete(ids=ids)
 
+    def list_sources(self, limit: int = 10) -> list[dict[str, Any]]:
+        result = self.collection.get(include=["metadatas"])
+        metadatas = result.get("metadatas", [])
+        sources = []
+        seen_urls = set()
+
+        for metadata in metadatas:
+            url = metadata.get("url", "")
+            if not url or url in seen_urls:
+                continue
+
+            seen_urls.add(url)
+            sources.append(
+                {
+                    "url": url,
+                    "title": metadata.get("title", ""),
+                    "chunk_index": None,
+                    "score": None,
+                    "content_preview": "",
+                }
+            )
+
+            if len(sources) >= limit:
+                break
+
+        return sources
+
+    def get_chunks_by_url(self, url: str) -> list[dict[str, Any]]:
+        if not url:
+            return []
+
+        result = self.collection.get(
+            where={"url": url},
+            include=["documents", "metadatas"],
+        )
+        documents = result.get("documents", [])
+        metadatas = result.get("metadatas", [])
+        chunks = [
+            {
+                "content": document,
+                "metadata": metadata,
+                "score": 1.0,
+            }
+            for document, metadata in zip(documents, metadatas)
+        ]
+        return sorted(
+            chunks,
+            key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
+        )
+
     def query(
         self,
         text: str,

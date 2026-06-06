@@ -88,13 +88,17 @@ function renderSources(sources) {
   if (!sources || sources.length === 0) return "<p class='muted'>No sources.</p>";
   return sources.map((source, index) => `
     <details>
-      <summary>Source ${index + 1} | score ${escapeHtml(source.score)}</summary>
+      <summary>${escapeHtml(source.display_title || source.title || `Source ${index + 1}`)}</summary>
       <div class="meta">
-        ${pill("title", source.title)}
         ${pill("url", source.url)}
-        ${pill("chunk", source.chunk_index)}
+        ${pill("score", source.score)}
+        ${pill("chunks", Array.isArray(source.chunk_indexes) ? source.chunk_indexes.join(", ") : source.chunk_index)}
       </div>
-      <pre>${escapeHtml(source.content)}</pre>
+      ${source.source_summary || source.source_note ? `<p>${escapeHtml(source.source_summary || source.source_note)}</p>` : "<p class='muted'>No source summary.</p>"}
+      <details>
+        <summary>Raw preview</summary>
+        <pre>${escapeHtml(source.content_preview)}</pre>
+      </details>
     </details>
   `).join("");
 }

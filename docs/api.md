@@ -216,9 +216,13 @@ Page-preferred chat:
     {
       "url": "https://example.com",
       "title": "Example Domain",
+      "display_title": "Example Domain",
       "chunk_index": 0,
+      "chunk_indexes": [0, 1, 2],
       "score": 0.82,
-      "content": "source chunk text..."
+      "source_summary": "这段来源解释了与问题相关的核心内容。",
+      "content_preview": "merged source text preview...",
+      "source_note": "这段来源解释了与问题相关的核心内容。"
     }
   ],
   "source_type": "knowledge_base",
@@ -236,6 +240,7 @@ Possible `source_type` values:
 - `mixed`
 - `llm_fallback`
 - `need_page_context`
+- `page_not_found_with_suggestions`
 - `unsupported_realtime`
 - `no_knowledge_found`
 - `unsupported_action`
@@ -277,6 +282,14 @@ If the user asks an article-reference question without `url`, SmartFeed does not
 }
 ```
 
+When `url` is provided, SmartFeed treats the request as current-page chat:
+
+- Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use the ingested chunks for that URL as page context.
+- More specific questions still retrieve matching chunks first, then expand neighboring chunks.
+- If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
+- `sources` are display-oriented citation blocks. Consecutive chunks from the same article are merged, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
+- `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.
+
 ### curl
 
 ```bash
@@ -295,6 +308,7 @@ curl -X POST http://127.0.0.1:8000/chat \
 
 - No matching chunks: response uses `source_type: "llm_fallback"`.
 - Article-reference query without `url`: response uses `source_type: "need_page_context"`.
+- URL is provided but the page was not uploaded or has no chunks: response uses `source_type: "page_not_found_with_suggestions"`.
 - Realtime query without relevant knowledge: response uses `source_type: "unsupported_realtime"`.
 - Search-history query without matching knowledge: response uses `source_type: "no_knowledge_found"`.
 - Unsupported management action: response uses `source_type: "unsupported_action"`.

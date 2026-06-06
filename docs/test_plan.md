@@ -94,7 +94,28 @@ Expected result:
 - `intent` should be `page_reference`.
 - `retrieval_scope` should be `page_first`.
 - `sources` should include the provided URL.
+- Consecutive chunks from the same article may be merged into one source.
+- Merged sources should include `display_title`, `chunk_indexes`, `source_summary` when available, and `content_preview`.
+- Frontend should treat `content_preview` as expandable evidence/debug text, not the primary source card content.
 - `answer` should be generated from retrieved chunks, unless DeepSeek is unavailable.
+
+## 4.1 Test Page-Wide Question With URL
+
+Use an uploaded page that contains a list of methods, algorithms, or steps.
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"十种算法有哪些","url":"https://cloud.tencent.com/developer/article/1181768"}'
+```
+
+Expected result:
+
+- `source_type` should be `page` if the URL has uploaded chunks.
+- The system should use current-page context instead of relying only on a few vector topK chunks.
+- `sources` should include merged citation blocks from the same URL.
+- `answer` should try to organize the methods, algorithms, steps, or list items found in the page context.
+- The answer should naturally reference the current page or article title instead of exposing raw source numbers to users.
 
 ## 5. Test /chat Without URL
 
@@ -199,8 +220,9 @@ curl -X POST http://127.0.0.1:8000/chat \
 Expected result:
 
 - Page retrieval should find no page chunks.
-- System may fall back to global retrieval.
-- If global knowledge has no related content, response should use `source_type: "llm_fallback"`.
+- System should not answer the missing page with unrelated global chunks.
+- Response should use `source_type: "page_not_found_with_suggestions"`.
+- `sources` may list saved article URLs as suggestions.
 
 ## 7. Test DeepSeek API Key Missing
 

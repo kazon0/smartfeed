@@ -13,6 +13,7 @@
   - 返回开发调试 HTML 页面。
   - 页面通过浏览器调用现有 `/upload` 和 `/chat`。
   - 页面展示 parser、stored chunks、summary、chunks、answer、sources、source_type。
+  - sources 默认展示文章标题、URL、摘要和 chunk 索引，原始 `content_preview` 放在折叠的 Raw preview 中。
 
 - `POST /upload`
   - 定义位置：`app/routes/upload.py`
@@ -48,14 +49,22 @@
   - 当前流程：
     - 调用 `QueryIntentService.classify(query, has_url)`。
     - 如果 `retrieval_scope == "none"`，根据 fallback policy 直接返回，不检索。
-    - 如果 `retrieval_scope == "page_first"`，先按 `metadata.url` 检索当前网页 chunks。
-    - 如果当前网页高相关 chunks 少于 2 个，再补充全局知识库检索。
-    - 如果 `retrieval_scope == "global"`，执行全局知识库检索。
-    - 合并 page/global chunks 并做轻量关键词重排。
+    - 如果请求包含 `url`，进入当前网页聊天逻辑。
+    - 当前网页聊天会先按 `metadata.url` 查询当前网页 chunks，并读取该 URL 已入库的全部 chunks。
+    - 对 `总结`、`讲了什么`、`有哪些`、`方法`、`算法`、`步骤` 等页面级问题，直接选择当前 URL 的页面上下文 chunks 供 LLM 回答。
+    - 对更具体的问题，先使用向量检索命中的当前网页 chunks，再扩展相邻 chunks。
+    - 如果当前 URL 没有可用 chunks，不使用全局知识库假装回答该网页，而是返回已保存文章建议。
+    - 如果请求不包含 `url`，执行全局知识库检索。
+    - 全局检索结果会做轻量关键词重排。
     - 使用 `score >= 0.25` 判断高相关 chunks。
     - 根据 `fallback_policy` 决定是否调用 LLM 兜底、是否拒绝实时猜测、是否只返回知识库未命中。
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
+    - 传给 LLM 的 context 使用 `[1]`、`[2]`、`[3]` 形式的来源编号。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
+    - 返回 sources 时会合并同一 URL 下连续 chunks，形成更适合前端展示的引用块。
+    - sources 包含 `display_title`，用于前端展示更干净的文章标题。
+    - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
+    - sources 保留 `content_preview`，用于调试或展开查看依据，不作为默认主展示内容。
   - 返回字段：
     - `answer`
     - `sources`
@@ -103,6 +112,8 @@
     - collection metadata 设置为 cosine：`{"hnsw:space": "cosine"}`。
     - `add_chunks(chunks, metadata)` 写入 chunks、embeddings、metadata。
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
+    - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
+    - `list_sources(limit=10)` 返回已保存文章来源列表。
     - `query(text, top_k=5, metadata_filter=None)` 执行语义检索。
     - query 支持可选 Chroma metadata filter。
     - 优先使用 `sentence-transformers` 的 `all-MiniLM-L6-v2`。
@@ -117,7 +128,9 @@
     - 从环境变量 `DEEPSEEK_API_KEY` 读取 API Key。
     - `summarize(text)` 生成 100 到 200 字中文总结。
     - `answer(question, context_chunks)` 基于 context chunks 生成自然语言回答。
+    - `answer()` prompt 要求最终回答面向普通用户，单篇文章场景使用文章标题或当前网页自然引用，不要求用户理解来源编号。
     - `answer_without_context(question, reason)` 在无可用知识库上下文或通用兜底场景生成回答。
+    - `describe_sources(question, source_texts)` 为 sources 生成一句中文来源说明。
     - DeepSeek 调用不可用时返回 `LLM unavailable: ...` 字符串。
 
 - `app/services/query_intent.py`
@@ -153,7 +166,7 @@ query → embedding → ChromaDB topK chunks → search results
 
 ### `/chat`
 
-query + optional url → query intent classification → retrieval scope decision → page/global retrieval → keyword rerank → relevance filter → policy-based answer → sources + source_type
+query + optional url → query intent classification → retrieval scope decision → page context or global retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → merged sources + source_type
 
 ### `/debug`
 
@@ -186,11 +199,20 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat query intent classification 已实现。
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
 - chat 支持可选 url 优先检索当前网页已实现。
+- chat 对当前网页页面级问题使用该 URL 已入库页面上下文已实现。
+- chat 对当前网页具体问题扩展相邻 chunks 已实现。
+- chat 当前 URL 没有可用 chunks 时返回已保存文章建议已实现。
 - chat 全局知识库检索已实现。
 - chat 高相关 score 阈值判断已实现，当前阈值为 `0.25`。
 - chat keyword rerank 已实现。
 - chat policy-based fallback 已实现。
 - chat sources 返回已实现。
+- chat sources 连续 chunk 合并展示已实现。
+- chat sources 返回 `display_title` 已实现。
+- chat sources 返回 `source_summary` 已实现。
+- chat sources 返回 `content_preview` 已实现，当前长度最多为前 1200 字。
+- chat sources 返回 `chunk_indexes` 已实现。
+- chat sources 返回可选 `source_note` 已实现。
 - chat source_type 返回已实现。
 - chat intent metadata 返回已实现。
 - DeepSeek API 调用封装已实现。
@@ -229,7 +251,9 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 对实时类问题在无高相关知识库内容时拒绝猜测。
 - 对用户历史/收藏查询在无知识库结果时不使用通用知识替代。
 - 对当前不支持的管理操作直接返回 unsupported。
-- 返回回答来源 sources、source_type、intent、retrieval_scope 和 fallback_policy。
+- 当前网页聊天中，对总结、列表、方法、算法、步骤类问题使用当前 URL 页面上下文回答。
+- 当前网页聊天中，如果当前 URL 没有可用 chunks，不用无关全局 chunks 回答该网页。
+- 返回合并后的回答来源 sources、source_type、intent、retrieval_scope 和 fallback_policy。
 - 通过 `/debug` 页面进行开发验证。
 
 ### 当前不能保证什么
@@ -240,6 +264,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 不能保证 DeepSeek API 在未配置 `DEEPSEEK_API_KEY` 时可用。
 - 不能保证 mock embedding 下的语义检索质量与真实 embedding 一致。
 - 不能保证规则型 query intent classification 覆盖所有自然语言表达。
+- 不能保证固定 chunking 能完整保留原网页的标题层级、代码块和章节结构。
+- 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 
 ## 6. 技术栈总结
