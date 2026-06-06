@@ -304,7 +304,7 @@ If the user asks an article-reference question without `url`, SmartFeed does not
 When `url` is provided, SmartFeed treats the request as current-page chat:
 
 - Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use the ingested chunks for that URL as page context.
-- More specific questions still retrieve matching chunks first, then expand neighboring chunks.
+- More specific current-page questions use lightweight hybrid retrieval: vector results are merged with keyword matches from the uploaded page chunks, then expanded to the matched article section when section metadata exists. If old chunks do not have section metadata, SmartFeed falls back to neighboring chunks.
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
 - `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
 - `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.

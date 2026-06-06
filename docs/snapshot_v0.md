@@ -52,7 +52,9 @@
     - 如果请求包含 `url`，进入当前网页聊天逻辑。
     - 当前网页聊天会先按 `metadata.url` 查询当前网页 chunks，并读取该 URL 已入库的全部 chunks。
     - 对 `总结`、`讲了什么`、`有哪些`、`方法`、`算法`、`步骤` 等页面级问题，直接选择当前 URL 的页面上下文 chunks 供 LLM 回答。
-    - 对更具体的问题，先使用向量检索命中的当前网页 chunks，再扩展相邻 chunks。
+    - 对更具体的问题，先使用向量检索当前网页 chunks，同时在当前 URL 全部 chunks 中做轻量关键词召回。
+    - 当前网页向量结果和关键词结果会合并去重，再优先扩展到命中 chunk 所在 section。
+    - 如果旧 chunks 没有 section metadata，则 fallback 到相邻 chunks 扩展。
     - 如果当前 URL 没有可用 chunks，不使用全局知识库假装回答该网页，而是返回已保存文章建议。
     - 如果请求不包含 `url`，执行全局知识库检索。
     - 全局检索结果会做轻量关键词重排。
@@ -173,7 +175,7 @@ query → embedding → ChromaDB topK chunks → search results
 
 ### `/chat`
 
-query + optional url → query intent classification → retrieval scope decision → page context or global retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → merged sources + source_type
+query + optional url → query intent classification → retrieval scope decision → page hybrid retrieval or global retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → merged sources + source_type
 
 ### `/debug`
 
@@ -209,7 +211,9 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
 - chat 支持可选 url 优先检索当前网页已实现。
 - chat 对当前网页页面级问题使用该 URL 已入库页面上下文已实现。
-- chat 对当前网页具体问题扩展相邻 chunks 已实现。
+- chat 对当前网页具体问题使用向量检索 + 关键词召回合并已实现。
+- chat 对当前网页具体问题优先扩展到命中 section 已实现。
+- chat 对没有 section metadata 的旧 chunks 使用相邻 chunks fallback 已实现。
 - chat 当前 URL 没有可用 chunks 时返回已保存文章建议已实现。
 - chat 全局知识库检索已实现。
 - chat 高相关 score 阈值判断已实现，当前阈值为 `0.25`。
@@ -257,6 +261,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 根据 intent 决定检索范围和 fallback 策略。
 - 将 query 转为 embedding。
 - 从 ChromaDB 中检索 topK 相关 chunks。
+- 当前网页聊天会在指定 URL 的 chunks 中做轻量关键词召回。
 - 按 score 阈值判断是否存在高相关知识库内容。
 - 基于高相关 chunks 调用 DeepSeek 生成回答。
 - 在允许时使用 DeepSeek 生成通用兜底回答。
@@ -278,6 +283,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 不能保证规则型 query intent classification 覆盖所有自然语言表达。
 - 不能保证固定 chunking 能完整保留原网页的标题层级、代码块和章节结构。
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
+- 全局知识库检索当前仍以向量检索和轻量重排为主，尚未实现全局关键词召回。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 
 ## 6. 技术栈总结

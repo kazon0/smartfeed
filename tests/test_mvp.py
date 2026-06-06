@@ -437,6 +437,159 @@ def test_chat_page_answer_expands_neighbor_chunks(monkeypatch):
     assert "方法3" in "\n".join(captured_context)
 
 
+def test_chat_page_answer_expands_full_section_when_metadata_exists(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return [
+                    {
+                        "content": "快速排序使用基准元素分治。",
+                        "metadata": {
+                            "url": "https://example.com/algorithms",
+                            "title": "Algorithms",
+                            "section_index": 0,
+                            "section_title": "排序算法",
+                            "chunk_index": 1,
+                        },
+                        "score": 0.9,
+                    }
+                ]
+            return []
+
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "冒泡排序通过相邻元素交换完成排序。",
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 0,
+                        "section_title": "排序算法",
+                        "chunk_index": 0,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "快速排序使用基准元素分治。",
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 0,
+                        "section_title": "排序算法",
+                        "chunk_index": 1,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "二分查找适用于有序数组。",
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 1,
+                        "section_title": "搜索算法",
+                        "chunk_index": 2,
+                    },
+                    "score": 1.0,
+                },
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据《Algorithms》的排序算法章节回答。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源来自排序算法章节。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "快速排序怎么理解",
+            "url": "https://example.com/algorithms",
+        },
+    )
+    data = response.json()
+
+    joined_context = "\n".join(captured_context)
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page"
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["section_title"] == "排序算法"
+    assert data["sources"][0]["chunk_indexes"] == [0, 1]
+    assert "冒泡排序" in joined_context
+    assert "快速排序" in joined_context
+    assert "二分查找" not in joined_context
+
+
+def test_chat_page_hybrid_retrieval_uses_keyword_match_when_vector_misses(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return []
+            return []
+
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "快速排序使用基准元素把数组划分为左右两部分。",
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 0,
+                        "section_title": "排序算法",
+                        "chunk_index": 0,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "二分查找每次缩小一半搜索范围。",
+                    "metadata": {
+                        "url": url,
+                        "title": "Algorithms",
+                        "section_index": 1,
+                        "section_title": "搜索算法",
+                        "chunk_index": 1,
+                    },
+                    "score": 1.0,
+                },
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据《Algorithms》的排序算法章节，快速排序使用分治。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源解释了快速排序。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "快速排序怎么理解",
+            "url": "https://example.com/algorithms",
+        },
+    )
+    data = response.json()
+    joined_context = "\n".join(captured_context)
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page"
+    assert data["sources"][0]["section_title"] == "排序算法"
+    assert "快速排序" in joined_context
+    assert "二分查找" not in joined_context
+
+
 def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypatch):
     captured_context = []
 

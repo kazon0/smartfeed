@@ -121,6 +121,39 @@ Expected result:
 - `answer` should try to organize the methods, algorithms, steps, or list items found in the page context.
 - The answer should naturally reference the current page or article title instead of exposing raw source numbers to users.
 
+## 4.2 Test Specific Question With Section Context
+
+Use an uploaded article that has clear headings, then ask about one method or one concept from a section.
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"快速排序怎么理解","url":"https://cloud.tencent.com/developer/article/2352039"}'
+```
+
+Expected result:
+
+- `source_type` should be `page` if the URL has uploaded chunks.
+- The answer should use the matched section context, not only one isolated chunk.
+- `sources` should include `section_title` when section metadata exists.
+- If old chunks do not have section metadata, re-upload the URL first.
+
+## 4.3 Test Current-Page Keyword Match
+
+Ask a specific term that appears in the uploaded page, especially algorithm names or section headings.
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"二分查找怎么理解","url":"https://cloud.tencent.com/developer/article/2352039"}'
+```
+
+Expected result:
+
+- Current-page chat should use vector retrieval plus keyword matching over the uploaded page chunks.
+- If the term appears in the page, the matched source should usually include the related `section_title`.
+- The answer should not fall back to unrelated saved articles while the current page has matching content.
+
 ## 5. Test /chat Without URL
 
 ```bash

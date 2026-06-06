@@ -73,8 +73,13 @@ def _chat_with_current_page(
         metadata_filter={"url": url},
     )
     ranked_page_chunks = _rank_chunks(query, page_chunks)
-    relevant_page_chunks = _high_relevance_chunks(ranked_page_chunks)
     all_page_chunks = vector_store.get_chunks_by_url(url)
+    keyword_page_chunks = _keyword_retrieve_chunks(query, all_page_chunks)
+    ranked_page_chunks = _rank_chunks(
+        query,
+        _merge_chunks(ranked_page_chunks, keyword_page_chunks),
+    )
+    relevant_page_chunks = _high_relevance_chunks(ranked_page_chunks)
 
     if all_page_chunks and _is_page_wide_query(query, intent):
         selected_page_chunks = _select_page_context(all_page_chunks)
@@ -96,7 +101,7 @@ def _chat_with_current_page(
         }
 
     if relevant_page_chunks:
-        expanded_page_chunks = _expand_page_chunks(
+        expanded_page_chunks = _expand_page_context(
             relevant_page_chunks,
             all_page_chunks,
         )
@@ -248,6 +253,46 @@ def _select_page_context(chunks: list[dict]) -> list[dict]:
     return sorted_chunks[:FULL_PAGE_CONTEXT_CHUNK_LIMIT]
 
 
+def _expand_page_context(
+    relevant_chunks: list[dict],
+    all_page_chunks: list[dict],
+) -> list[dict]:
+    section_chunks = _expand_section_chunks(relevant_chunks, all_page_chunks)
+    if section_chunks:
+        return section_chunks
+    return _expand_page_chunks(relevant_chunks, all_page_chunks)
+
+
+def _expand_section_chunks(
+    relevant_chunks: list[dict],
+    all_page_chunks: list[dict],
+    limit: int = 12,
+) -> list[dict]:
+    if not all_page_chunks:
+        return []
+
+    selected_sections = []
+    for chunk in relevant_chunks:
+        metadata = chunk.get("metadata", {})
+        section_index = metadata.get("section_index")
+        if section_index is None or section_index in selected_sections:
+            continue
+        selected_sections.append(section_index)
+
+    if not selected_sections:
+        return []
+
+    selected_chunks = [
+        chunk
+        for chunk in all_page_chunks
+        if chunk.get("metadata", {}).get("section_index") in selected_sections
+    ]
+    return sorted(
+        selected_chunks,
+        key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
+    )[:limit]
+
+
 def _expand_page_chunks(
     relevant_chunks: list[dict],
     all_page_chunks: list[dict],
@@ -295,6 +340,51 @@ def _merge_chunks(primary_chunks: list[dict], secondary_chunks: list[dict]) -> l
         merged.append(chunk)
 
     return merged
+
+
+def _keyword_retrieve_chunks(
+    query: str,
+    chunks: list[dict],
+    limit: int = 5,
+) -> list[dict]:
+    terms = _query_terms(query)
+    if not terms or not chunks:
+        return []
+
+    scored_chunks = []
+    for chunk in chunks:
+        searchable_text = _chunk_search_text(chunk)
+        hits = sum(1 for term in terms if term in searchable_text)
+        if hits <= 0:
+            continue
+
+        keyword_score = min(1.0, 0.3 + hits * 0.08)
+        scored_chunk = {
+            **chunk,
+            "score": max(chunk.get("score", 0), keyword_score),
+        }
+        scored_chunks.append((hits, scored_chunk))
+
+    scored_chunks.sort(
+        key=lambda item: (
+            item[0],
+            item[1].get("score", 0),
+            -item[1].get("metadata", {}).get("chunk_index", 0),
+        ),
+        reverse=True,
+    )
+    return [chunk for _, chunk in scored_chunks[:limit]]
+
+
+def _chunk_search_text(chunk: dict) -> str:
+    metadata = chunk.get("metadata", {})
+    return "".join(
+        [
+            str(metadata.get("title", "")),
+            str(metadata.get("section_title", "")),
+            str(chunk.get("content", "")),
+        ]
+    )
 
 
 def _rank_chunks(query: str, chunks: list[dict]) -> list[dict]:
