@@ -116,6 +116,22 @@ class VectorStoreService:
             key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
         )
 
+    def get_all_chunks(self, limit: int = 1000) -> list[dict[str, Any]]:
+        result = self.collection.get(
+            include=["documents", "metadatas"],
+            limit=limit,
+        )
+        documents = result.get("documents", [])
+        metadatas = result.get("metadatas", [])
+        return [
+            {
+                "content": document,
+                "metadata": metadata,
+                "score": 1.0,
+            }
+            for document, metadata in zip(documents, metadatas)
+        ]
+
     def query(
         self,
         text: str,

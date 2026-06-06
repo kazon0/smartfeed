@@ -57,7 +57,8 @@
     - 如果旧 chunks 没有 section metadata，则 fallback 到相邻 chunks 扩展。
     - 如果当前 URL 没有可用 chunks，不使用全局知识库假装回答该网页，而是返回已保存文章建议。
     - 如果请求不包含 `url`，执行全局知识库检索。
-    - 全局检索结果会做轻量关键词重排。
+    - 全局知识库检索会合并 ChromaDB 向量召回和全库 chunks 关键词召回。
+    - 全局合并结果会做轻量关键词重排。
     - 使用 `score >= 0.25` 判断高相关 chunks。
     - 根据 `fallback_policy` 决定是否调用 LLM 兜底、是否拒绝实时猜测、是否只返回知识库未命中。
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
@@ -69,6 +70,9 @@
     - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
     - sources 保留 `content_preview`，用于调试或展开查看依据，不作为默认主展示内容。
   - 返回字段：
+    - `status`
+    - `error_code`
+    - `message`
     - `answer`
     - `sources`
     - `source_type`
@@ -122,6 +126,7 @@
     - 写入时会将通用 metadata 和每个 chunk 的 `section_index`、`section_title`、`section_chunk_index` 合并。
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
+    - `get_all_chunks(limit=1000)` 返回本地知识库中的 chunks，用于轻量关键词召回。
     - `list_sources(limit=10)` 返回已保存文章来源列表。
     - `query(text, top_k=5, metadata_filter=None)` 执行语义检索。
     - query 支持可选 Chroma metadata filter。
@@ -175,7 +180,7 @@ query → embedding → ChromaDB topK chunks → search results
 
 ### `/chat`
 
-query + optional url → query intent classification → retrieval scope decision → page hybrid retrieval or global retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → merged sources + source_type
+query + optional url → query intent classification → retrieval scope decision → page/global hybrid retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
 
 ### `/debug`
 
@@ -216,6 +221,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat 对没有 section metadata 的旧 chunks 使用相邻 chunks fallback 已实现。
 - chat 当前 URL 没有可用 chunks 时返回已保存文章建议已实现。
 - chat 全局知识库检索已实现。
+- chat 全局知识库向量召回 + 关键词召回合并已实现。
 - chat 高相关 score 阈值判断已实现，当前阈值为 `0.25`。
 - chat keyword rerank 已实现。
 - chat policy-based fallback 已实现。
@@ -228,6 +234,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat sources 返回 `chunk_indexes` 已实现。
 - chat sources 返回可选 `source_note` 已实现。
 - chat source_type 返回已实现。
+- chat `status`、`error_code`、`message` 稳定字段返回已实现。
 - chat intent metadata 返回已实现。
 - DeepSeek API 调用封装已实现。
 - `.env` API Key 加载已实现。
@@ -262,6 +269,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 将 query 转为 embedding。
 - 从 ChromaDB 中检索 topK 相关 chunks。
 - 当前网页聊天会在指定 URL 的 chunks 中做轻量关键词召回。
+- 全局聊天会在已保存 chunks 中做轻量关键词召回。
 - 按 score 阈值判断是否存在高相关知识库内容。
 - 基于高相关 chunks 调用 DeepSeek 生成回答。
 - 在允许时使用 DeepSeek 生成通用兜底回答。
@@ -283,7 +291,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 不能保证规则型 query intent classification 覆盖所有自然语言表达。
 - 不能保证固定 chunking 能完整保留原网页的标题层级、代码块和章节结构。
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
-- 全局知识库检索当前仍以向量检索和轻量重排为主，尚未实现全局关键词召回。
+- 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 
 ## 6. 技术栈总结

@@ -131,6 +131,8 @@ def test_chat_without_data_returns_answer_or_fallback(monkeypatch):
     data = response.json()
 
     assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert data["error_code"] is None
     assert data["source_type"] == "llm_fallback"
     assert data["sources"] == []
     assert data["answer"]
@@ -148,6 +150,8 @@ def test_chat_article_reference_without_url_does_not_search(monkeypatch):
 
     assert response.status_code == 200
     assert data["intent"] == "page_reference"
+    assert data["status"] == "failed"
+    assert data["error_code"] == "NEED_PAGE_CONTEXT"
     assert data["source_type"] == "need_page_context"
     assert data["sources"] == []
     assert data["answer"] == "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。"
@@ -245,6 +249,8 @@ def test_chat_realtime_without_knowledge_does_not_guess(monkeypatch):
 
     assert response.status_code == 200
     assert data["intent"] == "realtime_or_current_query"
+    assert data["status"] == "failed"
+    assert data["error_code"] == "REALTIME_UNSUPPORTED"
     assert data["source_type"] == "unsupported_realtime"
     assert data["sources"] == []
 
@@ -266,6 +272,8 @@ def test_chat_search_history_without_results_no_general_answer(monkeypatch):
 
     assert response.status_code == 200
     assert data["intent"] == "search_history"
+    assert data["status"] == "failed"
+    assert data["error_code"] == "NO_KNOWLEDGE_FOUND"
     assert data["source_type"] == "no_knowledge_found"
     assert data["answer"] == "没有在知识库中找到相关内容。"
 
@@ -282,6 +290,8 @@ def test_chat_unsupported_action_returns_directly(monkeypatch):
 
     assert response.status_code == 200
     assert data["intent"] == "unsupported_action"
+    assert data["status"] == "failed"
+    assert data["error_code"] == "UNSUPPORTED_ACTION"
     assert data["source_type"] == "unsupported_action"
     assert data["answer"] == "当前版本还不支持这个操作。"
 
@@ -319,6 +329,50 @@ def test_chat_sources_use_content_preview(monkeypatch):
     assert data["sources"][0]["display_title"] == "AI"
     assert data["sources"][0]["content_preview"] == long_content[:1200]
     assert len(data["sources"][0]["content_preview"]) == 320
+
+
+def test_chat_global_hybrid_retrieval_uses_keyword_match_when_vector_misses(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return []
+
+        def get_all_chunks(self):
+            return [
+                {
+                    "content": "Kotlin 协程可以用 suspend、CoroutineScope 和 Flow 组织异步任务。",
+                    "metadata": {
+                        "url": "https://example.com/kotlin",
+                        "title": "Kotlin 学习",
+                        "section_index": 0,
+                        "section_title": "协程",
+                        "chunk_index": 0,
+                    },
+                    "score": 1.0,
+                }
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据《Kotlin 学习》，Kotlin 协程适合处理异步任务。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源说明了 Kotlin 协程。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "如何学习 Kotlin 协程"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert data["error_code"] is None
+    assert data["source_type"] == "knowledge_base"
+    assert data["sources"][0]["section_title"] == "协程"
+    assert "Kotlin 协程" in "\n".join(captured_context)
 
 
 def test_chat_with_missing_page_returns_suggestions_not_page_answer(monkeypatch):

@@ -165,9 +165,11 @@ curl -X POST http://127.0.0.1:8000/chat \
 Expected result:
 
 - System searches the global knowledge base.
+- System uses vector retrieval plus lightweight keyword matching over stored chunks.
 - `intent` should be `knowledge_or_general_query`.
 - `source_type` should be `knowledge_base` if matching chunks exist.
 - `sources` should include matching chunks.
+- Response should include stable fields: `status`, `error_code`, `message`.
 
 ## 5.1 Test Article Reference Without URL
 
@@ -184,6 +186,8 @@ Expected result:
 - `retrieval_scope` should be `none`.
 - `fallback_policy` should be `ask_for_page`.
 - `source_type` should be `need_page_context`.
+- `status` should be `failed`.
+- `error_code` should be `NEED_PAGE_CONTEXT`.
 - `answer` should ask the user to provide an article URL or title.
 
 ## 5.2 Test Knowledge Or General Query
@@ -200,6 +204,7 @@ Expected result:
 - `intent` should be `knowledge_or_general_query`.
 - `retrieval_scope` should be `global`.
 - If there are no high-relevance chunks, `source_type` should be `llm_fallback`.
+- If a saved chunk contains the query keywords, global keyword matching may return `source_type: "knowledge_base"` even when vector search alone would miss.
 
 ## 5.3 Test Realtime Query
 
@@ -214,6 +219,7 @@ Expected result:
 - System should search the global knowledge base first.
 - `intent` should be `realtime_or_current_query`.
 - If there are no high-relevance chunks, `source_type` should be `unsupported_realtime`.
+- `error_code` should be `REALTIME_UNSUPPORTED`.
 - The answer should not guess realtime information.
 
 ## 5.4 Test Search History
@@ -229,6 +235,7 @@ Expected result:
 - System should search only the knowledge base.
 - `intent` should be `search_history`.
 - If there are no high-relevance chunks, `source_type` should be `no_knowledge_found`.
+- `error_code` should be `NO_KNOWLEDGE_FOUND`.
 - The answer should not use general LLM knowledge as a substitute.
 
 ## 5.5 Test Unsupported Action

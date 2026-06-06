@@ -13,6 +13,13 @@ router = APIRouter()
 RELEVANCE_THRESHOLD = 0.25
 SOURCE_PREVIEW_LENGTH = 1200
 FULL_PAGE_CONTEXT_CHUNK_LIMIT = 30
+ERROR_CODE_BY_SOURCE_TYPE = {
+    "need_page_context": "NEED_PAGE_CONTEXT",
+    "page_not_found_with_suggestions": "PAGE_CONTENT_NOT_FOUND",
+    "unsupported_realtime": "REALTIME_UNSUPPORTED",
+    "no_knowledge_found": "NO_KNOWLEDGE_FOUND",
+    "unsupported_action": "UNSUPPORTED_ACTION",
+}
 
 
 class ChatRequest(BaseModel):
@@ -40,7 +47,12 @@ def chat(request: ChatRequest):
             vector_store,
         )
 
-    global_chunks = vector_store.query(request.query)
+    global_vector_chunks = vector_store.query(request.query)
+    global_keyword_chunks = _keyword_retrieve_chunks(
+        request.query,
+        _get_all_chunks(vector_store),
+    )
+    global_chunks = _merge_chunks(global_vector_chunks, global_keyword_chunks)
     ranked_chunks = _rank_chunks(request.query, global_chunks)
     relevant_chunks = _high_relevance_chunks(ranked_chunks)
     answer, source_type, selected_chunks = _answer_with_policy(
@@ -51,15 +63,13 @@ def chat(request: ChatRequest):
         global_chunks,
     )
 
-    return {
-        "answer": answer,
-        "sources": _build_sources(selected_chunks, request.query),
-        "source_type": source_type,
-        "intent": intent["intent"],
-        "intent_reason": intent["reason"],
-        "retrieval_scope": intent["retrieval_scope"],
-        "fallback_policy": intent["fallback_policy"],
-    }
+    return _chat_response(
+        answer=answer,
+        sources=_build_sources(selected_chunks, request.query),
+        source_type=source_type,
+        intent=intent,
+        retrieval_scope=intent["retrieval_scope"],
+    )
 
 
 def _chat_with_current_page(
@@ -90,15 +100,13 @@ def _chat_with_current_page(
             selected_page_chunks,
             [],
         )
-        return {
-            "answer": answer,
-            "sources": _build_sources(selected_chunks, query),
-            "source_type": source_type,
-            "intent": intent["intent"],
-            "intent_reason": intent["reason"],
-            "retrieval_scope": "page_first",
-            "fallback_policy": intent["fallback_policy"],
-        }
+        return _chat_response(
+            answer=answer,
+            sources=_build_sources(selected_chunks, query),
+            source_type=source_type,
+            intent=intent,
+            retrieval_scope="page_first",
+        )
 
     if relevant_page_chunks:
         expanded_page_chunks = _expand_page_context(
@@ -112,15 +120,13 @@ def _chat_with_current_page(
             expanded_page_chunks,
             [],
         )
-        return {
-            "answer": answer,
-            "sources": _build_sources(selected_chunks, query),
-            "source_type": source_type,
-            "intent": intent["intent"],
-            "intent_reason": intent["reason"],
-            "retrieval_scope": "page_first",
-            "fallback_policy": intent["fallback_policy"],
-        }
+        return _chat_response(
+            answer=answer,
+            sources=_build_sources(selected_chunks, query),
+            source_type=source_type,
+            intent=intent,
+            retrieval_scope="page_first",
+        )
 
     saved_sources = [
         source
@@ -128,18 +134,18 @@ def _chat_with_current_page(
         if source.get("url") != url
     ]
 
-    return {
-        "answer": (
+    answer = (
             "当前网页没有找到可用于回答的内容。"
             "你可以改为询问知识库中已有内容，或从下方已保存文章中选择一个继续提问。"
-        ),
-        "sources": saved_sources,
-        "source_type": "page_not_found_with_suggestions",
-        "intent": intent["intent"],
-        "intent_reason": intent["reason"],
-        "retrieval_scope": "page_first",
-        "fallback_policy": intent["fallback_policy"],
-    }
+        )
+
+    return _chat_response(
+        answer=answer,
+        sources=saved_sources,
+        source_type="page_not_found_with_suggestions",
+        intent=intent,
+        retrieval_scope="page_first",
+    )
 
 
 def _no_retrieval_response(intent: dict) -> dict:
@@ -153,15 +159,49 @@ def _no_retrieval_response(intent: dict) -> dict:
         answer = "当前请求无法处理。"
         source_type = "unsupported_action"
 
+    return _chat_response(
+        answer=answer,
+        sources=[],
+        source_type=source_type,
+        intent=intent,
+        retrieval_scope=intent["retrieval_scope"],
+    )
+
+
+def _chat_response(
+    answer: str,
+    sources: list[dict],
+    source_type: str,
+    intent: dict,
+    retrieval_scope: str,
+) -> dict:
+    error_code = _error_code(source_type, answer)
     return {
+        "status": "failed" if error_code else "ok",
+        "error_code": error_code,
+        "message": _response_message(error_code, answer),
         "answer": answer,
-        "sources": [],
+        "sources": sources,
         "source_type": source_type,
         "intent": intent["intent"],
         "intent_reason": intent["reason"],
-        "retrieval_scope": intent["retrieval_scope"],
+        "retrieval_scope": retrieval_scope,
         "fallback_policy": intent["fallback_policy"],
     }
+
+
+def _error_code(source_type: str, answer: str) -> str | None:
+    if answer == "LLM unavailable":
+        return "LLM_UNAVAILABLE"
+    return ERROR_CODE_BY_SOURCE_TYPE.get(source_type)
+
+
+def _response_message(error_code: str | None, answer: str) -> str:
+    if not error_code:
+        return ""
+    if error_code == "LLM_UNAVAILABLE":
+        return "LLM service is unavailable."
+    return answer
 
 
 def _answer_with_policy(
@@ -374,6 +414,13 @@ def _keyword_retrieve_chunks(
         reverse=True,
     )
     return [chunk for _, chunk in scored_chunks[:limit]]
+
+
+def _get_all_chunks(vector_store: VectorStoreService) -> list[dict]:
+    get_all_chunks = getattr(vector_store, "get_all_chunks", None)
+    if not get_all_chunks:
+        return []
+    return get_all_chunks()
 
 
 def _chunk_search_text(chunk: dict) -> str:

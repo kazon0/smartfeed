@@ -228,6 +228,9 @@ Page-preferred chat:
 
 ```json
 {
+  "status": "ok",
+  "error_code": null,
+  "message": "",
   "answer": "自然语言回答...",
   "sources": [
     {
@@ -251,6 +254,26 @@ Page-preferred chat:
   "fallback_policy": "llm_allowed"
 }
 ```
+
+Stable fields for Android MVP:
+
+- `status`: `ok` or `failed`
+- `error_code`: `null` when answerable, otherwise one of the stable error codes below
+- `message`: user-readable explanation for failed states, empty when `status` is `ok`
+- `answer`: answer text or fallback explanation
+- `sources`: source cards for UI display
+- `source_type`: where the answer came from
+- `intent`: classified query intent
+- `retrieval_scope`: retrieval scope selected by backend
+
+Stable `error_code` values:
+
+- `NEED_PAGE_CONTEXT`
+- `PAGE_CONTENT_NOT_FOUND`
+- `REALTIME_UNSUPPORTED`
+- `NO_KNOWLEDGE_FOUND`
+- `UNSUPPORTED_ACTION`
+- `LLM_UNAVAILABLE`
 
 Possible `source_type` values:
 
@@ -291,6 +314,9 @@ If the user asks an article-reference question without `url`, SmartFeed does not
 
 ```json
 {
+  "status": "failed",
+  "error_code": "NEED_PAGE_CONTEXT",
+  "message": "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。",
   "answer": "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。",
   "sources": [],
   "source_type": "need_page_context",
@@ -308,6 +334,12 @@ When `url` is provided, SmartFeed treats the request as current-page chat:
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
 - `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
 - `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.
+
+When `url` is not provided, SmartFeed searches the global knowledge base with lightweight hybrid retrieval:
+
+- Vector results from ChromaDB are merged with keyword matches from stored chunks.
+- Merged chunks are reranked and filtered by score.
+- If no high-relevance knowledge exists and policy allows general fallback, the backend returns `source_type: "llm_fallback"`.
 
 ### curl
 
