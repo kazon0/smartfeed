@@ -131,6 +131,7 @@ Docs:
 * `docs/api.md`
 * `docs/test_plan.md`
 * `docs/snapshot_v0.md`
+* `docs/roadmap.md`
 
 Tests:
 

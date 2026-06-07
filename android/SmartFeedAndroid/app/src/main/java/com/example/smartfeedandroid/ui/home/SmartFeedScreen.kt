@@ -20,38 +20,39 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.data.remote.ChatResponse
 import com.example.smartfeedandroid.data.remote.ChatSource
 import com.example.smartfeedandroid.data.remote.UploadResponse
-import com.example.smartfeedandroid.data.repository.ChatRepository
-import com.example.smartfeedandroid.data.repository.UploadRepository
-import kotlinx.coroutines.launch
 
 @Composable
 fun SmartFeedScreen(
     modifier: Modifier = Modifier,
-    uploadRepository: UploadRepository = UploadRepository(),
-    chatRepository: ChatRepository = ChatRepository()
+    viewModel: HomeViewModel = viewModel()
 ) {
-    var url by remember { mutableStateOf("") }
-    var activeUrl by remember { mutableStateOf("") }
-    var query by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var isAsking by remember { mutableStateOf(false) }
-    var response by remember { mutableStateOf<UploadResponse?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
-    val scope = rememberCoroutineScope()
+    SmartFeedContent(
+        uiState = viewModel.uiState,
+        onUrlChange = viewModel::onUrlChange,
+        onUpload = viewModel::upload,
+        onQueryChange = viewModel::onQueryChange,
+        onAsk = viewModel::ask,
+        modifier = modifier
+    )
+}
 
+@Composable
+private fun SmartFeedContent(
+    uiState: HomeUiState,
+    onUrlChange: (String) -> Unit,
+    onUpload: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onAsk: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -73,8 +74,8 @@ fun SmartFeedScreen(
             )
 
             OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
+                value = uiState.url,
+                onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Article URL") },
                 placeholder = { Text("https://example.com/article") },
@@ -82,37 +83,14 @@ fun SmartFeedScreen(
             )
 
             Button(
-                onClick = {
-                    val cleanUrl = url.trim()
-                    if (cleanUrl.isEmpty()) {
-                        errorMessage = "Please enter a URL."
-                        response = null
-                        return@Button
-                    }
-
-                    isLoading = true
-                    errorMessage = null
-                    response = null
-
-                    scope.launch {
-                        uploadRepository.upload(cleanUrl)
-                            .onSuccess {
-                                response = it
-                                activeUrl = it.data?.url?.takeIf { parsedUrl -> parsedUrl.isNotBlank() }
-                                    ?: cleanUrl
-                                messages = emptyList()
-                            }
-                            .onFailure { errorMessage = it.message ?: "Upload failed." }
-                        isLoading = false
-                    }
-                },
-                enabled = !isLoading,
+                onClick = onUpload,
+                enabled = !uiState.isUploading,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (isLoading) "Uploading..." else "Upload")
+                Text(if (uiState.isUploading) "Uploading..." else "Upload")
             }
 
-            if (isLoading) {
+            if (uiState.isUploading) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -122,47 +100,23 @@ fun SmartFeedScreen(
                 }
             }
 
-            errorMessage?.let {
+            uiState.errorMessage?.let {
                 ResultCard(title = "Error") {
                     Text(text = it, color = MaterialTheme.colorScheme.error)
                 }
             }
 
-            response?.let {
+            uiState.uploadResponse?.let {
                 UploadResult(response = it)
             }
 
             ChatSection(
-                query = query,
-                onQueryChange = { query = it },
-                messages = messages,
-                activeUrl = activeUrl,
-                isAsking = isAsking,
-                onAsk = {
-                    val cleanQuery = query.trim()
-                    if (cleanQuery.isEmpty()) {
-                        errorMessage = "Please enter a question."
-                        return@ChatSection
-                    }
-
-                    messages = messages + ChatMessage.User(cleanQuery)
-                    query = ""
-                    isAsking = true
-                    errorMessage = null
-
-                    scope.launch {
-                        chatRepository.ask(cleanQuery, activeUrl)
-                            .onSuccess {
-                                messages = messages + ChatMessage.Assistant(it)
-                            }
-                            .onFailure {
-                                messages = messages + ChatMessage.Error(
-                                    it.message ?: "Chat request failed."
-                                )
-                            }
-                        isAsking = false
-                    }
-                }
+                query = uiState.query,
+                onQueryChange = onQueryChange,
+                messages = uiState.messages,
+                activeUrl = uiState.activeUrl,
+                isAsking = uiState.isAsking,
+                onAsk = onAsk
             )
         }
     }
@@ -364,10 +318,4 @@ private fun ResultRow(label: String, value: String) {
         Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, fontWeight = FontWeight.Medium)
     }
-}
-
-private sealed interface ChatMessage {
-    data class User(val text: String) : ChatMessage
-    data class Assistant(val response: ChatResponse) : ChatMessage
-    data class Error(val text: String) : ChatMessage
 }

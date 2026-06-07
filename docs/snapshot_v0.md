@@ -164,6 +164,22 @@
     - `search_history` 返回 `global` + `no_llm_general_answer`。
     - `unsupported_action` 返回 `none` + `unsupported_action`。
 
+### Android MVP
+
+- 项目路径：`android/SmartFeedAndroid`
+- 当前包名：`com.example.smartfeedandroid`
+- 当前能力：
+  - 已配置 Android 网络权限。
+  - 已允许访问本地开发后端的 cleartext HTTP。
+  - 使用 Retrofit 调用 FastAPI 后端。
+  - Retrofit base URL 当前为 `http://10.0.2.2:8000/`。
+  - 已封装 `SmartFeedApi`、`SmartFeedNetwork`、`UploadRepository`、`ChatRepository`。
+  - 已实现 `/upload` 请求模型和响应模型。
+  - 已实现 `/chat` 请求模型和响应模型。
+  - `SmartFeedScreen` 使用 Jetpack Compose 展示 URL 输入、上传结果、summary、stored chunks、聊天输入、AI 回答和 sources。
+  - `HomeViewModel` 负责上传、提问、本地 UI 状态和本地 messages 列表。
+  - 当前 messages 只保存在内存中，应用重启后不会保留。
+
 ## 2. 当前数据流
 
 URL → Jina Reader 或 HTML fallback → text → sections → chunks + chunk metadata → embedding → ChromaDB → search/chat results
@@ -246,6 +262,11 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - `docs/test_plan.md` 手动测试计划已创建。
 - `tests/test_mvp.py` 最小自动化测试已创建。
 - `requirements.txt` 已包含 `pytest`。
+- Android Compose 项目已接入 Retrofit。
+- Android 端已实现上传 URL 并展示 summary、status、stored chunks。
+- Android 端已实现本地聊天消息列表。
+- Android 端已实现调用当前 `/chat` 并展示 answer 和 sources。
+- Android 端已将上传和聊天状态迁入 `HomeViewModel`。
 
 ## 5. 当前系统边界
 
@@ -293,6 +314,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
+- Android 当前不保存历史会话，messages 仅在当前进程内存在。
+- Android 当前没有分享入口、Room、本地持久化、登录、WebSocket 或 session。
 
 ## 6. 技术栈总结
 
@@ -313,3 +336,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Test framework：pytest
 - Persistence path：`chroma_db`
 - Python package list：`requirements.txt`
+- Android：Kotlin
+- Android UI：Jetpack Compose / Material 3
+- Android network：Retrofit + OkHttp
+- Android JSON：kotlinx.serialization
+- Android state：ViewModel + Compose state
