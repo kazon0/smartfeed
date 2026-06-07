@@ -115,6 +115,41 @@ def test_vector_store_delete_by_url_does_not_crash():
     service.delete_by_url("https://example.com")
 
 
+def test_stats_returns_content_distribution(monkeypatch):
+    class FakeVectorStoreService:
+        def stats(self):
+            return {
+                "total_chunks": 3,
+                "total_articles": 2,
+                "topics": [
+                    {"topic": "科技", "chunk_count": 2, "percentage": 66.67}
+                ],
+                "domains": [
+                    {"domain": "example.com", "chunk_count": 2, "percentage": 66.67}
+                ],
+                "articles": [
+                    {
+                        "url": "https://example.com/a",
+                        "title": "A",
+                        "domain": "example.com",
+                        "chunk_count": 2,
+                        "percentage": 66.67,
+                    }
+                ],
+            }
+
+    monkeypatch.setattr("app.routes.stats.VectorStoreService", FakeVectorStoreService)
+
+    response = client.get("/stats")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total_chunks"] == 3
+    assert data["total_articles"] == 2
+    assert data["topics"][0]["topic"] == "科技"
+    assert data["domains"][0]["domain"] == "example.com"
+
+
 def test_chat_without_data_returns_answer_or_fallback(monkeypatch):
     class FakeVectorStoreService:
         def query(self, text, top_k=5, metadata_filter=None):

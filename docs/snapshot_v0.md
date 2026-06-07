@@ -40,6 +40,19 @@
     - `query`
     - `results`
 
+- `GET /stats`
+  - 定义位置：`app/routes/stats.py`
+  - 当前流程：
+    - 调用 `VectorStoreService.stats()`。
+    - 从 ChromaDB 已入库 chunks 统计知识库分布。
+    - 使用轻量关键词规则对 chunk 做主题分类。
+  - 返回字段：
+    - `total_chunks`
+    - `total_articles`
+    - `topics`
+    - `domains`
+    - `articles`
+
 - `POST /chat`
   - 定义位置：`app/routes/chat.py`
   - 输入：
@@ -128,6 +141,8 @@
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
     - `get_all_chunks(limit=1000)` 返回本地知识库中的 chunks，用于轻量关键词召回。
     - `list_sources(limit=10)` 返回已保存文章来源列表。
+    - `stats(limit=5000)` 返回知识库 chunks、文章、来源域名和主题占比统计。
+    - 主题占比当前基于内置关键词规则分类，分类包括科技、学习、健康、职业、财经、生活、新闻、其他。
     - `query(text, top_k=5, metadata_filter=None)` 执行语义检索。
     - query 支持可选 Chroma metadata filter。
     - 优先使用 `sentence-transformers` 的 `all-MiniLM-L6-v2`。
@@ -180,9 +195,14 @@
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
-  - Analysis tab 和 Profile tab 当前为占位页。
+  - Analysis tab 当前调用后端 `/stats` 展示知识库主题占比、文章占比和来源域名占比。
+  - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
+  - Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
+  - 已实现 `ConversationStore`，使用 Android `SharedPreferences` 保存 conversations。
+  - conversations 会通过 kotlinx serialization 序列化为本地 JSON。
+  - App 启动时会加载本地保存的 conversations。
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
   - App 会从分享文本中提取第一个 `http` / `https` URL。
   - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
@@ -190,7 +210,7 @@
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
   - 可以在当前进程内切换已有 conversation。
-  - 当前 conversations 和 messages 只保存在内存中，应用重启后不会保留。
+  - 当前 conversations 和 messages 会保存到本地 SharedPreferences。
 
 ## 2. 当前数据流
 
@@ -205,6 +225,10 @@ URL → parse → clean text → sections → chunks + section metadata → dele
 ### `/search`
 
 query → embedding → ChromaDB topK chunks → search results
+
+### `/stats`
+
+ChromaDB chunks → topic keyword classification → topics/domains/articles distribution → Android Analysis pie chart
 
 ### `/chat`
 
@@ -239,6 +263,9 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - `POST /search` 语义检索接口已实现。
 - search 返回 `query` 和 `results` 已实现。
 - search results 返回 `content`、`metadata`、`score` 已实现。
+- `GET /stats` 知识库统计接口已实现。
+- stats 返回主题占比、来源域名占比和文章占比已实现。
+- stats 主题分类当前使用轻量关键词规则已实现。
 - `POST /chat` 问答接口已实现。
 - chat query intent classification 已实现。
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
@@ -287,6 +314,10 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已将历史对话列表和聊天详情页拆开。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
+- Android 端已实现 SharedPreferences 级本地历史对话保存。
+- Android 端已实现 Analysis 页调用后端 `/stats`。
+- Android 端已实现知识库主题占比饼图。
+- Android 端已展示主题、文章和来源域名分布。
 
 ## 5. 当前系统边界
 
@@ -321,6 +352,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 当前网页聊天中，如果当前 URL 没有可用 chunks，不用无关全局 chunks 回答该网页。
 - 返回合并后的回答来源 sources、source_type、intent、retrieval_scope 和 fallback_policy。
 - 通过 `/debug` 页面进行开发验证。
+- 通过 `/stats` 查看知识库主题、来源域名和文章占比。
 
 ### 当前不能保证什么
 
@@ -334,10 +366,11 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
-- Android 当前不持久化历史会话，conversations 和 messages 仅在当前进程内存在。
-- Android 当前没有 Room、本地持久化、登录、WebSocket 或 session。
+- stats 主题分类当前是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
+- Android 当前本地持久化使用 SharedPreferences，不是 Room。
+- Android 当前没有 Room、登录、WebSocket 或 session。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
-- Android Analysis / Profile 当前只是占位页，没有真实统计或用户功能。
+- Android Profile 当前只是占位页，没有真实用户功能。
 
 ## 6. 技术栈总结
 

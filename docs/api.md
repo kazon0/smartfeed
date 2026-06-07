@@ -191,6 +191,58 @@ curl -X POST http://127.0.0.1:8000/search \
 - No uploaded content returns an empty results list.
 - ChromaDB or embedding dependencies are not installed.
 
+## GET /stats
+
+Returns knowledge base distribution statistics based on chunks currently stored in ChromaDB.
+
+### Request JSON
+
+No request body.
+
+### Response JSON
+
+```json
+{
+  "total_chunks": 12,
+  "total_articles": 3,
+  "topics": [
+    {
+      "topic": "科技",
+      "chunk_count": 5,
+      "percentage": 41.67
+    }
+  ],
+  "domains": [
+    {
+      "domain": "example.com",
+      "chunk_count": 4,
+      "percentage": 33.33
+    }
+  ],
+  "articles": [
+    {
+      "url": "https://example.com/article",
+      "title": "Example Article",
+      "domain": "example.com",
+      "chunk_count": 4,
+      "percentage": 33.33
+    }
+  ]
+}
+```
+
+### curl
+
+```bash
+curl http://127.0.0.1:8000/stats
+```
+
+### Typical Failures
+
+- No uploaded content returns zero counts and empty distribution lists.
+- Topic classification is rule-based and may be inaccurate for ambiguous content.
+- ChromaDB dependencies or local database files are unavailable.
+
 ## POST /chat
 
 Runs retrieval and sends retrieved context to DeepSeek to generate an answer.

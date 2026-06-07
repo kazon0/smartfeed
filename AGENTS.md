@@ -49,6 +49,9 @@ Backend 已实现：
 * Android 历史对话列表和聊天详情页分层
 * Android 系统分享入口
 * Android 分享 URL 自动上传并创建新对话
+* Android SharedPreferences 本地历史对话保存
+* `GET /stats`
+* Android Analysis 主题占比饼图
 
 当前未实现：
 
@@ -57,9 +60,8 @@ Backend 已实现：
 * WebSocket
 * 文章删除接口
 * 文章列表接口
-* Android Analysis 真实统计页
 * Android Profile 真实个人中心
-* Room / 本地移动端数据库
+* Room 本地移动端数据库
 * 实时搜索、天气、股价、汇率等外部实时工具
 * LangChain
 
@@ -263,6 +265,6 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 验证 Android 分享入口真实设备/模拟器体验。
-2. 引入 Room 保存本地历史对话。
-3. 开始实现 Analysis 页的知识库统计入口。
+1. 验证 Android 分享入口、本地历史恢复和 Analysis 主题占比。
+2. 后续再决定是否用 Room 替换 SharedPreferences。
+3. 继续优化统计分类质量，考虑 LLM 分类或 embedding 聚类。

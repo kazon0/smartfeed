@@ -1,6 +1,7 @@
 package com.example.smartfeedandroid.ui.home
 
 import com.example.smartfeedandroid.data.remote.UploadResponse
+import com.example.smartfeedandroid.data.remote.StatsResponse
 
 data class HomeUiState(
     val url: String = "",
@@ -11,8 +12,11 @@ data class HomeUiState(
     val query: String = "",
     val isUploading: Boolean = false,
     val isAsking: Boolean = false,
+    val isLoadingStats: Boolean = false,
     val uploadResponse: UploadResponse? = null,
+    val statsResponse: StatsResponse? = null,
     val errorMessage: String? = null,
+    val statsErrorMessage: String? = null,
     val lastSharedUrl: String? = null,
     val conversations: List<Conversation> = emptyList(),
     val messages: List<ChatMessage> = emptyList()

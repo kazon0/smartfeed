@@ -3,9 +3,13 @@ package com.example.smartfeedandroid.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface SmartFeedApi {
+    @GET("stats")
+    suspend fun stats(): StatsResponse
+
     @POST("upload")
     suspend fun upload(@Body request: UploadRequest): UploadResponse
 
@@ -75,4 +79,41 @@ data class ChatSource(
     @SerialName("source_summary")
     val sourceSummary: String = "",
     val score: Double? = null
+)
+
+@Serializable
+data class StatsResponse(
+    @SerialName("total_chunks")
+    val totalChunks: Int = 0,
+    @SerialName("total_articles")
+    val totalArticles: Int = 0,
+    val topics: List<TopicDistribution> = emptyList(),
+    val domains: List<DomainDistribution> = emptyList(),
+    val articles: List<ArticleDistribution> = emptyList()
+)
+
+@Serializable
+data class TopicDistribution(
+    val topic: String = "",
+    @SerialName("chunk_count")
+    val chunkCount: Int = 0,
+    val percentage: Double = 0.0
+)
+
+@Serializable
+data class DomainDistribution(
+    val domain: String = "",
+    @SerialName("chunk_count")
+    val chunkCount: Int = 0,
+    val percentage: Double = 0.0
+)
+
+@Serializable
+data class ArticleDistribution(
+    val url: String = "",
+    val title: String = "",
+    val domain: String = "",
+    @SerialName("chunk_count")
+    val chunkCount: Int = 0,
+    val percentage: Double = 0.0
 )

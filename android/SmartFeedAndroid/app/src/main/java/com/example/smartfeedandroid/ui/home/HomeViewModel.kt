@@ -1,20 +1,32 @@
 package com.example.smartfeedandroid.ui.home
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartfeedandroid.data.local.ConversationStore
+import com.example.smartfeedandroid.data.local.StoredChatMessage
+import com.example.smartfeedandroid.data.local.StoredConversation
 import com.example.smartfeedandroid.data.repository.ChatRepository
+import com.example.smartfeedandroid.data.repository.StatsRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
 import kotlinx.coroutines.launch
 
-class HomeViewModel(
-    private val uploadRepository: UploadRepository = UploadRepository(),
-    private val chatRepository: ChatRepository = ChatRepository()
-) : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
+    private val uploadRepository = UploadRepository()
+    private val chatRepository = ChatRepository()
+    private val statsRepository = StatsRepository()
+    private val conversationStore = ConversationStore(application.applicationContext)
+
     var uiState by mutableStateOf(HomeUiState())
         private set
+
+    init {
+        val conversations = conversationStore.load().map { it.toConversation() }
+        uiState = uiState.copy(conversations = conversations)
+    }
 
     fun onUrlChange(value: String) {
         uiState = uiState.copy(url = value)
@@ -22,6 +34,10 @@ class HomeViewModel(
 
     fun onQueryChange(value: String) {
         uiState = uiState.copy(query = value)
+    }
+
+    fun clearError() {
+        uiState = uiState.copy(errorMessage = null)
     }
 
     fun handleSharedUrl(url: String) {
@@ -47,6 +63,9 @@ class HomeViewModel(
             )
         } else {
             uiState.copy(selectedTab = tab)
+        }
+        if (tab == AppTab.Analysis) {
+            refreshStats()
         }
     }
 
@@ -88,6 +107,7 @@ class HomeViewModel(
             conversations = listOf(conversation) + uiState.conversations,
             messages = emptyList()
         )
+        persistConversations(uiState.conversations)
     }
 
     fun upload() {
@@ -135,6 +155,7 @@ class HomeViewModel(
                         conversations = listOf(conversation) + uiState.conversations,
                         messages = conversation.messages
                     )
+                    persistConversations(uiState.conversations)
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
@@ -173,6 +194,7 @@ class HomeViewModel(
             isAsking = true,
             errorMessage = null
         )
+        persistConversations(uiState.conversations)
 
         viewModelScope.launch {
             chatRepository.ask(cleanQuery, activeUrl)
@@ -185,6 +207,7 @@ class HomeViewModel(
                         conversations = conversations,
                         messages = activeMessagesFrom(conversations, conversationId)
                     )
+                    persistConversations(conversations)
                 }
                 .onFailure { error ->
                     val conversations = appendConversationMessage(
@@ -195,9 +218,31 @@ class HomeViewModel(
                         conversations = conversations,
                         messages = activeMessagesFrom(conversations, conversationId)
                     )
+                    persistConversations(conversations)
                 }
 
             uiState = uiState.copy(isAsking = false)
+        }
+    }
+
+    fun refreshStats() {
+        uiState = uiState.copy(
+            isLoadingStats = true,
+            statsErrorMessage = null
+        )
+
+        viewModelScope.launch {
+            statsRepository.getStats()
+                .onSuccess { stats ->
+                    uiState = uiState.copy(statsResponse = stats)
+                }
+                .onFailure { error ->
+                    uiState = uiState.copy(
+                        statsErrorMessage = error.message ?: "Failed to load stats."
+                    )
+                }
+
+            uiState = uiState.copy(isLoadingStats = false)
         }
     }
 
@@ -221,6 +266,7 @@ class HomeViewModel(
             messages = emptyList(),
             activeUrl = ""
         )
+        persistConversations(uiState.conversations)
         return conversation
     }
 
@@ -269,5 +315,64 @@ class HomeViewModel(
 
     private fun createConversationId(): String {
         return "${System.currentTimeMillis()}-${System.nanoTime()}"
+    }
+
+    private fun persistConversations(conversations: List<Conversation>) {
+        conversationStore.save(conversations.map { it.toStoredConversation() })
+    }
+
+    private fun StoredConversation.toConversation(): Conversation {
+        return Conversation(
+            id = id,
+            title = title,
+            url = url,
+            summary = summary,
+            status = status,
+            storedChunks = storedChunks,
+            updatedAtMillis = updatedAtMillis,
+            messages = messages.mapNotNull { it.toChatMessage() }
+        )
+    }
+
+    private fun Conversation.toStoredConversation(): StoredConversation {
+        return StoredConversation(
+            id = id,
+            title = title,
+            url = url,
+            summary = summary,
+            status = status,
+            storedChunks = storedChunks,
+            updatedAtMillis = updatedAtMillis,
+            messages = messages.map { it.toStoredChatMessage() }
+        )
+    }
+
+    private fun StoredChatMessage.toChatMessage(): ChatMessage? {
+        return when (type) {
+            MESSAGE_TYPE_USER -> ChatMessage.User(text)
+            MESSAGE_TYPE_SUMMARY -> ChatMessage.Summary(text)
+            MESSAGE_TYPE_ASSISTANT -> response?.let { ChatMessage.Assistant(it) }
+            MESSAGE_TYPE_ERROR -> ChatMessage.Error(text)
+            else -> null
+        }
+    }
+
+    private fun ChatMessage.toStoredChatMessage(): StoredChatMessage {
+        return when (this) {
+            is ChatMessage.User -> StoredChatMessage(type = MESSAGE_TYPE_USER, text = text)
+            is ChatMessage.Summary -> StoredChatMessage(type = MESSAGE_TYPE_SUMMARY, text = text)
+            is ChatMessage.Assistant -> StoredChatMessage(
+                type = MESSAGE_TYPE_ASSISTANT,
+                response = response
+            )
+            is ChatMessage.Error -> StoredChatMessage(type = MESSAGE_TYPE_ERROR, text = text)
+        }
+    }
+
+    private companion object {
+        const val MESSAGE_TYPE_USER = "user"
+        const val MESSAGE_TYPE_SUMMARY = "summary"
+        const val MESSAGE_TYPE_ASSISTANT = "assistant"
+        const val MESSAGE_TYPE_ERROR = "error"
     }
 }

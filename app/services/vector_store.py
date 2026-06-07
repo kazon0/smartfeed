@@ -1,5 +1,7 @@
 import hashlib
 import uuid
+from collections import defaultdict
+from urllib.parse import urlparse
 from typing import Any
 
 import chromadb
@@ -9,6 +11,95 @@ class VectorStoreService:
     COLLECTION_NAME = "smartfeed"
     PERSIST_DIR = "chroma_db"
     EMBEDDING_DIMENSION = 384
+    TOPIC_KEYWORDS = {
+        "科技": [
+            "ai",
+            "人工智能",
+            "算法",
+            "编程",
+            "代码",
+            "软件",
+            "数据",
+            "模型",
+            "rag",
+            "fastapi",
+            "android",
+            "kotlin",
+            "python",
+            "开发",
+            "技术",
+        ],
+        "学习": [
+            "学习",
+            "知识",
+            "课程",
+            "考试",
+            "高考",
+            "教育",
+            "笔记",
+            "教程",
+            "方法",
+            "总结",
+            "复习",
+        ],
+        "健康": [
+            "健康",
+            "医生",
+            "疾病",
+            "中毒",
+            "症状",
+            "治疗",
+            "医院",
+            "睡眠",
+            "心理",
+            "饮食",
+        ],
+        "职业": [
+            "职业",
+            "实习",
+            "面试",
+            "招聘",
+            "简历",
+            "工作",
+            "岗位",
+            "职场",
+            "薪资",
+        ],
+        "财经": [
+            "财经",
+            "股票",
+            "基金",
+            "投资",
+            "价格",
+            "汇率",
+            "美元",
+            "经济",
+            "市场",
+            "公司",
+        ],
+        "生活": [
+            "生活",
+            "旅行",
+            "美食",
+            "家庭",
+            "情感",
+            "娱乐",
+            "消费",
+            "家长",
+            "孩子",
+        ],
+        "新闻": [
+            "新闻",
+            "通报",
+            "发布",
+            "记者",
+            "官方",
+            "事件",
+            "社会",
+            "政策",
+            "最新",
+        ],
+    }
     _embedding_model = None
     _embedding_model_loaded = False
 
@@ -132,6 +223,75 @@ class VectorStoreService:
             for document, metadata in zip(documents, metadatas)
         ]
 
+    def stats(self, limit: int = 5000) -> dict[str, Any]:
+        chunks = self.get_all_chunks(limit=limit)
+        total_chunks = len(chunks)
+        articles: dict[str, dict[str, Any]] = {}
+        domains: dict[str, int] = defaultdict(int)
+        topics: dict[str, int] = defaultdict(int)
+
+        for chunk in chunks:
+            content = chunk.get("content", "") or ""
+            metadata = chunk.get("metadata", {}) or {}
+            url = metadata.get("url", "") or ""
+            title = metadata.get("title", "") or url or "Untitled"
+            domain = self._domain_from_url(url)
+            topic = self._classify_topic(f"{title}\n{content}")
+
+            if url not in articles:
+                articles[url] = {
+                    "url": url,
+                    "title": title,
+                    "domain": domain,
+                    "chunk_count": 0,
+                    "percentage": 0.0,
+                }
+
+            articles[url]["chunk_count"] += 1
+            domains[domain] += 1
+            topics[topic] += 1
+
+        article_items = sorted(
+            articles.values(),
+            key=lambda item: item["chunk_count"],
+            reverse=True,
+        )
+        domain_items = [
+            {
+                "domain": domain,
+                "chunk_count": chunk_count,
+                "percentage": self._percentage(chunk_count, total_chunks),
+            }
+            for domain, chunk_count in sorted(
+                domains.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        ]
+        topic_items = [
+            {
+                "topic": topic,
+                "chunk_count": chunk_count,
+                "percentage": self._percentage(chunk_count, total_chunks),
+            }
+            for topic, chunk_count in sorted(
+                topics.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        ]
+
+        for article in article_items:
+            article["percentage"] = self._percentage(article["chunk_count"], total_chunks)
+
+        return {
+            "total_chunks": total_chunks,
+            "total_articles": len(article_items),
+            "topics": topic_items,
+            "domains": domain_items,
+            "articles": article_items,
+        }
+
     def query(
         self,
         text: str,
@@ -217,3 +377,23 @@ class VectorStoreService:
             else:
                 normalized[key] = str(value)
         return normalized
+
+    def _domain_from_url(self, url: str) -> str:
+        domain = urlparse(url).netloc.lower()
+        return domain.removeprefix("www.") or "unknown"
+
+    def _percentage(self, value: int, total: int) -> float:
+        if total <= 0:
+            return 0.0
+        return round(value * 100 / total, 2)
+
+    def _classify_topic(self, text: str) -> str:
+        lowered = text.lower()
+        scores = {
+            topic: sum(1 for keyword in keywords if keyword.lower() in lowered)
+            for topic, keywords in self.TOPIC_KEYWORDS.items()
+        }
+        topic, score = max(scores.items(), key=lambda item: item[1])
+        if score <= 0:
+            return "其他"
+        return topic
