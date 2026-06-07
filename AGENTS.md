@@ -41,10 +41,13 @@ Backend 已实现：
 * `/chat` 稳定字段：`status`、`error_code`、`message`
 * pytest 最小测试
 * API 文档和测试计划
+* Android Compose MVP
+* Android Retrofit 网络层
+* Android `/upload` 和 `/chat` 接入
+* Android 内存级 conversation/message 结构
 
 当前未实现：
 
-* Android 客户端
 * 用户系统
 * session / 多会话管理
 * WebSocket
@@ -250,10 +253,10 @@ Android MVP 阶段：
 
 ## Current Next Step
 
-后端已经可以支持 Android MVP 接入。
+后端已经可以支持 Android MVP 接入，Android 已完成基础上传和聊天接入。
 
 建议下一步：
 
-1. 提交当前后端稳定版本。
-2. 用 Android Studio 创建空白 Compose 项目。
-3. 让 Codex 先实现 Android 网络层和 `/upload` 页面。
+1. 稳定 Android conversation/message 结构。
+2. 实现浏览器分享 URL 到 App。
+3. 上传成功后自动进入新对话并展示 summary。

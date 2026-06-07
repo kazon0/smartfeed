@@ -24,6 +24,34 @@ class HomeViewModel(
         uiState = uiState.copy(query = value)
     }
 
+    fun selectConversation(conversationId: String) {
+        val conversation = uiState.conversations.firstOrNull { it.id == conversationId } ?: return
+        uiState = uiState.copy(
+            activeConversationId = conversation.id,
+            activeUrl = conversation.url,
+            messages = conversation.messages,
+            uploadResponse = null,
+            errorMessage = null
+        )
+    }
+
+    fun startGlobalConversation() {
+        val conversation = Conversation(
+            id = createConversationId(),
+            title = "Global knowledge chat",
+            updatedAtMillis = System.currentTimeMillis()
+        )
+
+        uiState = uiState.copy(
+            activeConversationId = conversation.id,
+            activeUrl = "",
+            uploadResponse = null,
+            errorMessage = null,
+            conversations = listOf(conversation) + uiState.conversations,
+            messages = emptyList()
+        )
+    }
+
     fun upload() {
         val cleanUrl = uiState.url.trim()
         if (cleanUrl.isEmpty()) {
@@ -43,10 +71,29 @@ class HomeViewModel(
         viewModelScope.launch {
             uploadRepository.upload(cleanUrl)
                 .onSuccess { response ->
+                    val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
+                    val title = response.data?.title?.takeIf { it.isNotBlank() } ?: parsedUrl
+                    val summaryMessages = response.summary
+                        .takeIf { it.isNotBlank() }
+                        ?.let { listOf(ChatMessage.Summary(it)) }
+                        ?: emptyList()
+                    val conversation = Conversation(
+                        id = createConversationId(),
+                        title = title,
+                        url = parsedUrl,
+                        summary = response.summary,
+                        status = response.status,
+                        storedChunks = response.storedChunks,
+                        updatedAtMillis = System.currentTimeMillis(),
+                        messages = summaryMessages
+                    )
+
                     uiState = uiState.copy(
                         uploadResponse = response,
-                        activeUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl,
-                        messages = emptyList()
+                        activeConversationId = conversation.id,
+                        activeUrl = parsedUrl,
+                        conversations = listOf(conversation) + uiState.conversations,
+                        messages = conversation.messages
                     )
                 }
                 .onFailure { error ->
@@ -66,9 +113,20 @@ class HomeViewModel(
             return
         }
 
-        val activeUrl = uiState.activeUrl
+        val conversation = ensureActiveConversation()
+        val conversationId = conversation.id
+        val activeUrl = conversation.url
+        val userMessage = ChatMessage.User(cleanQuery)
+        val updatedMessages = conversation.messages + userMessage
+
         uiState = uiState.copy(
-            messages = uiState.messages + ChatMessage.User(cleanQuery),
+            conversations = updateConversationMessages(
+                conversationId = conversationId,
+                messages = updatedMessages
+            ),
+            activeConversationId = conversationId,
+            activeUrl = activeUrl,
+            messages = updatedMessages,
             query = "",
             isAsking = true,
             errorMessage = null
@@ -77,19 +135,95 @@ class HomeViewModel(
         viewModelScope.launch {
             chatRepository.ask(cleanQuery, activeUrl)
                 .onSuccess { response ->
+                    val conversations = appendConversationMessage(
+                        conversationId = conversationId,
+                        message = ChatMessage.Assistant(response)
+                    )
                     uiState = uiState.copy(
-                        messages = uiState.messages + ChatMessage.Assistant(response)
+                        conversations = conversations,
+                        messages = activeMessagesFrom(conversations, conversationId)
                     )
                 }
                 .onFailure { error ->
+                    val conversations = appendConversationMessage(
+                        conversationId = conversationId,
+                        message = ChatMessage.Error(error.message ?: "Chat request failed.")
+                    )
                     uiState = uiState.copy(
-                        messages = uiState.messages + ChatMessage.Error(
-                            error.message ?: "Chat request failed."
-                        )
+                        conversations = conversations,
+                        messages = activeMessagesFrom(conversations, conversationId)
                     )
                 }
 
             uiState = uiState.copy(isAsking = false)
         }
+    }
+
+    private fun ensureActiveConversation(): Conversation {
+        val activeConversation = uiState.conversations
+            .firstOrNull { it.id == uiState.activeConversationId }
+        if (activeConversation != null) {
+            return activeConversation
+        }
+
+        val conversation = Conversation(
+            id = createConversationId(),
+            title = "Global knowledge chat",
+            updatedAtMillis = System.currentTimeMillis()
+        )
+        uiState = uiState.copy(
+            activeConversationId = conversation.id,
+            conversations = listOf(conversation) + uiState.conversations,
+            messages = emptyList(),
+            activeUrl = ""
+        )
+        return conversation
+    }
+
+    private fun updateConversationMessages(
+        conversationId: String,
+        messages: List<ChatMessage>
+    ): List<Conversation> {
+        return uiState.conversations.map { conversation ->
+            if (conversation.id == conversationId) {
+                conversation.copy(
+                    messages = messages,
+                    updatedAtMillis = System.currentTimeMillis()
+                )
+            } else {
+                conversation
+            }
+        }
+    }
+
+    private fun appendConversationMessage(
+        conversationId: String,
+        message: ChatMessage
+    ): List<Conversation> {
+        return uiState.conversations.map { conversation ->
+            if (conversation.id == conversationId) {
+                conversation.copy(
+                    messages = conversation.messages + message,
+                    updatedAtMillis = System.currentTimeMillis()
+                )
+            } else {
+                conversation
+            }
+        }
+    }
+
+    private fun activeMessagesFrom(
+        conversations: List<Conversation>,
+        updatedConversationId: String
+    ): List<ChatMessage> {
+        return if (uiState.activeConversationId == updatedConversationId) {
+            conversations.firstOrNull { it.id == updatedConversationId }?.messages.orEmpty()
+        } else {
+            uiState.messages
+        }
+    }
+
+    private fun createConversationId(): String {
+        return "${System.currentTimeMillis()}-${System.nanoTime()}"
     }
 }

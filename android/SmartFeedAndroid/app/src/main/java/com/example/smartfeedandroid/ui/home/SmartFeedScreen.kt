@@ -1,5 +1,6 @@
 package com.example.smartfeedandroid.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,8 @@ fun SmartFeedScreen(
         onUpload = viewModel::upload,
         onQueryChange = viewModel::onQueryChange,
         onAsk = viewModel::ask,
+        onSelectConversation = viewModel::selectConversation,
+        onStartGlobalConversation = viewModel::startGlobalConversation,
         modifier = modifier
     )
 }
@@ -51,8 +54,13 @@ private fun SmartFeedContent(
     onUpload: () -> Unit,
     onQueryChange: (String) -> Unit,
     onAsk: () -> Unit,
+    onSelectConversation: (String) -> Unit,
+    onStartGlobalConversation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val activeConversation = uiState.conversations
+        .firstOrNull { it.id == uiState.activeConversationId }
+
     Surface(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -71,6 +79,13 @@ private fun SmartFeedContent(
                 text = "Save a web article and generate a summary.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            ConversationList(
+                conversations = uiState.conversations,
+                activeConversationId = uiState.activeConversationId,
+                onSelectConversation = onSelectConversation,
+                onStartGlobalConversation = onStartGlobalConversation
             )
 
             OutlinedTextField(
@@ -115,8 +130,83 @@ private fun SmartFeedContent(
                 onQueryChange = onQueryChange,
                 messages = uiState.messages,
                 activeUrl = uiState.activeUrl,
+                activeTitle = activeConversation?.title.orEmpty(),
                 isAsking = uiState.isAsking,
                 onAsk = onAsk
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConversationList(
+    conversations: List<Conversation>,
+    activeConversationId: String?,
+    onSelectConversation: (String) -> Unit,
+    onStartGlobalConversation: () -> Unit
+) {
+    ResultCard(title = "Conversations") {
+        Button(
+            onClick = onStartGlobalConversation,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("New global chat")
+        }
+
+        if (conversations.isEmpty()) {
+            Text(
+                text = "Upload a page to create a conversation.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            conversations.forEach { conversation ->
+                ConversationItem(
+                    conversation = conversation,
+                    isActive = conversation.id == activeConversationId,
+                    onClick = { onSelectConversation(conversation.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationItem(
+    conversation: Conversation,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = conversation.title,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (conversation.url.isNotBlank()) {
+                Text(
+                    text = conversation.url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "${conversation.messages.size} messages",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -148,6 +238,7 @@ private fun ChatSection(
     onQueryChange: (String) -> Unit,
     messages: List<ChatMessage>,
     activeUrl: String,
+    activeTitle: String,
     isAsking: Boolean,
     onAsk: () -> Unit
 ) {
@@ -161,6 +252,8 @@ private fun ChatSection(
         Text(
             text = if (activeUrl.isBlank()) {
                 "Ask the global knowledge base."
+            } else if (activeTitle.isNotBlank()) {
+                "Current page: $activeTitle"
             } else {
                 "Asking with current page context."
             },
@@ -213,6 +306,12 @@ private fun ChatBubble(message: ChatMessage) {
                         modifier = Modifier.padding(12.dp)
                     )
                 }
+            }
+        }
+
+        is ChatMessage.Summary -> {
+            ResultCard(title = "Summary") {
+                Text(text = message.text)
             }
         }
 

@@ -14,7 +14,7 @@
 - 调用后端 `/chat`。
 - 用聊天气泡展示用户问题和 AI 回答。
 - 展示基础 sources。
-- 使用本地内存维护当前 messages。
+- 使用本地内存维护 conversations 和 messages。
 
 暂不做：
 

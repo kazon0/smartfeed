@@ -177,8 +177,13 @@
   - 已实现 `/upload` 请求模型和响应模型。
   - 已实现 `/chat` 请求模型和响应模型。
   - `SmartFeedScreen` 使用 Jetpack Compose 展示 URL 输入、上传结果、summary、stored chunks、聊天输入、AI 回答和 sources。
-  - `HomeViewModel` 负责上传、提问、本地 UI 状态和本地 messages 列表。
-  - 当前 messages 只保存在内存中，应用重启后不会保留。
+  - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
+  - 已定义内存级 `Conversation` 和 `ChatMessage`。
+  - 上传 URL 成功后会创建一个新的内存 conversation。
+  - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
+  - 可以创建 global knowledge chat。
+  - 可以在当前进程内切换已有 conversation。
+  - 当前 conversations 和 messages 只保存在内存中，应用重启后不会保留。
 
 ## 2. 当前数据流
 
@@ -267,6 +272,10 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现本地聊天消息列表。
 - Android 端已实现调用当前 `/chat` 并展示 answer 和 sources。
 - Android 端已将上传和聊天状态迁入 `HomeViewModel`。
+- Android 端已实现内存级 conversations 列表。
+- Android 端已实现上传 URL 后创建新 conversation。
+- Android 端已实现 summary 作为聊天消息展示。
+- Android 端已实现当前进程内 conversation 切换。
 
 ## 5. 当前系统边界
 
@@ -314,7 +323,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
-- Android 当前不保存历史会话，messages 仅在当前进程内存在。
+- Android 当前不持久化历史会话，conversations 和 messages 仅在当前进程内存在。
 - Android 当前没有分享入口、Room、本地持久化、登录、WebSocket 或 session。
 
 ## 6. 技术栈总结
