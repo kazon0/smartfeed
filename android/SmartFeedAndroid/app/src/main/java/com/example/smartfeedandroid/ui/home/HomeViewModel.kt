@@ -24,10 +24,31 @@ class HomeViewModel(
         uiState = uiState.copy(query = value)
     }
 
+    fun selectTab(tab: AppTab) {
+        uiState = if (tab == AppTab.Home) {
+            uiState.copy(
+                selectedTab = tab,
+                isChatOpen = false
+            )
+        } else {
+            uiState.copy(selectedTab = tab)
+        }
+    }
+
+    fun showConversationList() {
+        uiState = uiState.copy(
+            selectedTab = AppTab.Home,
+            isChatOpen = false,
+            errorMessage = null
+        )
+    }
+
     fun selectConversation(conversationId: String) {
         val conversation = uiState.conversations.firstOrNull { it.id == conversationId } ?: return
         uiState = uiState.copy(
             activeConversationId = conversation.id,
+            selectedTab = AppTab.Home,
+            isChatOpen = true,
             activeUrl = conversation.url,
             messages = conversation.messages,
             uploadResponse = null,
@@ -44,6 +65,8 @@ class HomeViewModel(
 
         uiState = uiState.copy(
             activeConversationId = conversation.id,
+            selectedTab = AppTab.Home,
+            isChatOpen = true,
             activeUrl = "",
             uploadResponse = null,
             errorMessage = null,
@@ -89,8 +112,10 @@ class HomeViewModel(
                     )
 
                     uiState = uiState.copy(
-                        uploadResponse = response,
+                        uploadResponse = null,
                         activeConversationId = conversation.id,
+                        selectedTab = AppTab.Home,
+                        isChatOpen = true,
                         activeUrl = parsedUrl,
                         conversations = listOf(conversation) + uiState.conversations,
                         messages = conversation.messages
@@ -125,6 +150,8 @@ class HomeViewModel(
                 messages = updatedMessages
             ),
             activeConversationId = conversationId,
+            selectedTab = AppTab.Home,
+            isChatOpen = true,
             activeUrl = activeUrl,
             messages = updatedMessages,
             query = "",
@@ -173,6 +200,8 @@ class HomeViewModel(
         )
         uiState = uiState.copy(
             activeConversationId = conversation.id,
+            selectedTab = AppTab.Home,
+            isChatOpen = true,
             conversations = listOf(conversation) + uiState.conversations,
             messages = emptyList(),
             activeUrl = ""

@@ -6,6 +6,8 @@ data class HomeUiState(
     val url: String = "",
     val activeUrl: String = "",
     val activeConversationId: String? = null,
+    val selectedTab: AppTab = AppTab.Home,
+    val isChatOpen: Boolean = false,
     val query: String = "",
     val isUploading: Boolean = false,
     val isAsking: Boolean = false,

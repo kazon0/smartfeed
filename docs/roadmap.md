@@ -15,12 +15,17 @@
 - 用聊天气泡展示用户问题和 AI 回答。
 - 展示基础 sources。
 - 使用本地内存维护 conversations 和 messages。
+- Home / Analysis / Profile 底部 tab。
+- Home 展示历史对话列表。
+- 点击历史对话进入聊天详情页。
 
 暂不做：
 
 - Room 本地数据库。
 - 历史会话持久化。
 - 分享入口。
+- Analysis 真实统计能力。
+- Profile 真实用户能力。
 - 用户登录。
 - 云端同步。
 - WebSocket。

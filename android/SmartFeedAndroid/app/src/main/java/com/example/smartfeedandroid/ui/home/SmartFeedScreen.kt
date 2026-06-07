@@ -17,7 +17,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,8 +44,10 @@ fun SmartFeedScreen(
         onUpload = viewModel::upload,
         onQueryChange = viewModel::onQueryChange,
         onAsk = viewModel::ask,
+        onSelectTab = viewModel::selectTab,
         onSelectConversation = viewModel::selectConversation,
         onStartGlobalConversation = viewModel::startGlobalConversation,
+        onBackToConversations = viewModel::showConversationList,
         modifier = modifier
     )
 }
@@ -54,40 +59,99 @@ private fun SmartFeedContent(
     onUpload: () -> Unit,
     onQueryChange: (String) -> Unit,
     onAsk: () -> Unit,
+    onSelectTab: (AppTab) -> Unit,
     onSelectConversation: (String) -> Unit,
     onStartGlobalConversation: () -> Unit,
+    onBackToConversations: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val activeConversation = uiState.conversations
         .firstOrNull { it.id == uiState.activeConversationId }
 
     Surface(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "SmartFeed",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+        Scaffold(
+            bottomBar = {
+                AppBottomBar(
+                    selectedTab = uiState.selectedTab,
+                    onSelectTab = onSelectTab
+                )
+            }
+        ) { innerPadding ->
+            when (uiState.selectedTab) {
+                AppTab.Home -> {
+                    if (uiState.isChatOpen) {
+                        ChatDetailScreen(
+                            query = uiState.query,
+                            onQueryChange = onQueryChange,
+                            messages = uiState.messages,
+                            activeUrl = uiState.activeUrl,
+                            activeTitle = activeConversation?.title.orEmpty(),
+                            isAsking = uiState.isAsking,
+                            onAsk = onAsk,
+                            onBack = onBackToConversations,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        HomeScreen(
+                            uiState = uiState,
+                            onUrlChange = onUrlChange,
+                            onUpload = onUpload,
+                            onSelectConversation = onSelectConversation,
+                            onStartGlobalConversation = onStartGlobalConversation,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
+                }
 
-            Text(
-                text = "Save a web article and generate a summary.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                AppTab.Analysis -> {
+                    PlaceholderScreen(
+                        title = "Analysis",
+                        description = "Knowledge base analysis will appear here.",
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
 
-            ConversationList(
-                conversations = uiState.conversations,
-                activeConversationId = uiState.activeConversationId,
-                onSelectConversation = onSelectConversation,
-                onStartGlobalConversation = onStartGlobalConversation
-            )
+                AppTab.Profile -> {
+                    PlaceholderScreen(
+                        title = "Profile",
+                        description = "Account and settings will appear here.",
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+            }
+        }
+    }
+}
 
+@Composable
+private fun HomeScreen(
+    uiState: HomeUiState,
+    onUrlChange: (String) -> Unit,
+    onUpload: () -> Unit,
+    onSelectConversation: (String) -> Unit,
+    onStartGlobalConversation: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "SmartFeed",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            text = "Save articles and continue reading through conversation.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        ResultCard(title = "Save article") {
             OutlinedTextField(
                 value = uiState.url,
                 onValueChange = onUrlChange,
@@ -114,25 +178,98 @@ private fun SmartFeedContent(
                     CircularProgressIndicator()
                 }
             }
+        }
 
-            uiState.errorMessage?.let {
-                ResultCard(title = "Error") {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                }
+        uiState.errorMessage?.let {
+            ResultCard(title = "Error") {
+                Text(text = it, color = MaterialTheme.colorScheme.error)
             }
+        }
 
-            uiState.uploadResponse?.let {
-                UploadResult(response = it)
-            }
+        uiState.uploadResponse?.let {
+            UploadResult(response = it)
+        }
 
-            ChatSection(
-                query = uiState.query,
-                onQueryChange = onQueryChange,
-                messages = uiState.messages,
-                activeUrl = uiState.activeUrl,
-                activeTitle = activeConversation?.title.orEmpty(),
-                isAsking = uiState.isAsking,
-                onAsk = onAsk
+        ConversationList(
+            conversations = uiState.conversations,
+            activeConversationId = uiState.activeConversationId,
+            onSelectConversation = onSelectConversation,
+            onStartGlobalConversation = onStartGlobalConversation
+        )
+    }
+}
+
+@Composable
+private fun ChatDetailScreen(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    messages: List<ChatMessage>,
+    activeUrl: String,
+    activeTitle: String,
+    isAsking: Boolean,
+    onAsk: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Button(onClick = onBack) {
+            Text("Back")
+        }
+
+        ChatSection(
+            query = query,
+            onQueryChange = onQueryChange,
+            messages = messages,
+            activeUrl = activeUrl,
+            activeTitle = activeTitle,
+            isAsking = isAsking,
+            onAsk = onAsk
+        )
+    }
+}
+
+@Composable
+private fun PlaceholderScreen(
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = description,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AppBottomBar(
+    selectedTab: AppTab,
+    onSelectTab: (AppTab) -> Unit
+) {
+    NavigationBar {
+        AppTab.entries.forEach { tab ->
+            NavigationBarItem(
+                selected = selectedTab == tab,
+                onClick = { onSelectTab(tab) },
+                icon = { Text(tab.label.take(1)) },
+                label = { Text(tab.label) }
             )
         }
     }
@@ -208,6 +345,13 @@ private fun ConversationItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (conversation.status.isNotBlank() || conversation.storedChunks > 0) {
+                Text(
+                    text = "status: ${conversation.status.ifBlank { "N/A" }} · chunks: ${conversation.storedChunks}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

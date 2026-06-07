@@ -45,6 +45,8 @@ Backend 已实现：
 * Android Retrofit 网络层
 * Android `/upload` 和 `/chat` 接入
 * Android 内存级 conversation/message 结构
+* Android Home / Analysis / Profile 底部 tab
+* Android 历史对话列表和聊天详情页分层
 
 当前未实现：
 
@@ -53,6 +55,9 @@ Backend 已实现：
 * WebSocket
 * 文章删除接口
 * 文章列表接口
+* Android 分享入口
+* Android Analysis 真实统计页
+* Android Profile 真实个人中心
 * Room / 本地移动端数据库
 * 实时搜索、天气、股价、汇率等外部实时工具
 * LangChain
@@ -257,6 +262,6 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 稳定 Android conversation/message 结构。
-2. 实现浏览器分享 URL 到 App。
+1. 实现浏览器分享 URL 到 App。
+2. App 接收分享 URL 后自动创建新对话。
 3. 上传成功后自动进入新对话并展示 summary。

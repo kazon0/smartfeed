@@ -176,7 +176,11 @@
   - 已封装 `SmartFeedApi`、`SmartFeedNetwork`、`UploadRepository`、`ChatRepository`。
   - 已实现 `/upload` 请求模型和响应模型。
   - 已实现 `/chat` 请求模型和响应模型。
-  - `SmartFeedScreen` 使用 Jetpack Compose 展示 URL 输入、上传结果、summary、stored chunks、聊天输入、AI 回答和 sources。
+  - `SmartFeedScreen` 使用 Jetpack Compose 展示 Home / Analysis / Profile 三个底部 tab。
+  - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
+  - 点击 Home 中的 conversation 会进入聊天详情页。
+  - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
+  - Analysis tab 和 Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
   - 上传 URL 成功后会创建一个新的内存 conversation。
@@ -276,6 +280,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现上传 URL 后创建新 conversation。
 - Android 端已实现 summary 作为聊天消息展示。
 - Android 端已实现当前进程内 conversation 切换。
+- Android 端已实现 Home / Analysis / Profile 底部 tab 结构。
+- Android 端已将历史对话列表和聊天详情页拆开。
 
 ## 5. 当前系统边界
 
@@ -325,6 +331,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 - Android 当前不持久化历史会话，conversations 和 messages 仅在当前进程内存在。
 - Android 当前没有分享入口、Room、本地持久化、登录、WebSocket 或 session。
+- Android Analysis / Profile 当前只是占位页，没有真实统计或用户功能。
 
 ## 6. 技术栈总结
 
