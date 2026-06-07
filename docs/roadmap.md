@@ -18,12 +18,13 @@
 - Home / Analysis / Profile 底部 tab。
 - Home 展示历史对话列表。
 - 点击历史对话进入聊天详情页。
+- 支持从浏览器系统分享菜单接收网页 URL。
+- 分享 URL 后自动创建新对话并展示 summary。
 
 暂不做：
 
 - Room 本地数据库。
 - 历史会话持久化。
-- 分享入口。
 - Analysis 真实统计能力。
 - Profile 真实用户能力。
 - 用户登录。

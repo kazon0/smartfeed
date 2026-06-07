@@ -24,6 +24,21 @@ class HomeViewModel(
         uiState = uiState.copy(query = value)
     }
 
+    fun handleSharedUrl(url: String) {
+        val cleanUrl = url.trim()
+        if (cleanUrl.isBlank() || cleanUrl == uiState.lastSharedUrl) {
+            return
+        }
+
+        uiState = uiState.copy(
+            url = cleanUrl,
+            lastSharedUrl = cleanUrl,
+            selectedTab = AppTab.Home,
+            isChatOpen = false
+        )
+        upload()
+    }
+
     fun selectTab(tab: AppTab) {
         uiState = if (tab == AppTab.Home) {
             uiState.copy(

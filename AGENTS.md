@@ -47,6 +47,8 @@ Backend 已实现：
 * Android 内存级 conversation/message 结构
 * Android Home / Analysis / Profile 底部 tab
 * Android 历史对话列表和聊天详情页分层
+* Android 系统分享入口
+* Android 分享 URL 自动上传并创建新对话
 
 当前未实现：
 
@@ -55,7 +57,6 @@ Backend 已实现：
 * WebSocket
 * 文章删除接口
 * 文章列表接口
-* Android 分享入口
 * Android Analysis 真实统计页
 * Android Profile 真实个人中心
 * Room / 本地移动端数据库
@@ -262,6 +263,6 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 实现浏览器分享 URL 到 App。
-2. App 接收分享 URL 后自动创建新对话。
-3. 上传成功后自动进入新对话并展示 summary。
+1. 验证 Android 分享入口真实设备/模拟器体验。
+2. 引入 Room 保存本地历史对话。
+3. 开始实现 Analysis 页的知识库统计入口。

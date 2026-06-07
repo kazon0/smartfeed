@@ -13,6 +13,7 @@ data class HomeUiState(
     val isAsking: Boolean = false,
     val uploadResponse: UploadResponse? = null,
     val errorMessage: String? = null,
+    val lastSharedUrl: String? = null,
     val conversations: List<Conversation> = emptyList(),
     val messages: List<ChatMessage> = emptyList()
 )

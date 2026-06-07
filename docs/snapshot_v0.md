@@ -183,6 +183,9 @@
   - Analysis tab 和 Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
+  - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
+  - App 会从分享文本中提取第一个 `http` / `https` URL。
+  - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
   - 上传 URL 成功后会创建一个新的内存 conversation。
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
@@ -282,6 +285,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现当前进程内 conversation 切换。
 - Android 端已实现 Home / Analysis / Profile 底部 tab 结构。
 - Android 端已将历史对话列表和聊天详情页拆开。
+- Android 端已实现系统分享入口。
+- Android 端已实现从分享文本提取 URL 并自动上传。
 
 ## 5. 当前系统边界
 
@@ -330,7 +335,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 - Android 当前不持久化历史会话，conversations 和 messages 仅在当前进程内存在。
-- Android 当前没有分享入口、Room、本地持久化、登录、WebSocket 或 session。
+- Android 当前没有 Room、本地持久化、登录、WebSocket 或 session。
+- Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Analysis / Profile 当前只是占位页，没有真实统计或用户功能。
 
 ## 6. 技术栈总结
