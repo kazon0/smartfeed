@@ -153,6 +153,8 @@
 - query rewrite 使用 DeepSeek 将用户问题改写为更适合检索的 query。
 - query rewrite 不可用时回退原始 query。
 - 检索使用 rewritten query，最终回答仍使用用户原始问题。
+- `/chat` 已接入 multi-query retrieval，基于原始 query、rewritten query 和 LLM 生成的查询变体合并召回。
+- multi-query 不可用时回退到 rewritten query + 原始 query。
 - `/chat` 已接入 LLM rerank，对向量召回和关键词召回后的候选 chunks 做语义重排。
 - LLM rerank 不可用时回退到原有排序。
 - `/chat` 已接入 context compression，在回答前压缩候选上下文，保留来源、步骤、代码、清单和结论。
@@ -162,7 +164,6 @@
 
 - 优化 chunk 策略。
 - 优化 section-aware retrieval。
-- 增加 multi-query 检索。
 - 改善代码类文章、列表类文章、长文总结的回答质量。
 - 将 `/chat` 中逐渐变复杂的 retrieval / rerank / compression / fallback 流程抽到 service 层。
 - 保持 Android API 尽量稳定。

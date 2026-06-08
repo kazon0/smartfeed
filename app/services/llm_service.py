@@ -155,6 +155,46 @@ class LLMService:
             "reason": reason,
         }
 
+    def generate_search_queries(
+        self,
+        question: str,
+        rewritten_query: str,
+        *,
+        url: str | None = None,
+    ) -> list[str]:
+        query = question.strip()
+        rewritten = rewritten_query.strip()
+        if not query and not rewritten:
+            return []
+
+        prompt = (
+            "请为知识库检索生成 2 到 4 个查询变体，用来提高召回率。"
+            "要求："
+            "1. 每个查询都必须服务于用户原始问题；"
+            "2. 覆盖同义词、标题词、技术词、清单词、步骤词等可能写法；"
+            "3. 如果问题询问文章中的列表、方法、算法、步骤，查询要包含这些清单相关词；"
+            "4. 不要生成与用户问题无关的新问题；"
+            "5. 必须只返回 JSON 字符串数组，不要 Markdown，不要解释。"
+            '示例：["十个基础算法 清单","排序算法 搜索算法 图算法 动态规划","程序员 应该知道 算法"]'
+            "\n\n"
+            f"question:\n{query}\n\n"
+            f"rewritten_query:\n{rewritten}\n\n"
+            f"current_url:\n{url or ''}"
+        )
+        response = self._chat(prompt)
+        if response.startswith("LLM unavailable"):
+            return []
+
+        data = self._parse_json_array(response)
+        queries = []
+        for item in data:
+            if not isinstance(item, str):
+                continue
+            clean_item = item.strip()
+            if clean_item and clean_item not in queries:
+                queries.append(clean_item)
+        return queries[:4]
+
     def rerank_chunks(self, question: str, candidates: list[str]) -> list[int]:
         clean_candidates = [
             candidate.strip()

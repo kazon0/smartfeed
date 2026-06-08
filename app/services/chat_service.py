@@ -45,22 +45,24 @@ class ChatService:
 
         vector_store = self.vector_store_factory()
         rewritten_query = self._rewrite_query(query, url)
+        search_queries = self._search_queries(query, rewritten_query, url)
+        ranking_query = " ".join(search_queries)
         if url:
             return self._chat_with_current_page(
                 query,
-                rewritten_query,
+                search_queries,
+                ranking_query,
                 url,
                 intent,
                 vector_store,
             )
 
-        global_vector_chunks = vector_store.query(rewritten_query)
-        global_keyword_chunks = self._keyword_retrieve_chunks(
-            rewritten_query,
-            self._get_all_chunks(vector_store),
+        global_chunks = self._retrieve_chunks(
+            vector_store,
+            search_queries,
+            all_chunks=self._get_all_chunks(vector_store),
         )
-        global_chunks = self._merge_chunks(global_vector_chunks, global_keyword_chunks)
-        ranked_chunks = self._rank_chunks(rewritten_query, global_chunks)
+        ranked_chunks = self._rank_chunks(ranking_query, global_chunks)
         ranked_chunks = self._llm_rerank_chunks(query, ranked_chunks)
         relevant_chunks = self._high_relevance_chunks(ranked_chunks)
         answer, source_type, selected_chunks = self._answer_with_policy(
@@ -82,22 +84,20 @@ class ChatService:
     def _chat_with_current_page(
         self,
         query: str,
-        rewritten_query: str,
+        search_queries: list[str],
+        ranking_query: str,
         url: str,
         intent: dict,
         vector_store: VectorStoreService,
     ) -> dict:
-        page_chunks = vector_store.query(
-            rewritten_query,
-            metadata_filter={"url": url},
-        )
-        ranked_page_chunks = self._rank_chunks(rewritten_query, page_chunks)
         all_page_chunks = vector_store.get_chunks_by_url(url)
-        keyword_page_chunks = self._keyword_retrieve_chunks(rewritten_query, all_page_chunks)
-        ranked_page_chunks = self._rank_chunks(
-            rewritten_query,
-            self._merge_chunks(ranked_page_chunks, keyword_page_chunks),
+        page_chunks = self._retrieve_chunks(
+            vector_store,
+            search_queries,
+            metadata_filter={"url": url},
+            all_chunks=all_page_chunks,
         )
+        ranked_page_chunks = self._rank_chunks(ranking_query, page_chunks)
         ranked_page_chunks = self._llm_rerank_chunks(query, ranked_page_chunks)
         relevant_page_chunks = self._high_relevance_chunks(ranked_page_chunks)
 
@@ -185,6 +185,54 @@ class ChatService:
         if not isinstance(rewritten_query, str) or not rewritten_query.strip():
             return query
         return rewritten_query.strip()
+
+    def _search_queries(
+        self,
+        query: str,
+        rewritten_query: str,
+        url: str | None = None,
+    ) -> list[str]:
+        queries = []
+        for candidate in (rewritten_query, query):
+            clean_candidate = candidate.strip()
+            if clean_candidate and clean_candidate not in queries:
+                queries.append(clean_candidate)
+
+        try:
+            generated_queries = self.llm_service_factory().generate_search_queries(
+                query,
+                rewritten_query,
+                url=url,
+            )
+        except Exception:
+            generated_queries = []
+
+        for candidate in generated_queries:
+            clean_candidate = candidate.strip()
+            if clean_candidate and clean_candidate not in queries:
+                queries.append(clean_candidate)
+
+        return queries[:5] or [query]
+
+    def _retrieve_chunks(
+        self,
+        vector_store: VectorStoreService,
+        queries: list[str],
+        *,
+        metadata_filter: dict | None = None,
+        all_chunks: list[dict] | None = None,
+    ) -> list[dict]:
+        retrieved_chunks = []
+        keyword_source_chunks = all_chunks or []
+        for search_query in queries:
+            retrieved_chunks.extend(
+                vector_store.query(search_query, metadata_filter=metadata_filter)
+            )
+            retrieved_chunks.extend(
+                self._keyword_retrieve_chunks(search_query, keyword_source_chunks)
+            )
+
+        return self._merge_chunks([], retrieved_chunks)
 
     def _chat_response(
         self,
@@ -379,7 +427,7 @@ class ChatService:
 
     def _merge_chunks(self, primary_chunks: list[dict], secondary_chunks: list[dict]) -> list[dict]:
         merged = []
-        seen = set()
+        seen = {}
 
         for chunk in primary_chunks + secondary_chunks:
             key = (
@@ -387,9 +435,13 @@ class ChatService:
                 chunk.get("metadata", {}).get("chunk_index", ""),
                 chunk.get("content", ""),
             )
-            if key in seen:
+            existing_index = seen.get(key)
+            if existing_index is not None:
+                existing = merged[existing_index]
+                if chunk.get("score", 0) > existing.get("score", 0):
+                    merged[existing_index] = chunk
                 continue
-            seen.add(key)
+            seen[key] = len(merged)
             merged.append(chunk)
 
         return merged

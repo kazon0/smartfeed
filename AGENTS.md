@@ -33,6 +33,7 @@ Backend 已实现：
 * DeepSeek summary / answer
 * DeepSeek article topic classification
 * DeepSeek query rewrite for `/chat`
+* DeepSeek multi-query retrieval for `/chat`
 * DeepSeek rerank for `/chat`
 * DeepSeek context compression for `/chat`
 * Rule-based topic fallback
@@ -122,7 +123,7 @@ URL
 -> embedding
 -> ChromaDB
 -> /search or /chat
--> query rewrite / rerank / context compression
+-> query rewrite / multi-query retrieval / rerank / context compression
 -> DeepSeek answer
 ```
 

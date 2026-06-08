@@ -94,7 +94,9 @@
     - 如果 `retrieval_scope == "none"`，根据 fallback policy 直接返回，不检索。
     - 检索前调用 `LLMService.rewrite_query()` 将用户问题改写为更适合检索的 query。
     - query rewrite 不可用时回退使用用户原始 query。
-    - 向量检索、关键词召回和轻量重排使用 rewritten query。
+    - 调用 `LLMService.generate_search_queries()` 基于用户原始 query 和 rewritten query 生成 2 到 4 个检索查询变体。
+    - multi-query 不可用时至少使用 rewritten query 和用户原始 query。
+    - 向量检索、关键词召回和轻量重排使用 multi-query 合并后的查询集合。
     - 最终回答仍使用用户原始 query。
     - 如果请求包含 `url`，进入当前网页聊天逻辑。
     - 当前网页聊天会先按 `metadata.url` 查询当前网页 chunks，并读取该 URL 已入库的全部 chunks。
@@ -137,7 +139,7 @@
 - `app/services/chat_service.py`
   - 服务类：`ChatService`
   - 当前能力：
-    - 承载 `/chat` 的 query intent、query rewrite、page/global retrieval、keyword retrieval、rerank、context compression、fallback 和 sources 构造流程。
+    - 承载 `/chat` 的 query intent、query rewrite、multi-query retrieval、page/global retrieval、keyword retrieval、rerank、context compression、fallback 和 sources 构造流程。
     - `app/routes/chat.py` 只负责 FastAPI 请求模型和调用 `ChatService`。
     - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService`，便于测试和后续替换 LangChain pipeline。
     - 对外返回结构保持 `/chat` 当前稳定字段不变。
@@ -207,6 +209,7 @@
     - `summarize(text)` 生成 100 到 200 字中文总结。
     - `classify_topic(title, url, summary, content)` 基于 DeepSeek 对文章做单标签 topic 分类，返回 topic、confidence、reason、source。
     - `rewrite_query(question, url=None)` 基于 DeepSeek 将用户问题改写成更适合检索的查询，返回 query、source、reason。
+    - `generate_search_queries(question, rewritten_query, url=None)` 基于 DeepSeek 生成多个检索查询变体。
     - `answer(question, context_chunks)` 基于 context chunks 生成自然语言回答。
     - `answer()` prompt 要求最终回答面向普通用户，单篇文章场景使用文章标题或当前网页自然引用，不要求用户理解来源编号。
     - `answer_without_context(question, reason)` 在无可用知识库上下文或通用兜底场景生成回答。
@@ -298,7 +301,7 @@ ChromaDB articles → article topic grouping → Android Analysis topic pie char
 
 ### `/chat`
 
-query + optional url → ChatService → query intent classification → query rewrite → retrieval scope decision → page/global hybrid retrieval → keyword rerank / LLM rerank / page context selection → context compression → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
+query + optional url → ChatService → query intent classification → query rewrite → multi-query generation → retrieval scope decision → page/global hybrid retrieval → keyword rerank / LLM rerank / page context selection → context compression → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
 
 ### `/debug`
 
@@ -421,6 +424,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 接收自然语言 query。
 - 对 chat query 进行规则型意图分类。
 - 对 chat query 进行 LLM query rewrite，LLM 不可用时回退原始 query。
+- 对 chat query 进行 LLM multi-query generation，LLM 不可用时回退 rewritten query + 原始 query。
 - 根据 intent 决定检索范围和 fallback 策略。
 - 将 query 转为 embedding。
 - 从 ChromaDB 中检索 topK 相关 chunks。
