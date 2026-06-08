@@ -91,7 +91,11 @@ Successful ingestion:
     "metadata": {
       "source": "web",
       "parser": "jina",
-      "length": 1234
+      "length": 1234,
+      "topic": "新闻",
+      "topic_source": "llm",
+      "topic_confidence": 0.86,
+      "topic_reason": "文章来自新闻媒体，内容是政策修订报道。"
     }
   },
   "stored_chunks": 2,
@@ -138,6 +142,7 @@ curl -X POST http://127.0.0.1:8000/upload \
 - Jina Reader and HTML fallback both fail.
 - Page has no readable article content.
 - DeepSeek API key is missing: `summary` may contain `LLM unavailable...`.
+- DeepSeek topic classification unavailable or low confidence: topic falls back to rule-based classification.
 - ChromaDB or embedding dependencies are not installed.
 
 ## POST /search

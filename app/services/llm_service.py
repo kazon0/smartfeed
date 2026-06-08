@@ -10,6 +10,7 @@ load_dotenv()
 class LLMService:
     API_URL = "https://api.deepseek.com/chat/completions"
     MODEL = "deepseek-chat"
+    TOPICS = ["科技", "学习", "健康", "职业", "财经", "生活", "新闻", "其他"]
 
     def __init__(self) -> None:
         self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
@@ -25,6 +26,64 @@ class LLMService:
             f"{content[:8000]}"
         )
         return self._chat(prompt)
+
+    def classify_topic(
+        self,
+        *,
+        title: str,
+        url: str,
+        summary: str,
+        content: str,
+    ) -> dict:
+        prompt = (
+            "请判断网页文章最合适的一个主题分类。"
+            "只能从以下分类中选择一个：科技、学习、健康、职业、财经、生活、新闻、其他。"
+            "分类标准："
+            "科技包括AI、编程、软件、算法、开发、数据、模型等；"
+            "学习包括考试、教育、课程、教程、学习方法、笔记等；"
+            "健康包括疾病、医生、治疗、饮食、心理、睡眠等；"
+            "职业包括实习、面试、招聘、简历、职场、薪资等；"
+            "财经包括股票、基金、投资、汇率、经济、公司、市场等；"
+            "生活包括旅行、美食、家庭、情感、消费、娱乐等；"
+            "新闻包括新闻报道、政策发布、社会事件、官方通报、媒体报道、时事内容等。"
+            "请综合 url、title、summary 和正文片段判断，不要只看关键词。"
+            "必须只返回 JSON，不要返回 Markdown，不要添加解释。"
+            "JSON 格式："
+            '{"topic":"新闻","confidence":0.86,"reason":"一句话原因"}'
+            "\n\n"
+            f"url:\n{url.strip()}\n\n"
+            f"title:\n{title.strip()}\n\n"
+            f"summary:\n{summary.strip()[:1200]}\n\n"
+            f"content:\n{content.strip()[:4000]}"
+        )
+        response = self._chat(prompt)
+        if response.startswith("LLM unavailable"):
+            return {
+                "topic": "其他",
+                "confidence": 0.0,
+                "reason": response,
+                "source": "fallback",
+            }
+
+        data = self._parse_json_object(response)
+        topic = data.get("topic") if isinstance(data.get("topic"), str) else "其他"
+        if topic not in self.TOPICS:
+            topic = "其他"
+
+        confidence = data.get("confidence", 0.0)
+        if not isinstance(confidence, (int, float)):
+            confidence = 0.0
+
+        reason = data.get("reason", "")
+        if not isinstance(reason, str):
+            reason = ""
+
+        return {
+            "topic": topic,
+            "confidence": float(confidence),
+            "reason": reason,
+            "source": "llm",
+        }
 
     def answer(self, question: str, context_chunks: list[str]) -> str:
         context = "\n\n".join(chunk.strip() for chunk in context_chunks if chunk.strip())
@@ -86,6 +145,23 @@ class LLMService:
             return []
 
         return [item for item in data if isinstance(item, str)]
+
+    def _parse_json_object(self, text: str) -> dict:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start < 0 or end <= start:
+                return {}
+            try:
+                data = json.loads(text[start : end + 1])
+            except json.JSONDecodeError:
+                return {}
+
+        if not isinstance(data, dict):
+            return {}
+        return data
 
     def _chat(self, user_prompt: str) -> str:
         if not self.api_key:

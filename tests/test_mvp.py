@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.llm_service import LLMService
 from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
 
@@ -77,6 +78,26 @@ Markdown Content:
     assert [section["title"] for section in result["sections"]] == ["排序算法", "搜索算法"]
     assert result["chunk_metadata"][0]["section_title"] == "排序算法"
     assert "冒泡排序" in result["content"]
+
+
+def test_llm_classify_topic_parses_json_response(monkeypatch):
+    service = LLMService()
+    monkeypatch.setattr(
+        service,
+        "_chat",
+        lambda prompt: '{"topic":"新闻","confidence":0.91,"reason":"央视新闻政策报道"}',
+    )
+
+    result = service.classify_topic(
+        title="住房公积金条例修订",
+        url="https://mbd.baidu.com/newspage/data/article",
+        summary="央视新闻报道住房公积金条例修订。",
+        content="近日，公开征求意见。",
+    )
+
+    assert result["topic"] == "新闻"
+    assert result["confidence"] == 0.91
+    assert result["source"] == "llm"
 
 
 def test_vector_store_add_chunks_keeps_section_metadata():
@@ -173,6 +194,73 @@ def test_articles_list_returns_saved_articles(monkeypatch):
     assert data["articles"][0]["url"] == "https://example.com/a"
     assert data["articles"][0]["chunk_count"] == 3
     assert data["articles"][0]["topic"] == "科技"
+
+
+def test_upload_stores_llm_topic_metadata(monkeypatch):
+    captured = {}
+
+    class FakeWebParserService:
+        def prepare(self, url):
+            return {
+                "url": url,
+                "title": "住房公积金条例修订",
+                "content": "央视新闻报道住房公积金条例修订，公开征求意见。",
+                "chunks": ["央视新闻报道住房公积金条例修订，公开征求意见。"],
+                "chunk_metadata": [{}],
+                "metadata": {"source": "web", "parser": "jina", "length": 24},
+            }
+
+    class FakeLLMService:
+        def summarize(self, text):
+            return "这是一篇关于住房公积金政策修订的新闻。"
+
+        def classify_topic(self, *, title, url, summary, content):
+            return {
+                "topic": "新闻",
+                "confidence": 0.91,
+                "reason": "央视新闻政策报道",
+                "source": "llm",
+            }
+
+    class FakeVectorStoreService:
+        def delete_by_url(self, url):
+            captured["deleted_url"] = url
+            return 0
+
+        def classify_topic(self, url, title, content):
+            return "新闻"
+
+        def add_chunks(self, chunks, metadata, chunk_metadata=None):
+            captured["metadata"] = metadata
+            return len(chunks)
+
+    monkeypatch.setattr("app.routes.upload.WebParserService", FakeWebParserService)
+    monkeypatch.setattr("app.routes.upload.LLMService", FakeLLMService)
+    monkeypatch.setattr("app.routes.upload.VectorStoreService", FakeVectorStoreService)
+
+    response = client.post(
+        "/upload",
+        json={"url": "https://mbd.baidu.com/newspage/data/article"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["stored_chunks"] == 1
+    assert data["data"]["metadata"]["topic"] == "新闻"
+    assert captured["metadata"]["topic"] == "新闻"
+    assert captured["metadata"]["topic_source"] == "llm"
+
+
+def test_vector_store_classifies_baidu_cctv_article_as_news():
+    service = VectorStoreService.__new__(VectorStoreService)
+
+    topic = service._classify_topic(
+        "https://mbd.baidu.com/newspage/data/article\n"
+        "主播说联播｜住房公积金条例修订，升级的不只是用途\n"
+        "央视新闻 近日 公开征求意见 政策 民生"
+    )
+
+    assert topic == "新闻"
 
 
 def test_articles_delete_by_url(monkeypatch):

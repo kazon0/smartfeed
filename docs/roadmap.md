@@ -20,13 +20,14 @@
 - 点击历史对话进入聊天详情页。
 - 支持从浏览器系统分享菜单接收网页 URL。
 - 分享 URL 后自动创建新对话并展示 summary。
-- Analysis 展示后端 `/stats` 返回的知识库主题占比。
+- Analysis 展示基于已保存文章 topic 的主题占比。
+- 后端上传时使用 DeepSeek 对文章做 topic 分类，低置信度或不可用时回退到规则分类。
 - Analysis 使用饼图展示主题分布。
 - 后端提供已保存文章列表和按 URL 删除文章 chunks 的接口。
 - Android Analysis 右上角提供文章管理入口。
 - Android 文章管理页按 topic 分组展示历史文章。
 - Android 文章管理页点击文章可跳转原网页。
-- Android 文章管理页支持右滑删除知识库文章。
+- Android 文章管理页支持左滑显示删除按钮。
 
 暂不做：
 
@@ -110,14 +111,15 @@
 
 - 后端已提供 `/stats`。
 - `/stats` 基于 ChromaDB chunks 统计主题、来源域名、文章占比。
-- 主题分类当前使用轻量关键词规则。
+- 文章 topic 当前优先使用上传时保存的 DeepSeek 分类结果。
+- 规则分类当前作为 DeepSeek 不可用、低置信度或旧数据 fallback。
 - Android Analysis 页已展示主题饼图和分布列表。
 - 后端已提供 `/articles` 列出 ChromaDB 中已保存文章。
 - 后端已提供 `DELETE /articles` 按 URL 删除该文章对应 chunks。
 - Android Analysis 页已提供文章管理入口。
 - Android 文章管理页已按 topic 展示已保存文章。
 - Android 文章管理页已支持点击打开原网页。
-- Android 文章管理页已支持右滑删除已保存文章。
+- Android 文章管理页已支持左滑显示删除按钮。
 
 范围：
 

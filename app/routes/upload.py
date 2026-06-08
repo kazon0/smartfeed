@@ -27,19 +27,43 @@ def upload_article(request: UploadRequest):
                 "stored_chunks": 0,
             }
 
+        llm_service = LLMService()
+        summary = llm_service.summarize(data["content"])
+        vector_store = VectorStoreService()
+        topic_result = llm_service.classify_topic(
+            title=data["title"],
+            url=data["url"],
+            summary=summary,
+            content=data["content"],
+        )
+        topic = topic_result["topic"]
+        if topic_result["source"] != "llm" or topic_result["confidence"] < 0.55:
+            topic = vector_store.classify_topic(
+                url=data["url"],
+                title=data["title"],
+                content=data["content"],
+            )
+            topic_result = {
+                **topic_result,
+                "topic": topic,
+                "source": "rule_fallback",
+            }
+
+        data["metadata"]["topic"] = topic
+        data["metadata"]["topic_source"] = topic_result["source"]
+        data["metadata"]["topic_confidence"] = topic_result["confidence"]
+        data["metadata"]["topic_reason"] = topic_result["reason"]
         metadata = {
             **data["metadata"],
             "url": data["url"],
             "title": data["title"],
         }
-        vector_store = VectorStoreService()
         vector_store.delete_by_url(data["url"])
         stored_chunks = vector_store.add_chunks(
             data["chunks"],
             metadata,
             data.get("chunk_metadata"),
         )
-        summary = LLMService().summarize(data["content"])
 
     return {
         "status": "received",

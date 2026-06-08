@@ -32,9 +32,11 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -61,6 +63,7 @@ import com.example.smartfeedandroid.data.remote.StatsResponse
 import com.example.smartfeedandroid.data.remote.TopicDistribution
 import com.example.smartfeedandroid.data.remote.UploadResponse
 import kotlin.math.min
+import kotlin.math.round
 
 @Composable
 fun SmartFeedScreen(
@@ -173,6 +176,7 @@ private fun SmartFeedContent(
                         AnalysisScreen(
                             conversations = uiState.conversations,
                             stats = uiState.statsResponse,
+                            articles = uiState.articlesResponse?.articles.orEmpty(),
                             isLoading = uiState.isLoadingStats,
                             errorMessage = uiState.statsErrorMessage,
                             onOpenArticleManager = onOpenArticleManager,
@@ -334,6 +338,7 @@ private fun ChatDetailScreen(
 private fun AnalysisScreen(
     conversations: List<Conversation>,
     stats: StatsResponse?,
+    articles: List<SavedArticle>,
     isLoading: Boolean,
     errorMessage: String?,
     onOpenArticleManager: () -> Unit,
@@ -341,7 +346,7 @@ private fun AnalysisScreen(
 ) {
     val localArticles = conversations.count { it.url.isNotBlank() }
     val localMessages = conversations.sumOf { it.messages.size }
-    val topics = stats?.topics.orEmpty()
+    val topics = articleTopicDistribution(articles)
 
     Column(
         modifier = modifier
@@ -389,7 +394,7 @@ private fun AnalysisScreen(
         ResultCard(title = "Topic share") {
             if (topics.isEmpty()) {
                 Text(
-                    text = "No backend topic stats yet. Upload or share articles first.",
+                    text = "No article topic stats yet. Upload or share articles first.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
@@ -401,26 +406,10 @@ private fun AnalysisScreen(
         ResultCard(title = "Overview") {
             ResultRow(label = "Backend articles", value = (stats?.totalArticles ?: 0).toString())
             ResultRow(label = "Backend chunks", value = (stats?.totalChunks ?: 0).toString())
+            ResultRow(label = "Managed articles", value = articles.size.toString())
             ResultRow(label = "Local conversations", value = conversations.size.toString())
             ResultRow(label = "Local articles", value = localArticles.toString())
             ResultRow(label = "Local messages", value = localMessages.toString())
-        }
-
-        ResultCard(title = "Article share") {
-            val articles = stats?.articles.orEmpty()
-            if (articles.isEmpty()) {
-                Text(
-                    text = "No article distribution yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                articles.take(6).forEach { article ->
-                    ResultRow(
-                        label = article.title.ifBlank { article.url.ifBlank { "Untitled" } },
-                        value = "${article.percentage}%"
-                    )
-                }
-            }
         }
 
         ResultCard(title = "Source domains") {
@@ -459,6 +448,13 @@ private fun ArticleManagerScreen(
             topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.size
         }.thenBy { it }
     )
+    val tabs = listOf("全部") + orderedTopics
+    var selectedTopic by remember(tabs) { mutableStateOf(tabs.first()) }
+    val visibleArticles = if (selectedTopic == "全部") {
+        articles
+    } else {
+        groupedArticles[selectedTopic].orEmpty()
+    }
 
     Column(
         modifier = modifier
@@ -486,7 +482,7 @@ private fun ArticleManagerScreen(
         }
 
         Text(
-            text = "Grouped by topic. Tap an article to open it, or swipe right to delete it.",
+            text = "Tap an article to open it. Swipe left to reveal Delete.",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -512,20 +508,49 @@ private fun ArticleManagerScreen(
                 )
             }
         } else {
-            orderedTopics.forEach { topic ->
-                Text(
-                    text = topic,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+            TopicTabs(
+                topics = tabs,
+                selectedTopic = selectedTopic,
+                onSelectTopic = { selectedTopic = it }
+            )
+
+            visibleArticles.forEach { article ->
+                SwipeDeleteArticleRow(
+                    article = article,
+                    isDeleting = deletingArticleUrl == article.url,
+                    onDeleteArticle = onDeleteArticle
                 )
-                groupedArticles.getValue(topic).forEach { article ->
-                    SwipeDeleteArticleRow(
-                        article = article,
-                        isDeleting = deletingArticleUrl == article.url,
-                        onDeleteArticle = onDeleteArticle
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopicTabs(
+    topics: List<String>,
+    selectedTopic: String,
+    onSelectTopic: (String) -> Unit
+) {
+    val selectedIndex = topics.indexOf(selectedTopic).coerceAtLeast(0)
+
+    ScrollableTabRow(
+        selectedTabIndex = selectedIndex,
+        containerColor = AppBackground,
+        contentColor = SoftBlue,
+        edgePadding = 0.dp
+    ) {
+        topics.forEach { topic ->
+            Tab(
+                selected = selectedTopic == topic,
+                onClick = { onSelectTopic(topic) },
+                text = {
+                    Text(
+                        text = topic,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            }
+            )
         }
     }
 }
@@ -539,35 +564,57 @@ private fun SwipeDeleteArticleRow(
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.StartToEnd && !isDeleting) {
-                onDeleteArticle(article.url)
-            }
-            false
+            value == SwipeToDismissBoxValue.EndToStart
         }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = true,
-        enableDismissFromEndToStart = false,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
         backgroundContent = {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(SoftRedLight, RoundedCornerShape(18.dp))
                     .padding(horizontal = 18.dp),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Text(
-                    text = if (isDeleting) "Deleting..." else "Delete",
-                    color = SoftRed,
-                    fontWeight = FontWeight.Bold
-                )
+                TextButton(
+                    onClick = { onDeleteArticle(article.url) },
+                    enabled = !isDeleting
+                ) {
+                    Text(
+                        text = if (isDeleting) "Deleting..." else "Delete",
+                        color = SoftRed,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     ) {
         SavedArticleCard(article = article, isDeleting = isDeleting)
     }
+}
+
+private fun articleTopicDistribution(articles: List<SavedArticle>): List<TopicDistribution> {
+    if (articles.isEmpty()) {
+        return emptyList()
+    }
+
+    val total = articles.size.toDouble()
+    return articles
+        .groupingBy { it.topic.ifBlank { "其他" } }
+        .eachCount()
+        .entries
+        .sortedByDescending { it.value }
+        .map { (topic, count) ->
+            TopicDistribution(
+                topic = topic,
+                chunkCount = count,
+                percentage = round(count * 10000.0 / total) / 100.0
+            )
+        }
 }
 
 @Composable

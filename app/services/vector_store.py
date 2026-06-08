@@ -90,6 +90,14 @@ class VectorStoreService:
         ],
         "新闻": [
             "新闻",
+            "央视新闻",
+            "新华社",
+            "人民日报",
+            "中新网",
+            "央广网",
+            "观察者网",
+            "新闻客户端",
+            "新闻报道",
             "通报",
             "发布",
             "记者",
@@ -97,6 +105,19 @@ class VectorStoreService:
             "事件",
             "社会",
             "政策",
+            "政务",
+            "民生",
+            "条例",
+            "修订",
+            "征求意见",
+            "公开征求意见",
+            "近日",
+            "据悉",
+            "消息称",
+            "报道称",
+            "媒体",
+            "直播",
+            "播报",
             "最新",
         ],
     }
@@ -198,7 +219,11 @@ class VectorStoreService:
 
             title = metadata.get("title", "") or url
             domain = self._domain_from_url(url)
-            topic = self._classify_topic(f"{title}\n{content}")
+            topic = metadata.get("topic", "") or self.classify_topic(
+                url=url,
+                title=title,
+                content=content,
+            )
             article = articles.setdefault(
                 url,
                 {
@@ -276,7 +301,11 @@ class VectorStoreService:
             url = metadata.get("url", "") or ""
             title = metadata.get("title", "") or url or "Untitled"
             domain = self._domain_from_url(url)
-            topic = self._classify_topic(f"{title}\n{content}")
+            topic = metadata.get("topic", "") or self.classify_topic(
+                url=url,
+                title=title,
+                content=content,
+            )
 
             if url not in articles:
                 articles[url] = {
@@ -427,8 +456,15 @@ class VectorStoreService:
             return 0.0
         return round(value * 100 / total, 2)
 
+    def classify_topic(self, url: str, title: str, content: str) -> str:
+        domain = self._domain_from_url(url)
+        return self._classify_topic(f"{url}\n{domain}\n{title}\n{content}")
+
     def _classify_topic(self, text: str) -> str:
         lowered = text.lower()
+        if self._is_news_source_or_article(lowered):
+            return "新闻"
+
         scores = {
             topic: sum(1 for keyword in keywords if keyword.lower() in lowered)
             for topic, keywords in self.TOPIC_KEYWORDS.items()
@@ -437,3 +473,20 @@ class VectorStoreService:
         if score <= 0:
             return "其他"
         return topic
+
+    def _is_news_source_or_article(self, lowered_text: str) -> bool:
+        news_signals = [
+            "mbd.baidu.com/newspage",
+            "baijiahao.baidu.com",
+            "news.baidu.com",
+            "news.",
+            "/news/",
+            "cctv.com",
+            "央视新闻",
+            "新华社",
+            "人民日报",
+            "中新网",
+            "央广网",
+            "新闻客户端",
+        ]
+        return any(signal in lowered_text for signal in news_signals)

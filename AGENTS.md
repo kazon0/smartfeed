@@ -30,6 +30,8 @@ Backend 已实现：
 * `QueryIntentService`
 * ChromaDB 持久化存储
 * DeepSeek summary / answer
+* DeepSeek article topic classification
+* Rule-based topic fallback
 * Jina Reader 优先网页解析
 * HTML fallback 解析
 * sections 结构化解析
@@ -58,7 +60,7 @@ Backend 已实现：
 * Android Analysis 右上角文章管理入口
 * Android 已保存文章按 topic 分组展示
 * Android 文章列表点击打开原网页
-* Android 文章列表右滑删除知识库文章
+* Android 文章列表左滑显示删除按钮
 
 当前未实现：
 
@@ -270,5 +272,5 @@ Android MVP 阶段：
 建议下一步：
 
 1. 验证 Android 分享入口、本地 Room 历史恢复、Analysis 主题占比和文章管理页。
-2. 继续优化统计分类质量，考虑 LLM 分类或 embedding 聚类。
+2. 继续优化 RAG 检索和回答质量，优先考虑 query rewrite、rerank、context compression。
 3. 后续再处理更复杂的本地数据结构，例如拆分 messages 表。

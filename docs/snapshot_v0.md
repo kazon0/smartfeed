@@ -48,9 +48,12 @@
     - 调用 `WebParserService.prepare(url)` 抓取并解析网页。
     - 解析成功后检查 `data["chunks"]`。
     - 如果 chunks 为空，返回 failed，不写入 ChromaDB，不调用 summary。
-    - 如果 chunks 非空，先调用 `VectorStoreService.delete_by_url(url)` 删除同 URL 旧 chunks。
+    - 如果 chunks 非空，调用 `LLMService.summarize(data["content"])` 生成中文 summary。
+    - 调用 `LLMService.classify_topic(title, url, summary, content)` 生成文章 topic。
+    - 如果 LLM topic 分类不可用或置信度低于 `0.55`，使用 `VectorStoreService.classify_topic()` 的规则分类 fallback。
+    - 将 `topic`、`topic_source`、`topic_confidence`、`topic_reason` 写入网页 metadata。
+    - 调用 `VectorStoreService.delete_by_url(url)` 删除同 URL 旧 chunks。
     - 调用 `VectorStoreService.add_chunks(chunks, metadata, chunk_metadata)` 写入 ChromaDB。
-    - 调用 `LLMService.summarize(data["content"])` 生成中文 summary。
   - 返回字段：
     - `status`
     - `data`
@@ -165,12 +168,13 @@
     - 写入时会将通用 metadata 和每个 chunk 的 `section_index`、`section_title`、`section_chunk_index` 合并。
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
     - `delete_by_url(url)` 返回删除的 chunk 数。
-    - `list_articles(limit=1000)` 按 URL 聚合返回已保存文章列表，并基于 chunks 内容返回文章 `topic`。
+    - `list_articles(limit=1000)` 按 URL 聚合返回已保存文章列表。
+    - `list_articles()` 优先使用 chunks metadata 中保存的 `topic`，旧数据没有 topic 时使用规则分类 fallback。
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
     - `get_all_chunks(limit=1000)` 返回本地知识库中的 chunks，用于轻量关键词召回。
     - `list_sources(limit=10)` 返回已保存文章来源列表。
     - `stats(limit=5000)` 返回知识库 chunks、文章、来源域名和主题占比统计。
-    - 主题占比当前基于内置关键词规则分类，分类包括科技、学习、健康、职业、财经、生活、新闻、其他。
+    - 规则分类包括科技、学习、健康、职业、财经、生活、新闻、其他，用于旧数据和 LLM 不可用时 fallback。
     - `query(text, top_k=5, metadata_filter=None)` 执行语义检索。
     - query 支持可选 Chroma metadata filter。
     - 优先使用 `sentence-transformers` 的 `all-MiniLM-L6-v2`。
@@ -184,6 +188,7 @@
     - 使用 `python-dotenv` 加载 `.env`。
     - 从环境变量 `DEEPSEEK_API_KEY` 读取 API Key。
     - `summarize(text)` 生成 100 到 200 字中文总结。
+    - `classify_topic(title, url, summary, content)` 基于 DeepSeek 对文章做单标签 topic 分类，返回 topic、confidence、reason、source。
     - `answer(question, context_chunks)` 基于 context chunks 生成自然语言回答。
     - `answer()` prompt 要求最终回答面向普通用户，单篇文章场景使用文章标题或当前网页自然引用，不要求用户理解来源编号。
     - `answer_without_context(question, reason)` 在无可用知识库上下文或通用兜底场景生成回答。
@@ -223,13 +228,14 @@
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
-  - Analysis tab 当前调用后端 `/stats` 展示知识库主题占比、文章占比和来源域名占比。
+  - Analysis tab 当前调用后端 `/stats` 展示知识库文章数、chunks 数和来源域名占比。
+  - Analysis tab 的 Topic share 当前基于 `/articles` 返回的文章 `topic` 按文章数量统计。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
   - Analysis tab 右上角提供文章管理入口。
   - 文章管理页调用后端 `/articles` 展示已保存文章列表。
-  - 文章管理页按 `topic` 分组展示文章。
+  - 文章管理页用顶部 topic tabs 切换文章分类。
   - 文章管理页点击文章可以跳转原网页。
-  - 文章管理页可以调用后端 `DELETE /articles` 按 URL 右滑删除知识库文章。
+  - 文章管理页左滑文章会显示 Delete 按钮，点击按钮后调用后端 `DELETE /articles` 按 URL 删除知识库文章。
   - 删除文章后会刷新文章列表和知识库统计。
   - Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
@@ -256,7 +262,7 @@ URL → Jina Reader 或 HTML fallback → text → sections → chunks + chunk m
 
 ### `/upload`
 
-URL → parse → clean text → sections → chunks + section metadata → delete old chunks by URL → embedding → ChromaDB → DeepSeek summary → response
+URL → parse → clean text → sections → chunks + section metadata → DeepSeek summary → LLM topic classification or rule fallback → delete old chunks by URL → embedding → ChromaDB → response
 
 ### `/search`
 
@@ -264,7 +270,9 @@ query → embedding → ChromaDB topK chunks → search results
 
 ### `/stats`
 
-ChromaDB chunks → topic keyword classification → topics/domains/articles distribution → Android Analysis pie chart
+ChromaDB chunks → topic keyword classification → topics/domains/articles distribution → Android Analysis source/domain stats
+
+ChromaDB articles → article topic grouping → Android Analysis topic pie chart + article manager tabs
 
 ### `/chat`
 
@@ -293,6 +301,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 同 URL 覆盖更新已实现。
 - 已保存文章列表接口已实现。
 - 按 URL 删除文章 chunks 接口已实现。
+- 上传时 DeepSeek topic 分类已实现。
+- topic 分类低置信度或不可用时规则 fallback 已实现。
 - ChromaDB 持久化向量存储已实现。
 - `smartfeed` collection 已实现。
 - chunks 写入向量库已实现。
@@ -303,7 +313,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - search results 返回 `content`、`metadata`、`score` 已实现。
 - `GET /stats` 知识库统计接口已实现。
 - stats 返回主题占比、来源域名占比和文章占比已实现。
-- stats 主题分类当前使用轻量关键词规则已实现。
+- stats chunks 主题分类当前使用轻量关键词规则已实现。
+- articles topic 优先使用上传时保存的 LLM 分类结果已实现。
 - `POST /chat` 问答接口已实现。
 - chat query intent classification 已实现。
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
@@ -332,6 +343,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - DeepSeek API 调用封装已实现。
 - `.env` API Key 加载已实现。
 - `LLMService.summarize(text)` 已实现。
+- `LLMService.classify_topic(title, url, summary, content)` 已实现。
 - `LLMService.answer(question, context_chunks)` 已实现。
 - `LLMService.answer_without_context(question, reason)` 已实现。
 - `/upload` 返回 `summary` 字段已实现。
@@ -358,9 +370,10 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现知识库主题占比饼图。
 - Android 端已展示主题、文章和来源域名分布。
 - Android 端已通过 Analysis 右上角入口进入文章管理页。
-- Android 文章管理页已按 topic 分组展示已保存文章。
+- Android Analysis Topic share 已改为按文章数量统计 topic。
+- Android 文章管理页已使用 topic tabs 展示已保存文章。
 - Android 文章管理页已支持点击打开原网页。
-- Android 文章管理页已支持右滑删除知识库文章。
+- Android 文章管理页已支持左滑显示删除按钮。
 
 ## 5. 当前系统边界
 
@@ -411,7 +424,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
-- stats 主题分类当前是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
+- stats chunks 主题分类当前仍是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
+- 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
 - Android 当前没有登录、WebSocket 或 session。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
