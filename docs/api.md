@@ -243,6 +243,87 @@ curl http://127.0.0.1:8000/stats
 - Topic classification is rule-based and may be inaccurate for ambiguous content.
 - ChromaDB dependencies or local database files are unavailable.
 
+## GET /articles
+
+Lists saved articles currently represented in ChromaDB.
+
+### Request JSON
+
+No request body.
+
+### Response JSON
+
+```json
+{
+  "articles": [
+    {
+      "url": "https://example.com/article",
+      "title": "Example Article",
+      "domain": "example.com",
+      "chunk_count": 4,
+      "topic": "科技"
+    }
+  ],
+  "total": 1
+}
+```
+
+### curl
+
+```bash
+curl http://127.0.0.1:8000/articles
+```
+
+### Typical Failures
+
+- No uploaded content returns an empty list.
+- ChromaDB dependencies or local database files are unavailable.
+
+## DELETE /articles
+
+Deletes all chunks for a saved article URL.
+
+### Request JSON
+
+```json
+{
+  "url": "https://example.com/article"
+}
+```
+
+### Response JSON
+
+```json
+{
+  "status": "deleted",
+  "url": "https://example.com/article",
+  "deleted_chunks": 4
+}
+```
+
+If the URL is not found:
+
+```json
+{
+  "status": "not_found",
+  "url": "https://example.com/missing",
+  "deleted_chunks": 0
+}
+```
+
+### curl
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/articles \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/article"}'
+```
+
+### Typical Failures
+
+- URL does not exist in the local ChromaDB collection.
+- ChromaDB dependencies or local database files are unavailable.
+
 ## POST /chat
 
 Runs retrieval and sends retrieved context to DeepSeek to generate an answer.

@@ -51,15 +51,19 @@ Backend 已实现：
 * Android 分享 URL 自动上传并创建新对话
 * Android SharedPreferences 本地历史对话保存
 * `GET /stats`
+* `GET /articles`
+* `DELETE /articles`
 * Android Analysis 主题占比饼图
+* Android Analysis 右上角文章管理入口
+* Android 已保存文章按 topic 分组展示
+* Android 文章列表点击打开原网页
+* Android 文章列表右滑删除知识库文章
 
 当前未实现：
 
 * 用户系统
 * session / 多会话管理
 * WebSocket
-* 文章删除接口
-* 文章列表接口
 * Android Profile 真实个人中心
 * Room 本地移动端数据库
 * 实时搜索、天气、股价、汇率等外部实时工具
@@ -265,6 +269,6 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 验证 Android 分享入口、本地历史恢复和 Analysis 主题占比。
+1. 验证 Android 分享入口、本地历史恢复、Analysis 主题占比和文章管理页。
 2. 后续再决定是否用 Room 替换 SharedPreferences。
 3. 继续优化统计分类质量，考虑 LLM 分类或 embedding 聚类。

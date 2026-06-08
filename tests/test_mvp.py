@@ -150,6 +150,51 @@ def test_stats_returns_content_distribution(monkeypatch):
     assert data["domains"][0]["domain"] == "example.com"
 
 
+def test_articles_list_returns_saved_articles(monkeypatch):
+    class FakeVectorStoreService:
+        def list_articles(self):
+            return [
+                {
+                    "url": "https://example.com/a",
+                    "title": "A",
+                    "domain": "example.com",
+                    "chunk_count": 3,
+                    "topic": "科技",
+                }
+            ]
+
+    monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+
+    response = client.get("/articles")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == 1
+    assert data["articles"][0]["url"] == "https://example.com/a"
+    assert data["articles"][0]["chunk_count"] == 3
+    assert data["articles"][0]["topic"] == "科技"
+
+
+def test_articles_delete_by_url(monkeypatch):
+    class FakeVectorStoreService:
+        def delete_by_url(self, url):
+            assert url == "https://example.com/a"
+            return 3
+
+    monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+
+    response = client.request(
+        "DELETE",
+        "/articles",
+        json={"url": "https://example.com/a"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "deleted"
+    assert data["deleted_chunks"] == 3
+
+
 def test_chat_without_data_returns_answer_or_fallback(monkeypatch):
     class FakeVectorStoreService:
         def query(self, text, top_k=5, metadata_filter=None):

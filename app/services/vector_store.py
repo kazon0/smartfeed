@@ -148,14 +148,15 @@ class VectorStoreService:
             return {}
         return chunk_metadata[index] or {}
 
-    def delete_by_url(self, url: str) -> None:
+    def delete_by_url(self, url: str) -> int:
         if not url:
-            return
+            return 0
 
         result = self.collection.get(where={"url": url})
         ids = result.get("ids", [])
         if ids:
             self.collection.delete(ids=ids)
+        return len(ids)
 
     def list_sources(self, limit: int = 10) -> list[dict[str, Any]]:
         result = self.collection.get(include=["metadatas"])
@@ -183,6 +184,45 @@ class VectorStoreService:
                 break
 
         return sources
+
+    def list_articles(self, limit: int = 1000) -> list[dict[str, Any]]:
+        chunks = self.get_all_chunks(limit=limit)
+        articles: dict[str, dict[str, Any]] = {}
+
+        for chunk in chunks:
+            content = chunk.get("content", "") or ""
+            metadata = chunk.get("metadata", {}) or {}
+            url = metadata.get("url", "") or ""
+            if not url:
+                continue
+
+            title = metadata.get("title", "") or url
+            domain = self._domain_from_url(url)
+            topic = self._classify_topic(f"{title}\n{content}")
+            article = articles.setdefault(
+                url,
+                {
+                    "url": url,
+                    "title": title,
+                    "domain": domain,
+                    "chunk_count": 0,
+                    "topic": "其他",
+                    "_topic_counts": defaultdict(int),
+                },
+            )
+            article["chunk_count"] += 1
+            article["_topic_counts"][topic] += 1
+
+        for article in articles.values():
+            topic_counts = article.pop("_topic_counts", {})
+            if topic_counts:
+                article["topic"] = max(topic_counts.items(), key=lambda item: item[1])[0]
+
+        return sorted(
+            articles.values(),
+            key=lambda item: item["chunk_count"],
+            reverse=True,
+        )
 
     def get_chunks_by_url(self, url: str) -> list[dict[str, Any]]:
         if not url:

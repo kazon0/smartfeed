@@ -4,9 +4,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 
 interface SmartFeedApi {
+    @GET("articles")
+    suspend fun articles(): ArticlesResponse
+
+    @HTTP(method = "DELETE", path = "articles", hasBody = true)
+    suspend fun deleteArticle(@Body request: DeleteArticleRequest): DeleteArticleResponse
+
     @GET("stats")
     suspend fun stats(): StatsResponse
 
@@ -20,6 +27,35 @@ interface SmartFeedApi {
 @Serializable
 data class UploadRequest(
     val url: String
+)
+
+@Serializable
+data class ArticlesResponse(
+    val articles: List<SavedArticle> = emptyList(),
+    val total: Int = 0
+)
+
+@Serializable
+data class SavedArticle(
+    val url: String = "",
+    val title: String = "",
+    val domain: String = "",
+    @SerialName("chunk_count")
+    val chunkCount: Int = 0,
+    val topic: String = "其他"
+)
+
+@Serializable
+data class DeleteArticleRequest(
+    val url: String
+)
+
+@Serializable
+data class DeleteArticleResponse(
+    val status: String = "",
+    val url: String = "",
+    @SerialName("deleted_chunks")
+    val deletedChunks: Int = 0
 )
 
 @Serializable

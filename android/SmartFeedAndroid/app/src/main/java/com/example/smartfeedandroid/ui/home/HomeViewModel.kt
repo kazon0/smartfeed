@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.local.ConversationStore
 import com.example.smartfeedandroid.data.local.StoredChatMessage
 import com.example.smartfeedandroid.data.local.StoredConversation
+import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.data.repository.StatsRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
@@ -18,6 +19,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val uploadRepository = UploadRepository()
     private val chatRepository = ChatRepository()
     private val statsRepository = StatsRepository()
+    private val articleRepository = ArticleRepository()
     private val conversationStore = ConversationStore(application.applicationContext)
 
     var uiState by mutableStateOf(HomeUiState())
@@ -50,7 +52,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             url = cleanUrl,
             lastSharedUrl = cleanUrl,
             selectedTab = AppTab.Home,
-            isChatOpen = false
+            isChatOpen = false,
+            isArticleManagerOpen = false
         )
         upload()
     }
@@ -59,13 +62,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = if (tab == AppTab.Home) {
             uiState.copy(
                 selectedTab = tab,
-                isChatOpen = false
+                isChatOpen = false,
+                isArticleManagerOpen = false
             )
         } else {
-            uiState.copy(selectedTab = tab)
+            uiState.copy(
+                selectedTab = tab,
+                isArticleManagerOpen = false
+            )
         }
         if (tab == AppTab.Analysis) {
             refreshStats()
+            refreshArticles()
         }
     }
 
@@ -73,7 +81,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(
             selectedTab = AppTab.Home,
             isChatOpen = false,
+            isArticleManagerOpen = false,
             errorMessage = null
+        )
+    }
+
+    fun openArticleManager() {
+        uiState = uiState.copy(
+            selectedTab = AppTab.Analysis,
+            isArticleManagerOpen = true,
+            articlesErrorMessage = null
+        )
+        refreshArticles()
+    }
+
+    fun closeArticleManager() {
+        uiState = uiState.copy(
+            isArticleManagerOpen = false,
+            articlesErrorMessage = null
         )
     }
 
@@ -83,6 +108,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
+            isArticleManagerOpen = false,
             activeUrl = conversation.url,
             messages = conversation.messages,
             uploadResponse = null,
@@ -101,6 +127,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
+            isArticleManagerOpen = false,
             activeUrl = "",
             uploadResponse = null,
             errorMessage = null,
@@ -151,6 +178,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         activeConversationId = conversation.id,
                         selectedTab = AppTab.Home,
                         isChatOpen = true,
+                        isArticleManagerOpen = false,
                         activeUrl = parsedUrl,
                         conversations = listOf(conversation) + uiState.conversations,
                         messages = conversation.messages
@@ -188,6 +216,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             activeConversationId = conversationId,
             selectedTab = AppTab.Home,
             isChatOpen = true,
+            isArticleManagerOpen = false,
             activeUrl = activeUrl,
             messages = updatedMessages,
             query = "",
@@ -246,6 +275,54 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshArticles() {
+        uiState = uiState.copy(
+            isLoadingArticles = true,
+            articlesErrorMessage = null
+        )
+
+        viewModelScope.launch {
+            articleRepository.getArticles()
+                .onSuccess { articles ->
+                    uiState = uiState.copy(articlesResponse = articles)
+                }
+                .onFailure { error ->
+                    uiState = uiState.copy(
+                        articlesErrorMessage = error.message ?: "Failed to load articles."
+                    )
+                }
+
+            uiState = uiState.copy(isLoadingArticles = false)
+        }
+    }
+
+    fun deleteArticle(url: String) {
+        val cleanUrl = url.trim()
+        if (cleanUrl.isBlank()) {
+            return
+        }
+
+        uiState = uiState.copy(
+            deletingArticleUrl = cleanUrl,
+            articlesErrorMessage = null
+        )
+
+        viewModelScope.launch {
+            articleRepository.deleteArticle(cleanUrl)
+                .onSuccess {
+                    refreshArticles()
+                    refreshStats()
+                }
+                .onFailure { error ->
+                    uiState = uiState.copy(
+                        articlesErrorMessage = error.message ?: "Failed to delete article."
+                    )
+                }
+
+            uiState = uiState.copy(deletingArticleUrl = null)
+        }
+    }
+
     private fun ensureActiveConversation(): Conversation {
         val activeConversation = uiState.conversations
             .firstOrNull { it.id == uiState.activeConversationId }
@@ -262,6 +339,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
+            isArticleManagerOpen = false,
             conversations = listOf(conversation) + uiState.conversations,
             messages = emptyList(),
             activeUrl = ""

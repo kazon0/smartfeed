@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -32,8 +33,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.data.remote.ChatResponse
 import com.example.smartfeedandroid.data.remote.ChatSource
+import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.remote.StatsResponse
 import com.example.smartfeedandroid.data.remote.TopicDistribution
 import com.example.smartfeedandroid.data.remote.UploadResponse
@@ -72,6 +77,9 @@ fun SmartFeedScreen(
         onSelectConversation = viewModel::selectConversation,
         onStartGlobalConversation = viewModel::startGlobalConversation,
         onBackToConversations = viewModel::showConversationList,
+        onOpenArticleManager = viewModel::openArticleManager,
+        onCloseArticleManager = viewModel::closeArticleManager,
+        onDeleteArticle = viewModel::deleteArticle,
         onDismissError = viewModel::clearError,
         modifier = modifier
     )
@@ -88,6 +96,9 @@ private fun SmartFeedContent(
     onSelectConversation: (String) -> Unit,
     onStartGlobalConversation: () -> Unit,
     onBackToConversations: () -> Unit,
+    onOpenArticleManager: () -> Unit,
+    onCloseArticleManager: () -> Unit,
+    onDeleteArticle: (String) -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,7 +108,10 @@ private fun SmartFeedContent(
     Surface(modifier = modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
-                if (!(uiState.selectedTab == AppTab.Home && uiState.isChatOpen)) {
+                if (
+                    !(uiState.selectedTab == AppTab.Home && uiState.isChatOpen) &&
+                    !(uiState.selectedTab == AppTab.Analysis && uiState.isArticleManagerOpen)
+                ) {
                     AppBottomBar(
                         selectedTab = uiState.selectedTab,
                         onSelectTab = onSelectTab
@@ -145,13 +159,26 @@ private fun SmartFeedContent(
                 }
 
                 AppTab.Analysis -> {
-                    AnalysisScreen(
-                        conversations = uiState.conversations,
-                        stats = uiState.statsResponse,
-                        isLoading = uiState.isLoadingStats,
-                        errorMessage = uiState.statsErrorMessage,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    if (uiState.isArticleManagerOpen) {
+                        ArticleManagerScreen(
+                            articles = uiState.articlesResponse?.articles.orEmpty(),
+                            isLoadingArticles = uiState.isLoadingArticles,
+                            deletingArticleUrl = uiState.deletingArticleUrl,
+                            articlesErrorMessage = uiState.articlesErrorMessage,
+                            onBack = onCloseArticleManager,
+                            onDeleteArticle = onDeleteArticle,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        AnalysisScreen(
+                            conversations = uiState.conversations,
+                            stats = uiState.statsResponse,
+                            isLoading = uiState.isLoadingStats,
+                            errorMessage = uiState.statsErrorMessage,
+                            onOpenArticleManager = onOpenArticleManager,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
 
                 AppTab.Profile -> {
@@ -309,6 +336,7 @@ private fun AnalysisScreen(
     stats: StatsResponse?,
     isLoading: Boolean,
     errorMessage: String?,
+    onOpenArticleManager: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val localArticles = conversations.count { it.url.isNotBlank() }
@@ -322,11 +350,20 @@ private fun AnalysisScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Analysis",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Analysis",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            TextButton(onClick = onOpenArticleManager) {
+                Text("Articles")
+            }
+        }
 
         Text(
             text = "Knowledge base content distribution.",
@@ -401,6 +438,176 @@ private fun AnalysisScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ArticleManagerScreen(
+    articles: List<SavedArticle>,
+    isLoadingArticles: Boolean,
+    deletingArticleUrl: String?,
+    articlesErrorMessage: String?,
+    onBack: () -> Unit,
+    onDeleteArticle: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val groupedArticles = articles.groupBy { it.topic.ifBlank { "其他" } }
+    val topicOrder = listOf("科技", "学习", "健康", "职业", "财经", "生活", "新闻", "其他")
+    val orderedTopics = groupedArticles.keys.sortedWith(
+        compareBy<String> { topic ->
+            topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.size
+        }.thenBy { it }
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBack) {
+                Text("‹", style = MaterialTheme.typography.headlineMedium)
+            }
+            Text(
+                text = "Saved articles",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Text(
+            text = "Grouped by topic. Tap an article to open it, or swipe right to delete it.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        articlesErrorMessage?.let {
+            ResultCard(title = "Articles Error") {
+                Text(text = it, color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        if (isLoadingArticles) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (articles.isEmpty()) {
+            ResultCard(title = "No saved articles") {
+                Text(
+                    text = "Upload or share articles first.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            orderedTopics.forEach { topic ->
+                Text(
+                    text = topic,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                groupedArticles.getValue(topic).forEach { article ->
+                    SwipeDeleteArticleRow(
+                        article = article,
+                        isDeleting = deletingArticleUrl == article.url,
+                        onDeleteArticle = onDeleteArticle
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeDeleteArticleRow(
+    article: SavedArticle,
+    isDeleting: Boolean,
+    onDeleteArticle: (String) -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd && !isDeleting) {
+                onDeleteArticle(article.url)
+            }
+            false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = false,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(SoftRedLight, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 18.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = if (isDeleting) "Deleting..." else "Delete",
+                    color = SoftRed,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    ) {
+        SavedArticleCard(article = article, isDeleting = isDeleting)
+    }
+}
+
+@Composable
+private fun SavedArticleCard(
+    article: SavedArticle,
+    isDeleting: Boolean
+) {
+    val uriHandler = LocalUriHandler.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = article.url.isNotBlank() && !isDeleting) {
+                uriHandler.openUri(article.url)
+            },
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(
+                text = article.title.ifBlank { article.url.ifBlank { "Untitled article" } },
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (article.domain.isNotBlank()) {
+                Text(
+                    text = article.domain,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "${article.chunkCount} chunks",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -978,3 +1185,5 @@ private val AppBackground = Color(0xFFF6F3EE)
 private val SoftBlue = Color(0xFF8FAADC)
 private val SoftBlueLight = Color(0xFFE7EEF8)
 private val SoftGreen = Color(0xFFA8C7A3)
+private val SoftRed = Color(0xFFC77878)
+private val SoftRedLight = Color(0xFFF4E4E2)

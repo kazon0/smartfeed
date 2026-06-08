@@ -14,7 +14,7 @@
 - 调用后端 `/chat`。
 - 用聊天气泡展示用户问题和 AI 回答。
 - 展示基础 sources。
-- 使用本地内存维护 conversations 和 messages。
+- 使用本地 SharedPreferences 保存 conversations 和 messages。
 - Home / Analysis / Profile 底部 tab。
 - Home 展示历史对话列表。
 - 点击历史对话进入聊天详情页。
@@ -22,11 +22,16 @@
 - 分享 URL 后自动创建新对话并展示 summary。
 - Analysis 展示后端 `/stats` 返回的知识库主题占比。
 - Analysis 使用饼图展示主题分布。
+- 后端提供已保存文章列表和按 URL 删除文章 chunks 的接口。
+- Android Analysis 右上角提供文章管理入口。
+- Android 文章管理页按 topic 分组展示历史文章。
+- Android 文章管理页点击文章可跳转原网页。
+- Android 文章管理页支持右滑删除知识库文章。
 
 暂不做：
 
 - Room 本地数据库。
-- 历史会话持久化。
+- 更完整的知识库管理页面，例如搜索、筛选、批量操作。
 - Profile 真实用户能力。
 - 用户登录。
 - 云端同步。
@@ -43,7 +48,7 @@
 
 目标：形成“分享网页即创建新对话”的产品形态。
 
-范围：
+当前实现：
 
 - 设计 Android 本地 `Conversation` 和 `Message` 模型。
 - 首页从单页面改为历史对话入口的雏形。
@@ -108,9 +113,16 @@
 - `/stats` 基于 ChromaDB chunks 统计主题、来源域名、文章占比。
 - 主题分类当前使用轻量关键词规则。
 - Android Analysis 页已展示主题饼图和分布列表。
+- 后端已提供 `/articles` 列出 ChromaDB 中已保存文章。
+- 后端已提供 `DELETE /articles` 按 URL 删除该文章对应 chunks。
+- Android Analysis 页已提供文章管理入口。
+- Android 文章管理页已按 topic 展示已保存文章。
+- Android 文章管理页已支持点击打开原网页。
+- Android 文章管理页已支持右滑删除已保存文章。
 
 范围：
 
+- 后续可将文章管理页升级为更完整的知识库管理入口。
 - 后续可升级为 LLM 分类、embedding 聚类或用户自定义标签。
 - 后续可统计保存时间、阅读/提问频率和主题趋势。
 - 后续可从后端返回更稳定的分类标签体系。
@@ -222,11 +234,9 @@
 
 ## 当前推荐顺序
 
-1. 完成 Android MVP 闭环。
-2. 实现分享 URL 到 App，并创建新对话。
-3. 引入 Room，保存本地历史对话。
-4. 增加知识库统计。
-5. 升级 RAG 检索质量。
-6. 在确实需要编排能力时引入 LangChain。
-7. 做云端存储和用户管理。
-8. 做高级记忆和个性化。
+1. 验证当前 Android MVP 闭环：上传、分享、聊天、本地历史、Analysis、文章管理页。
+2. 引入 Room，替换 SharedPreferences 保存本地历史对话。
+3. 升级 RAG 检索质量。
+4. 在确实需要编排能力时引入 LangChain。
+5. 做云端存储和用户管理。
+6. 做高级记忆和个性化。

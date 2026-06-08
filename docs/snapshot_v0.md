@@ -4,6 +4,32 @@
 
 ### FastAPI routes
 
+- `GET /articles`
+  - 定义位置：`app/routes/articles.py`
+  - 当前流程：
+    - 调用 `VectorStoreService.list_articles()`。
+    - 基于 ChromaDB chunks metadata 聚合已保存文章。
+  - 返回字段：
+    - `articles`
+    - `total`
+  - `articles` item 当前字段：
+    - `url`
+    - `title`
+    - `domain`
+    - `chunk_count`
+    - `topic`
+
+- `DELETE /articles`
+  - 定义位置：`app/routes/articles.py`
+  - 输入：`{"url": "..."}`
+  - 当前流程：
+    - 调用 `VectorStoreService.delete_by_url(url)`。
+    - 删除该 URL 对应的全部 chunks。
+  - 返回字段：
+    - `status`
+    - `url`
+    - `deleted_chunks`
+
 - `GET /`
   - 定义位置：`app/main.py`
   - 返回：`{"status": "ok"}`
@@ -138,6 +164,8 @@
     - `add_chunks(chunks, metadata, chunk_metadata=None)` 写入 chunks、embeddings、metadata。
     - 写入时会将通用 metadata 和每个 chunk 的 `section_index`、`section_title`、`section_chunk_index` 合并。
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
+    - `delete_by_url(url)` 返回删除的 chunk 数。
+    - `list_articles(limit=1000)` 按 URL 聚合返回已保存文章列表，并基于 chunks 内容返回文章 `topic`。
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
     - `get_all_chunks(limit=1000)` 返回本地知识库中的 chunks，用于轻量关键词召回。
     - `list_sources(limit=10)` 返回已保存文章来源列表。
@@ -197,6 +225,12 @@
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
   - Analysis tab 当前调用后端 `/stats` 展示知识库主题占比、文章占比和来源域名占比。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
+  - Analysis tab 右上角提供文章管理入口。
+  - 文章管理页调用后端 `/articles` 展示已保存文章列表。
+  - 文章管理页按 `topic` 分组展示文章。
+  - 文章管理页点击文章可以跳转原网页。
+  - 文章管理页可以调用后端 `DELETE /articles` 按 URL 右滑删除知识库文章。
+  - 删除文章后会刷新文章列表和知识库统计。
   - Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
@@ -255,6 +289,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chunk 与 section metadata 关联已实现。
 - 噪声 chunk 过滤已实现。
 - 同 URL 覆盖更新已实现。
+- 已保存文章列表接口已实现。
+- 按 URL 删除文章 chunks 接口已实现。
 - ChromaDB 持久化向量存储已实现。
 - `smartfeed` collection 已实现。
 - chunks 写入向量库已实现。
@@ -318,6 +354,10 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现 Analysis 页调用后端 `/stats`。
 - Android 端已实现知识库主题占比饼图。
 - Android 端已展示主题、文章和来源域名分布。
+- Android 端已通过 Analysis 右上角入口进入文章管理页。
+- Android 文章管理页已按 topic 分组展示已保存文章。
+- Android 文章管理页已支持点击打开原网页。
+- Android 文章管理页已支持右滑删除知识库文章。
 
 ## 5. 当前系统边界
 
@@ -333,6 +373,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 将 chunks 关联到对应 section metadata。
 - 将 chunks 转为 embedding。
 - 按 URL 删除旧 chunks 并写入新 chunks。
+- 列出已保存文章。
+- 删除某个 URL 对应的全部 chunks。
 - 将 chunks、metadata、embedding 存入本地 ChromaDB。
 - 调用 DeepSeek 为网页正文生成中文 summary。
 - 接收自然语言 query。
