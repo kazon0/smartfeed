@@ -84,6 +84,7 @@
 
 - `POST /chat`
   - 定义位置：`app/routes/chat.py`
+  - 业务实现位置：`app/services/chat_service.py`
   - 输入：
     - `query`
     - `url` 可选
@@ -132,6 +133,14 @@
     - `fallback_policy`
 
 ### services 层
+
+- `app/services/chat_service.py`
+  - 服务类：`ChatService`
+  - 当前能力：
+    - 承载 `/chat` 的 query intent、query rewrite、page/global retrieval、keyword retrieval、rerank、context compression、fallback 和 sources 构造流程。
+    - `app/routes/chat.py` 只负责 FastAPI 请求模型和调用 `ChatService`。
+    - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService`，便于测试和后续替换 LangChain pipeline。
+    - 对外返回结构保持 `/chat` 当前稳定字段不变。
 
 - `app/services/web_parser.py`
   - 服务类：`WebParserService`
@@ -289,7 +298,7 @@ ChromaDB articles → article topic grouping → Android Analysis topic pie char
 
 ### `/chat`
 
-query + optional url → query intent classification → query rewrite → retrieval scope decision → page/global hybrid retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
+query + optional url → ChatService → query intent classification → query rewrite → retrieval scope decision → page/global hybrid retrieval → keyword rerank / LLM rerank / page context selection → context compression → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
 
 ### `/debug`
 

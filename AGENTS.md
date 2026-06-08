@@ -24,6 +24,7 @@ Backend 已实现：
 * `POST /upload`
 * `POST /search`
 * `POST /chat`
+* `ChatService`
 * `WebParserService`
 * `VectorStoreService`
 * `LLMService`
@@ -143,6 +144,7 @@ Backend:
 * `app/routes/search.py`
 * `app/routes/chat.py`
 * `app/routes/debug.py`
+* `app/services/chat_service.py`
 * `app/services/web_parser.py`
 * `app/services/vector_store.py`
 * `app/services/llm_service.py`
@@ -178,6 +180,7 @@ Runtime/generated files that should not be committed:
 * 不新增用户系统，除非明确要求。
 * 不修改 DeepSeek API key 管理方式，继续使用 `.env` + `python-dotenv`。
 * 不提交运行产物，例如 `chroma_db`、`__pycache__`、`.pyc`。
+* 修改 `/chat` 业务流程时优先修改 `app/services/chat_service.py`，保持 `app/routes/chat.py` 只做请求入口。
 * 修改 `/chat` 时必须注意 Android 客户端稳定字段：
   * `status`
   * `error_code`
