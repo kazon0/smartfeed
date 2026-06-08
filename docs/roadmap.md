@@ -14,7 +14,7 @@
 - 调用后端 `/chat`。
 - 用聊天气泡展示用户问题和 AI 回答。
 - 展示基础 sources。
-- 使用本地 SharedPreferences 保存 conversations 和 messages。
+- 使用本地 Room 保存 conversations 和 messages。
 - Home / Analysis / Profile 底部 tab。
 - Home 展示历史对话列表。
 - 点击历史对话进入聊天详情页。
@@ -30,7 +30,7 @@
 
 暂不做：
 
-- Room 本地数据库。
+- 复杂 Room schema，例如单独 message 表和 migration schema 管理。
 - 更完整的知识库管理页面，例如搜索、筛选、批量操作。
 - Profile 真实用户能力。
 - 用户登录。
@@ -75,17 +75,16 @@
 
 目标：App 重启后仍保留历史对话和消息。
 
-当前过渡实现：
+当前实现：
 
-- 已使用 SharedPreferences 保存本地 conversations。
-- 已使用 kotlinx serialization 将 conversations 序列化为 JSON。
+- 已使用 Room 保存本地 conversations。
+- 已使用 kotlinx serialization 将 messages 序列化为 Room 字段 `messagesJson`。
+- 已支持从旧 SharedPreferences conversations 自动迁移到 Room。
 - App 启动后可以恢复本地历史对话。
 
 范围：
 
-- 引入 Room。
-- 持久化 conversations。
-- 持久化 messages。
+- 后续可将 messages 从 JSON 字段拆为独立 Room 表。
 - 持久化文章 URL、title、summary、created_at。
 - 首页展示历史对话列表。
 - 对话页按 conversation 读取本地 messages。
@@ -235,8 +234,7 @@
 ## 当前推荐顺序
 
 1. 验证当前 Android MVP 闭环：上传、分享、聊天、本地历史、Analysis、文章管理页。
-2. 引入 Room，替换 SharedPreferences 保存本地历史对话。
-3. 升级 RAG 检索质量。
-4. 在确实需要编排能力时引入 LangChain。
-5. 做云端存储和用户管理。
-6. 做高级记忆和个性化。
+2. 升级 RAG 检索质量。
+3. 在确实需要编排能力时引入 LangChain。
+4. 做云端存储和用户管理。
+5. 做高级记忆和个性化。

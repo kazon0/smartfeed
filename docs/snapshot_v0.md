@@ -234,9 +234,11 @@
   - Profile tab 当前为占位页。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
-  - 已实现 `ConversationStore`，使用 Android `SharedPreferences` 保存 conversations。
-  - conversations 会通过 kotlinx serialization 序列化为本地 JSON。
-  - App 启动时会加载本地保存的 conversations。
+  - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
+  - Room 当前表：`conversations`。
+  - conversations 的 messages 当前仍通过 kotlinx serialization 序列化为 `messagesJson` 字段。
+  - 旧 SharedPreferences conversations 会在首次 Room 加载为空时自动迁移到 Room。
+  - App 启动时会从 Room 加载本地保存的 conversations。
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
   - App 会从分享文本中提取第一个 `http` / `https` URL。
   - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
@@ -244,7 +246,7 @@
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
   - 可以在当前进程内切换已有 conversation。
-  - 当前 conversations 和 messages 会保存到本地 SharedPreferences。
+  - 当前 conversations 和 messages 会保存到本地 Room。
 
 ## 2. 当前数据流
 
@@ -350,7 +352,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已将历史对话列表和聊天详情页拆开。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
-- Android 端已实现 SharedPreferences 级本地历史对话保存。
+- Android 端已实现 Room 级本地历史对话保存。
+- Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
 - Android 端已实现知识库主题占比饼图。
 - Android 端已展示主题、文章和来源域名分布。
@@ -409,8 +412,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 - stats 主题分类当前是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
-- Android 当前本地持久化使用 SharedPreferences，不是 Room。
-- Android 当前没有 Room、登录、WebSocket 或 session。
+- Android 当前本地持久化使用 Room。
+- Android 当前没有登录、WebSocket 或 session。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前只是占位页，没有真实用户功能。
 

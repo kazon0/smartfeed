@@ -26,8 +26,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        val conversations = conversationStore.load().map { it.toConversation() }
-        uiState = uiState.copy(conversations = conversations)
+        viewModelScope.launch {
+            val conversations = conversationStore.load().map { it.toConversation() }
+            uiState = uiState.copy(conversations = conversations)
+        }
     }
 
     fun onUrlChange(value: String) {
@@ -396,7 +398,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persistConversations(conversations: List<Conversation>) {
-        conversationStore.save(conversations.map { it.toStoredConversation() })
+        viewModelScope.launch {
+            conversationStore.save(conversations.map { it.toStoredConversation() })
+        }
     }
 
     private fun StoredConversation.toConversation(): Conversation {
