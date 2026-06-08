@@ -100,6 +100,44 @@ def test_llm_classify_topic_parses_json_response(monkeypatch):
     assert result["source"] == "llm"
 
 
+def test_llm_rewrite_query_parses_json_response(monkeypatch):
+    service = LLMService()
+    monkeypatch.setattr(
+        service,
+        "_chat",
+        lambda prompt: '{"query":"Kotlin 协程 学习 方法","reason":"补充检索关键词"}',
+    )
+
+    result = service.rewrite_query("如何学习 Kotlin")
+
+    assert result["query"] == "Kotlin 协程 学习 方法"
+    assert result["source"] == "llm"
+
+
+def test_llm_rerank_chunks_parses_json_array(monkeypatch):
+    service = LLMService()
+    monkeypatch.setattr(service, "_chat", lambda prompt: "[1,0]")
+
+    indexes = service.rerank_chunks(
+        "快速排序怎么理解",
+        ["冒泡排序内容", "快速排序内容"],
+    )
+
+    assert indexes == [1, 0]
+
+
+def test_llm_compress_context_returns_text(monkeypatch):
+    service = LLMService()
+    monkeypatch.setattr(service, "_chat", lambda prompt: "[1] 快速排序核心上下文")
+
+    compressed = service.compress_context(
+        "快速排序怎么理解",
+        ["[1] title: 算法\n快速排序内容和广告噪声"],
+    )
+
+    assert compressed == "[1] 快速排序核心上下文"
+
+
 def test_vector_store_add_chunks_keeps_section_metadata():
     captured = {}
 
@@ -345,6 +383,97 @@ def test_chat_general_query_searches_first_then_llm(monkeypatch):
     assert data["source_type"] == "llm_fallback"
     assert data["sources"] == []
     assert data["fallback_policy"] == "llm_allowed"
+
+
+def test_chat_uses_rewritten_query_for_global_retrieval(monkeypatch):
+    captured_queries = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            captured_queries.append(text)
+            return []
+
+        def get_all_chunks(self):
+            return []
+
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            return {
+                "query": "Kotlin 协程 学习 路线",
+                "source": "llm",
+                "reason": "补充检索关键词",
+            }
+
+        def answer_without_context(self, question, reason):
+            assert question == "如何学习 Kotlin"
+            return f"{reason}。general answer"
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "如何学习 Kotlin"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert captured_queries[0] == "Kotlin 协程 学习 路线"
+    assert data["answer"]
+
+
+def test_chat_reranks_and_compresses_context(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [
+                {
+                    "content": "冒泡排序是相邻元素交换。",
+                    "metadata": {
+                        "url": "https://example.com/algorithms",
+                        "title": "算法",
+                        "chunk_index": 0,
+                    },
+                    "score": 0.8,
+                },
+                {
+                    "content": "快速排序使用基准元素和分治思想。",
+                    "metadata": {
+                        "url": "https://example.com/algorithms",
+                        "title": "算法",
+                        "chunk_index": 1,
+                    },
+                    "score": 0.7,
+                },
+            ]
+
+        def get_all_chunks(self):
+            return []
+
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            return {"query": question, "source": "llm", "reason": ""}
+
+        def rerank_chunks(self, question, candidates):
+            return [1, 0]
+
+        def compress_context(self, question, context_chunks):
+            return "[1] 快速排序使用基准元素和分治思想。"
+
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "快速排序使用基准元素和分治思想。"
+
+        def describe_sources(self, question, source_texts):
+            return []
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "算法怎么理解"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["sources"][0]["chunk_index"] == 1
+    assert captured_context == ["[1] 快速排序使用基准元素和分治思想。"]
 
 
 def test_chat_article_reference_with_url_uses_page_first(monkeypatch):

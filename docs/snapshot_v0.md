@@ -91,6 +91,10 @@
   - 当前流程：
     - 调用 `QueryIntentService.classify(query, has_url)`。
     - 如果 `retrieval_scope == "none"`，根据 fallback policy 直接返回，不检索。
+    - 检索前调用 `LLMService.rewrite_query()` 将用户问题改写为更适合检索的 query。
+    - query rewrite 不可用时回退使用用户原始 query。
+    - 向量检索、关键词召回和轻量重排使用 rewritten query。
+    - 最终回答仍使用用户原始 query。
     - 如果请求包含 `url`，进入当前网页聊天逻辑。
     - 当前网页聊天会先按 `metadata.url` 查询当前网页 chunks，并读取该 URL 已入库的全部 chunks。
     - 对 `总结`、`讲了什么`、`有哪些`、`方法`、`算法`、`步骤` 等页面级问题，直接选择当前 URL 的页面上下文 chunks 供 LLM 回答。
@@ -101,10 +105,14 @@
     - 如果请求不包含 `url`，执行全局知识库检索。
     - 全局知识库检索会合并 ChromaDB 向量召回和全库 chunks 关键词召回。
     - 全局合并结果会做轻量关键词重排。
+    - 轻量重排后会尝试调用 `LLMService.rerank_chunks()` 对候选 chunks 做语义重排。
+    - LLM rerank 不可用时保持原有检索排序，不中断 `/chat`。
     - 使用 `score >= 0.25` 判断高相关 chunks。
     - 根据 `fallback_policy` 决定是否调用 LLM 兜底、是否拒绝实时猜测、是否只返回知识库未命中。
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
     - 传给 LLM 的 context 使用 `[1]`、`[2]`、`[3]` 形式的来源编号。
+    - 回答前会尝试调用 `LLMService.compress_context()` 压缩上下文，保留与问题相关的来源头信息、步骤、代码、清单和结论。
+    - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
     - 返回 sources 时会合并同一 URL、同一 section 下连续 chunks，形成更适合前端展示的引用块。
     - sources 包含 `display_title`，用于前端展示更干净的文章标题。
@@ -189,10 +197,13 @@
     - 从环境变量 `DEEPSEEK_API_KEY` 读取 API Key。
     - `summarize(text)` 生成 100 到 200 字中文总结。
     - `classify_topic(title, url, summary, content)` 基于 DeepSeek 对文章做单标签 topic 分类，返回 topic、confidence、reason、source。
+    - `rewrite_query(question, url=None)` 基于 DeepSeek 将用户问题改写成更适合检索的查询，返回 query、source、reason。
     - `answer(question, context_chunks)` 基于 context chunks 生成自然语言回答。
     - `answer()` prompt 要求最终回答面向普通用户，单篇文章场景使用文章标题或当前网页自然引用，不要求用户理解来源编号。
     - `answer_without_context(question, reason)` 在无可用知识库上下文或通用兜底场景生成回答。
     - `describe_sources(question, source_texts)` 为 sources 生成一句中文来源说明。
+    - `rerank_chunks(question, candidates)` 基于 DeepSeek 对候选 chunks 返回相关性排序。
+    - `compress_context(question, context_chunks)` 基于 DeepSeek 将候选上下文压缩为更适合回答的 context。
     - DeepSeek 调用不可用时返回 `LLM unavailable: ...` 字符串。
 
 - `app/services/query_intent.py`
@@ -248,7 +259,9 @@
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
   - App 会从分享文本中提取第一个 `http` / `https` URL。
   - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
-  - 上传 URL 成功后会创建一个新的内存 conversation。
+  - 上传新 URL 成功后会创建一个新的 conversation。
+  - 上传或分享已存在 URL 时，会打开已有 conversation 并更新 title、summary、status 和 stored chunks，不创建重复历史项。
+  - URL 去重比较会忽略首尾空格、fragment、`www.` 和末尾 `/` 差异。
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
   - 可以在当前进程内切换已有 conversation。
@@ -276,7 +289,7 @@ ChromaDB articles → article topic grouping → Android Analysis topic pie char
 
 ### `/chat`
 
-query + optional url → query intent classification → retrieval scope decision → page/global hybrid retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
+query + optional url → query intent classification → query rewrite → retrieval scope decision → page/global hybrid retrieval → keyword rerank / page context selection → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
 
 ### `/debug`
 
@@ -344,6 +357,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - `.env` API Key 加载已实现。
 - `LLMService.summarize(text)` 已实现。
 - `LLMService.classify_topic(title, url, summary, content)` 已实现。
+- `LLMService.rewrite_query(question, url=None)` 已实现。
 - `LLMService.answer(question, context_chunks)` 已实现。
 - `LLMService.answer_without_context(question, reason)` 已实现。
 - `/upload` 返回 `summary` 字段已实现。
@@ -364,6 +378,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已将历史对话列表和聊天详情页拆开。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
+- Android 端已实现重复分享同 URL 时打开已有对话。
+- Android 端重复上传同 URL 时会更新已有对话并保留原聊天消息。
 - Android 端已实现 Room 级本地历史对话保存。
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
@@ -395,11 +411,13 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 调用 DeepSeek 为网页正文生成中文 summary。
 - 接收自然语言 query。
 - 对 chat query 进行规则型意图分类。
+- 对 chat query 进行 LLM query rewrite，LLM 不可用时回退原始 query。
 - 根据 intent 决定检索范围和 fallback 策略。
 - 将 query 转为 embedding。
 - 从 ChromaDB 中检索 topK 相关 chunks。
 - 当前网页聊天会在指定 URL 的 chunks 中做轻量关键词召回。
 - 全局聊天会在已保存 chunks 中做轻量关键词召回。
+- chat 检索使用 rewritten query，最终回答使用用户原始 query。
 - 按 score 阈值判断是否存在高相关知识库内容。
 - 基于高相关 chunks 调用 DeepSeek 生成回答。
 - 在允许时使用 DeepSeek 生成通用兜底回答。

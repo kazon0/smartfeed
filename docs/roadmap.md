@@ -20,6 +20,7 @@
 - 点击历史对话进入聊天详情页。
 - 支持从浏览器系统分享菜单接收网页 URL。
 - 分享 URL 后自动创建新对话并展示 summary。
+- 重复分享或上传同 URL 时打开已有对话，不创建重复历史项。
 - Analysis 展示基于已保存文章 topic 的主题占比。
 - 后端上传时使用 DeepSeek 对文章做 topic 分类，低置信度或不可用时回退到规则分类。
 - Analysis 使用饼图展示主题分布。
@@ -56,6 +57,7 @@
 - 单个对话页展示聊天气泡。
 - 支持从浏览器分享 URL 到 App。
 - App 接收 URL 后创建新对话。
+- App 接收已存在 URL 时打开已有对话。
 - 自动调用 `/upload`。
 - 将网页 summary 作为第一条 AI 消息展示。
 
@@ -145,13 +147,24 @@
 
 目标：提高检索命中率、上下文完整性和回答质量。
 
+当前实现：
+
+- `/chat` 已接入 query rewrite。
+- query rewrite 使用 DeepSeek 将用户问题改写为更适合检索的 query。
+- query rewrite 不可用时回退原始 query。
+- 检索使用 rewritten query，最终回答仍使用用户原始问题。
+- `/chat` 已接入 LLM rerank，对向量召回和关键词召回后的候选 chunks 做语义重排。
+- LLM rerank 不可用时回退到原有排序。
+- `/chat` 已接入 context compression，在回答前压缩候选上下文，保留来源、步骤、代码、清单和结论。
+- context compression 不可用时回退到原始 chunks。
+
 范围：
 
 - 优化 chunk 策略。
 - 优化 section-aware retrieval。
-- 增加 reranker 或更强的重排逻辑。
-- 增加 query rewrite 或 multi-query 检索。
+- 增加 multi-query 检索。
 - 改善代码类文章、列表类文章、长文总结的回答质量。
+- 将 `/chat` 中逐渐变复杂的 retrieval / rerank / compression / fallback 流程抽到 service 层。
 - 保持 Android API 尽量稳定。
 
 暂不做：

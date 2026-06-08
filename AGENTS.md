@@ -31,6 +31,9 @@ Backend 已实现：
 * ChromaDB 持久化存储
 * DeepSeek summary / answer
 * DeepSeek article topic classification
+* DeepSeek query rewrite for `/chat`
+* DeepSeek rerank for `/chat`
+* DeepSeek context compression for `/chat`
 * Rule-based topic fallback
 * Jina Reader 优先网页解析
 * HTML fallback 解析
@@ -51,6 +54,7 @@ Backend 已实现：
 * Android 历史对话列表和聊天详情页分层
 * Android 系统分享入口
 * Android 分享 URL 自动上传并创建新对话
+* Android 重复分享同 URL 打开已有对话
 * Android Room 本地历史对话保存
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
@@ -117,6 +121,7 @@ URL
 -> embedding
 -> ChromaDB
 -> /search or /chat
+-> query rewrite / rerank / context compression
 -> DeepSeek answer
 ```
 
@@ -272,5 +277,5 @@ Android MVP 阶段：
 建议下一步：
 
 1. 验证 Android 分享入口、本地 Room 历史恢复、Analysis 主题占比和文章管理页。
-2. 继续优化 RAG 检索和回答质量，优先考虑 query rewrite、rerank、context compression。
+2. 继续优化 RAG 检索和回答质量，优先考虑 rerank、context compression。
 3. 后续再处理更复杂的本地数据结构，例如拆分 messages 表。

@@ -14,6 +14,7 @@ import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.data.repository.StatsRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
 import kotlinx.coroutines.launch
+import java.net.URI
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val uploadRepository = UploadRepository()
@@ -46,7 +47,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleSharedUrl(url: String) {
         val cleanUrl = url.trim()
-        if (cleanUrl.isBlank() || cleanUrl == uiState.lastSharedUrl) {
+        if (cleanUrl.isBlank()) {
             return
         }
 
@@ -160,20 +161,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { response ->
                     val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
                     val title = response.data?.title?.takeIf { it.isNotBlank() } ?: parsedUrl
-                    val summaryMessages = response.summary
-                        .takeIf { it.isNotBlank() }
-                        ?.let { listOf(ChatMessage.Summary(it)) }
-                        ?: emptyList()
-                    val conversation = Conversation(
-                        id = createConversationId(),
-                        title = title,
+                    val conversations = upsertUploadedConversation(
                         url = parsedUrl,
+                        title = title,
                         summary = response.summary,
                         status = response.status,
-                        storedChunks = response.storedChunks,
-                        updatedAtMillis = System.currentTimeMillis(),
-                        messages = summaryMessages
+                        storedChunks = response.storedChunks
                     )
+                    val conversation = conversations.first()
 
                     uiState = uiState.copy(
                         uploadResponse = null,
@@ -182,7 +177,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         isChatOpen = true,
                         isArticleManagerOpen = false,
                         activeUrl = parsedUrl,
-                        conversations = listOf(conversation) + uiState.conversations,
+                        conversations = conversations,
                         messages = conversation.messages
                     )
                     persistConversations(uiState.conversations)
@@ -390,6 +385,81 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             conversations.firstOrNull { it.id == updatedConversationId }?.messages.orEmpty()
         } else {
             uiState.messages
+        }
+    }
+
+    private fun upsertUploadedConversation(
+        url: String,
+        title: String,
+        summary: String,
+        status: String,
+        storedChunks: Int
+    ): List<Conversation> {
+        val now = System.currentTimeMillis()
+        val existingConversation = uiState.conversations.firstOrNull {
+            sameArticleUrl(it.url, url)
+        }
+        val updatedConversation = if (existingConversation == null) {
+            Conversation(
+                id = createConversationId(),
+                title = title,
+                url = url,
+                summary = summary,
+                status = status,
+                storedChunks = storedChunks,
+                updatedAtMillis = now,
+                messages = summaryMessages(summary)
+            )
+        } else {
+            val messagesWithoutOldSummary = existingConversation.messages.filterNot {
+                it is ChatMessage.Summary
+            }
+            existingConversation.copy(
+                title = title,
+                url = url,
+                summary = summary,
+                status = status,
+                storedChunks = storedChunks,
+                updatedAtMillis = now,
+                messages = summaryMessages(summary) + messagesWithoutOldSummary
+            )
+        }
+
+        return listOf(updatedConversation) + uiState.conversations.filterNot {
+            it.id == updatedConversation.id
+        }
+    }
+
+    private fun summaryMessages(summary: String): List<ChatMessage> {
+        return summary
+            .takeIf { it.isNotBlank() }
+            ?.let { listOf(ChatMessage.Summary(it)) }
+            ?: emptyList()
+    }
+
+    private fun sameArticleUrl(left: String, right: String): Boolean {
+        return normalizeArticleUrl(left) == normalizeArticleUrl(right)
+    }
+
+    private fun normalizeArticleUrl(url: String): String {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) {
+            return ""
+        }
+
+        return runCatching {
+            val uri = URI(trimmed)
+            val scheme = uri.scheme?.lowercase().orEmpty()
+            val host = uri.host?.lowercase()?.removePrefix("www.").orEmpty()
+            val path = uri.path.orEmpty().trimEnd('/')
+            val query = uri.query?.let { "?$it" }.orEmpty()
+            if (scheme.isBlank() || host.isBlank()) {
+                trimmed.trimEnd('/')
+            } else {
+                "$scheme://$host$path$query"
+            }
+        }.getOrElse {
+            trimmed.trimEnd('/')
         }
     }
 

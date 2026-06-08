@@ -13,6 +13,7 @@ router = APIRouter()
 RELEVANCE_THRESHOLD = 0.25
 SOURCE_PREVIEW_LENGTH = 1200
 FULL_PAGE_CONTEXT_CHUNK_LIMIT = 30
+LLM_RERANK_CANDIDATE_LIMIT = 10
 ERROR_CODE_BY_SOURCE_TYPE = {
     "need_page_context": "NEED_PAGE_CONTEXT",
     "page_not_found_with_suggestions": "PAGE_CONTENT_NOT_FOUND",
@@ -39,21 +40,24 @@ def chat(request: ChatRequest):
         return _no_retrieval_response(intent)
 
     vector_store = VectorStoreService()
+    rewritten_query = _rewrite_query(request.query, request.url)
     if request.url:
         return _chat_with_current_page(
             request.query,
+            rewritten_query,
             request.url,
             intent,
             vector_store,
         )
 
-    global_vector_chunks = vector_store.query(request.query)
+    global_vector_chunks = vector_store.query(rewritten_query)
     global_keyword_chunks = _keyword_retrieve_chunks(
-        request.query,
+        rewritten_query,
         _get_all_chunks(vector_store),
     )
     global_chunks = _merge_chunks(global_vector_chunks, global_keyword_chunks)
-    ranked_chunks = _rank_chunks(request.query, global_chunks)
+    ranked_chunks = _rank_chunks(rewritten_query, global_chunks)
+    ranked_chunks = _llm_rerank_chunks(request.query, ranked_chunks)
     relevant_chunks = _high_relevance_chunks(ranked_chunks)
     answer, source_type, selected_chunks = _answer_with_policy(
         request.query,
@@ -74,21 +78,23 @@ def chat(request: ChatRequest):
 
 def _chat_with_current_page(
     query: str,
+    rewritten_query: str,
     url: str,
     intent: dict,
     vector_store: VectorStoreService,
 ) -> dict:
     page_chunks = vector_store.query(
-        query,
+        rewritten_query,
         metadata_filter={"url": url},
     )
-    ranked_page_chunks = _rank_chunks(query, page_chunks)
+    ranked_page_chunks = _rank_chunks(rewritten_query, page_chunks)
     all_page_chunks = vector_store.get_chunks_by_url(url)
-    keyword_page_chunks = _keyword_retrieve_chunks(query, all_page_chunks)
+    keyword_page_chunks = _keyword_retrieve_chunks(rewritten_query, all_page_chunks)
     ranked_page_chunks = _rank_chunks(
-        query,
+        rewritten_query,
         _merge_chunks(ranked_page_chunks, keyword_page_chunks),
     )
+    ranked_page_chunks = _llm_rerank_chunks(query, ranked_page_chunks)
     relevant_page_chunks = _high_relevance_chunks(ranked_page_chunks)
 
     if all_page_chunks and _is_page_wide_query(query, intent):
@@ -166,6 +172,18 @@ def _no_retrieval_response(intent: dict) -> dict:
         intent=intent,
         retrieval_scope=intent["retrieval_scope"],
     )
+
+
+def _rewrite_query(query: str, url: str | None = None) -> str:
+    try:
+        result = LLMService().rewrite_query(query, url=url)
+    except Exception:
+        return query
+
+    rewritten_query = result.get("query", "")
+    if not isinstance(rewritten_query, str) or not rewritten_query.strip():
+        return query
+    return rewritten_query.strip()
 
 
 def _chat_response(
@@ -445,6 +463,33 @@ def _rank_chunks(query: str, chunks: list[dict]) -> list[dict]:
     return sorted(chunks, key=rank_score, reverse=True)
 
 
+def _llm_rerank_chunks(query: str, chunks: list[dict]) -> list[dict]:
+    if len(chunks) <= 1:
+        return chunks
+
+    candidates = chunks[:LLM_RERANK_CANDIDATE_LIMIT]
+    try:
+        candidate_texts = [
+            _format_context_chunk(index, chunk)
+            for index, chunk in enumerate(candidates)
+        ]
+        indexes = LLMService().rerank_chunks(query, candidate_texts)
+    except Exception:
+        return chunks
+
+    if not indexes:
+        return chunks
+
+    selected = [candidates[index] for index in indexes]
+    selected_ids = set(indexes)
+    remaining_candidates = [
+        chunk
+        for index, chunk in enumerate(candidates)
+        if index not in selected_ids
+    ]
+    return selected + remaining_candidates + chunks[LLM_RERANK_CANDIDATE_LIMIT:]
+
+
 def _query_terms(query: str) -> list[str]:
     normalized = re.sub(r"\s+", "", query.strip())
     terms = {normalized}
@@ -489,16 +534,34 @@ def _build_general_answer(query: str, reason: str) -> str:
 
 def _build_context_answer(query: str, chunks: list[dict]) -> str:
     try:
+        llm_service = LLMService()
         context_chunks = [
             _format_context_chunk(index, chunk)
             for index, chunk in enumerate(chunks)
         ]
-        answer = LLMService().answer(question=query, context_chunks=context_chunks)
+        compressed_context = _compress_context(query, context_chunks, llm_service)
+        answer_context = [compressed_context] if compressed_context else context_chunks
+        answer = llm_service.answer(question=query, context_chunks=answer_context)
         if answer.startswith("LLM unavailable"):
             return "LLM unavailable"
         return answer
     except Exception:
         return "LLM unavailable"
+
+
+def _compress_context(
+    query: str,
+    context_chunks: list[str],
+    llm_service: LLMService,
+) -> str:
+    try:
+        compressed_context = llm_service.compress_context(query, context_chunks)
+    except Exception:
+        return ""
+
+    if not compressed_context or compressed_context.startswith("LLM unavailable"):
+        return ""
+    return compressed_context
 
 
 def _format_context_chunk(index: int, chunk: dict) -> str:
