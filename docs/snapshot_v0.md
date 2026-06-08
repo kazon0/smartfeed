@@ -38,8 +38,9 @@
   - 定义位置：`app/routes/debug.py`
   - 返回开发调试 HTML 页面。
   - 页面通过浏览器调用现有 `/upload` 和 `/chat`。
-  - 页面展示 parser、stored chunks、summary、chunks、answer、sources、source_type。
+  - 页面展示 parser、stored chunks、summary、chunks、answer、sources、source_type 和 chat diagnostics。
   - sources 默认展示文章标题、URL、摘要和 chunk 索引，原始 `content_preview` 放在折叠的 Raw preview 中。
+  - diagnostics 展示 rewritten query、multi-query 列表、每个 query 的向量/关键词命中数、selected chunks 和 context compression 状态。
 
 - `POST /upload`
   - 定义位置：`app/routes/upload.py`
@@ -100,7 +101,8 @@
     - 最终回答仍使用用户原始 query。
     - 如果请求包含 `url`，进入当前网页聊天逻辑。
     - 当前网页聊天会先按 `metadata.url` 查询当前网页 chunks，并读取该 URL 已入库的全部 chunks。
-    - 对 `总结`、`讲了什么`、`有哪些`、`方法`、`算法`、`步骤` 等页面级问题，直接选择当前 URL 的页面上下文 chunks 供 LLM 回答。
+    - 对 `总结`、`讲了什么`、`有哪些`、`方法`、`算法`、`步骤` 等页面级问题，选择当前 URL 的高质量页面上下文 chunks 供 LLM 回答。
+    - 页面级上下文选择会降低链接密度高、作者卡片、广告、推荐文章、页脚和导航类 chunks 的优先级。
     - 对更具体的问题，先使用向量检索当前网页 chunks，同时在当前 URL 全部 chunks 中做轻量关键词召回。
     - 当前网页向量结果和关键词结果会合并去重，再优先扩展到命中 chunk 所在 section。
     - 如果旧 chunks 没有 section metadata，则 fallback 到相邻 chunks 扩展。
@@ -122,6 +124,9 @@
     - sources 包含 `section_title` 和 `section_index`，用于展示来源章节。
     - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
     - sources 保留 `content_preview`，用于调试或展开查看依据，不作为默认主展示内容。
+    - sources 当前最多返回 3 个展示来源。
+    - 返回 `debug` 诊断字段，包含 rewritten query、search queries、retrieval steps、selected chunks 和 context compression 状态。
+    - `debug` 字段用于开发排查，不作为 Android 核心业务字段。
   - 返回字段：
     - `status`
     - `error_code`
@@ -133,6 +138,7 @@
     - `intent_reason`
     - `retrieval_scope`
     - `fallback_policy`
+    - `debug`
 
 ### services 层
 
@@ -143,6 +149,7 @@
     - `app/routes/chat.py` 只负责 FastAPI 请求模型和调用 `ChatService`。
     - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService`，便于测试和后续替换 LangChain pipeline。
     - 对外返回结构保持 `/chat` 当前稳定字段不变。
+    - 输出 `debug` 诊断信息，用于 `/debug` 页面展示检索链路。
 
 - `app/services/web_parser.py`
   - 服务类：`WebParserService`
@@ -305,7 +312,7 @@ query + optional url → ChatService → query intent classification → query r
 
 ### `/debug`
 
-browser page → calls `/upload` and `/chat` → displays parser, chunks, summary, answer and sources
+browser page → calls `/upload` and `/chat` → displays parser, chunks, summary, answer, sources and chat diagnostics
 
 ## 4. 已完成能力清单
 
@@ -345,6 +352,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
 - chat 支持可选 url 优先检索当前网页已实现。
 - chat 对当前网页页面级问题使用该 URL 已入库页面上下文已实现。
+- chat 对当前网页页面级上下文做 chunk quality filtering 已实现。
 - chat 对当前网页具体问题使用向量检索 + 关键词召回合并已实现。
 - chat 对当前网页具体问题优先扩展到命中 section 已实现。
 - chat 对没有 section metadata 的旧 chunks 使用相邻 chunks fallback 已实现。
@@ -362,9 +370,12 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat sources 返回 `content_preview` 已实现，当前长度最多为前 1200 字。
 - chat sources 返回 `chunk_indexes` 已实现。
 - chat sources 返回可选 `source_note` 已实现。
+- chat sources 最多返回 3 个展示来源已实现。
 - chat source_type 返回已实现。
 - chat `status`、`error_code`、`message` 稳定字段返回已实现。
 - chat intent metadata 返回已实现。
+- chat debug diagnostics 返回已实现。
+- `/debug` 页面展示 chat diagnostics 已实现。
 - DeepSeek API 调用封装已实现。
 - `.env` API Key 加载已实现。
 - `LLMService.summarize(text)` 已实现。
@@ -452,7 +463,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 不能保证 mock embedding 下的语义检索质量与真实 embedding 一致。
 - 不能保证规则型 query intent classification 覆盖所有自然语言表达。
 - 不能保证固定 chunking 能完整保留原网页的标题层级、代码块和章节结构。
-- 当前页面级回答最多选择当前 URL 的前 `30` 个 chunks 作为上下文。
+- 当前页面级回答使用轻量 chunk quality filtering，但不能保证完全去除所有网页噪声。
 - 全局关键词召回当前是轻量字符串匹配，不是完整 BM25/reranker。
 - 不能提供实时搜索、天气、股价、汇率等外部实时工具结果。
 - stats chunks 主题分类当前仍是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。

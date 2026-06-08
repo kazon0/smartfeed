@@ -389,7 +389,35 @@ Page-preferred chat:
   "intent": "knowledge_or_general_query",
   "intent_reason": "默认作为普通知识、学习、技术、解释、建议或代码类问题处理。",
   "retrieval_scope": "global",
-  "fallback_policy": "llm_allowed"
+  "fallback_policy": "llm_allowed",
+  "debug": {
+    "rewritten_query": "吃菌子中毒 症状 风险 处理",
+    "search_queries": ["吃菌子中毒 症状 风险 处理", "吃菌子中毒会怎么样"],
+    "retrieval_steps": [
+      {
+        "scope": "global",
+        "query": "吃菌子中毒 症状 风险 处理",
+        "metadata_filter": {},
+        "vector_count": 5,
+        "keyword_count": 2
+      }
+    ],
+    "selected_chunks": [
+      {
+        "url": "https://example.com/article",
+        "title": "Example",
+        "chunk_index": 0,
+        "score": 0.82,
+        "preview": "chunk preview..."
+      }
+    ],
+    "context": {
+      "chunk_count": 1,
+      "compressed": true,
+      "raw_length": 1200,
+      "compressed_length": 480
+    }
+  }
 }
 ```
 
@@ -403,6 +431,7 @@ Stable fields for Android MVP:
 - `source_type`: where the answer came from
 - `intent`: classified query intent
 - `retrieval_scope`: retrieval scope selected by backend
+- `debug`: diagnostics for development and troubleshooting. Android should not use it for core business logic.
 
 Stable `error_code` values:
 
@@ -467,10 +496,11 @@ If the user asks an article-reference question without `url`, SmartFeed does not
 
 When `url` is provided, SmartFeed treats the request as current-page chat:
 
-- Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use the ingested chunks for that URL as page context.
+- Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use quality-filtered page context from the ingested chunks for that URL. Link-heavy, author-card, ad, related-article, footer, and navigation-like chunks are deprioritized.
 - More specific current-page questions use lightweight hybrid retrieval: vector results are merged with keyword matches from the uploaded page chunks, then expanded to the matched article section when section metadata exists. If old chunks do not have section metadata, SmartFeed falls back to neighboring chunks.
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
 - `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
+- `/chat` limits returned sources to the most useful display sources. The current limit is 3.
 - `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.
 
 When `url` is not provided, SmartFeed searches the global knowledge base with lightweight hybrid retrieval:
@@ -478,6 +508,12 @@ When `url` is not provided, SmartFeed searches the global knowledge base with li
 - Vector results from ChromaDB are merged with keyword matches from stored chunks.
 - Merged chunks are reranked and filtered by score.
 - If no high-relevance knowledge exists and policy allows general fallback, the backend returns `source_type: "llm_fallback"`.
+
+Diagnostics:
+
+- `/chat` returns a `debug` object with rewritten query, multi-query search variants, retrieval hit counts, selected chunk previews, and context compression status.
+- `GET /debug` renders this diagnostics data in the browser so retrieval misses can be inspected without reading large terminal JSON.
+- The `debug` object is for development. UI clients should continue relying on stable fields such as `status`, `error_code`, `answer`, `sources`, `source_type`, `intent`, `retrieval_scope`, and `fallback_policy`.
 
 ### curl
 

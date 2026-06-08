@@ -541,6 +541,13 @@ def test_chat_multi_query_retrieves_generated_query(monkeypatch):
     assert "程序员算法" in captured_queries
     assert "十种算法有哪些" in captured_queries
     assert "十个基础算法 清单" in captured_queries
+    assert data["debug"]["search_queries"] == [
+        "程序员算法",
+        "十种算法有哪些",
+        "十个基础算法 清单",
+    ]
+    assert data["debug"]["retrieval_steps"][2]["query"] == "十个基础算法 清单"
+    assert data["debug"]["selected_chunks"][0]["chunk_index"] == 2
     assert data["source_type"] == "knowledge_base"
     assert data["sources"][0]["chunk_index"] == 2
     assert data["answer"] == "十个基础算法包括排序、搜索和图算法相关内容。"
@@ -597,6 +604,61 @@ def test_chat_article_reference_with_url_uses_page_first(monkeypatch):
     assert data["retrieval_scope"] == "page_first"
     assert data["source_type"] == "page"
     assert calls[0] == {"url": "https://example.com/rag"}
+
+
+def test_chat_page_wide_filters_noisy_chunks_and_limits_sources(monkeypatch):
+    captured_context = []
+
+    def chunk(index, content, score=1.0):
+        return {
+            "content": content,
+            "metadata": {
+                "url": "https://example.com/algorithms",
+                "title": "程序员应该知道的十个基础算法",
+                "section_title": "正文",
+                "section_index": 2,
+                "chunk_index": index,
+            },
+            "score": score,
+        }
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [chunk(2, "一. 排序算法 1.冒泡排序 2.快速排序 3.归并排序")]
+
+        def get_chunks_by_url(self, url):
+            return [
+                chunk(0, "[](https://ad.example.com?adtrace=1&fromSource=x) 登录 关注作者"),
+                chunk(1, "原创 关注作者 关联问题 换一批 登录 控制台"),
+                chunk(2, "一. 排序算法 1.冒泡排序 2.快速排序 3.归并排序"),
+                chunk(3, "二. 搜索算法 1.二分查找 2.广度优先搜索 3.深度优先搜索"),
+                chunk(4, "三. 图算法 1.最短路径算法 2.最小生成树算法 四. 动态规划 1.背包问题 2.最长公共子序列"),
+                chunk(5, "社区规范 联系我们 友情链接"),
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "十种基础算法包括排序、搜索、图算法和动态规划。"
+
+        def describe_sources(self, question, source_texts):
+            return ["来源[3]列出了算法分类和具体名称。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={"query": "十种算法有哪些", "url": "https://example.com/algorithms"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert len(data["sources"]) <= 3
+    assert "adtrace" not in captured_context[0]
+    assert "关注作者" not in captured_context[0]
+    assert data["debug"]["selected_chunks"][0]["chunk_index"] == 2
+    assert "来源[" not in data["sources"][0]["source_summary"]
 
 
 def test_chat_realtime_without_knowledge_does_not_guess(monkeypatch):

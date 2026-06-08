@@ -10,7 +10,9 @@ class ChatService:
     RELEVANCE_THRESHOLD = 0.25
     SOURCE_PREVIEW_LENGTH = 1200
     FULL_PAGE_CONTEXT_CHUNK_LIMIT = 30
+    PAGE_WIDE_CONTEXT_CHUNK_LIMIT = 10
     LLM_RERANK_CANDIDATE_LIMIT = 10
+    SOURCE_LIMIT = 3
     ERROR_CODE_BY_SOURCE_TYPE = {
         "need_page_context": "NEED_PAGE_CONTEXT",
         "page_not_found_with_suggestions": "PAGE_CONTENT_NOT_FOUND",
@@ -39,14 +41,18 @@ class ChatService:
             query,
             has_url=bool(url),
         )
+        debug = self._new_debug(query, url, mode, intent)
 
         if intent["retrieval_scope"] == "none":
-            return self._no_retrieval_response(intent)
+            return self._no_retrieval_response(intent, debug)
 
         vector_store = self.vector_store_factory()
         rewritten_query = self._rewrite_query(query, url)
         search_queries = self._search_queries(query, rewritten_query, url)
         ranking_query = " ".join(search_queries)
+        debug["rewritten_query"] = rewritten_query
+        debug["search_queries"] = search_queries
+        debug["ranking_query"] = ranking_query
         if url:
             return self._chat_with_current_page(
                 query,
@@ -55,23 +61,30 @@ class ChatService:
                 url,
                 intent,
                 vector_store,
+                debug,
             )
 
         global_chunks = self._retrieve_chunks(
             vector_store,
             search_queries,
             all_chunks=self._get_all_chunks(vector_store),
+            scope="global",
+            debug=debug,
         )
         ranked_chunks = self._rank_chunks(ranking_query, global_chunks)
-        ranked_chunks = self._llm_rerank_chunks(query, ranked_chunks)
+        debug["ranked_chunks"] = self._debug_chunk_refs(ranked_chunks)
+        ranked_chunks = self._llm_rerank_chunks(query, ranked_chunks, debug)
         relevant_chunks = self._high_relevance_chunks(ranked_chunks)
+        debug["relevant_chunks"] = self._debug_chunk_refs(relevant_chunks)
         answer, source_type, selected_chunks = self._answer_with_policy(
             query,
             intent["fallback_policy"],
             relevant_chunks,
             [],
             global_chunks,
+            debug,
         )
+        debug["selected_chunks"] = self._debug_chunk_refs(selected_chunks)
 
         return self._chat_response(
             answer=answer,
@@ -79,6 +92,7 @@ class ChatService:
             source_type=source_type,
             intent=intent,
             retrieval_scope=intent["retrieval_scope"],
+            debug=debug,
         )
 
     def _chat_with_current_page(
@@ -89,33 +103,47 @@ class ChatService:
         url: str,
         intent: dict,
         vector_store: VectorStoreService,
+        debug: dict,
     ) -> dict:
         all_page_chunks = vector_store.get_chunks_by_url(url)
+        debug["page_chunk_count"] = len(all_page_chunks)
         page_chunks = self._retrieve_chunks(
             vector_store,
             search_queries,
             metadata_filter={"url": url},
             all_chunks=all_page_chunks,
+            scope="page",
+            debug=debug,
         )
         ranked_page_chunks = self._rank_chunks(ranking_query, page_chunks)
-        ranked_page_chunks = self._llm_rerank_chunks(query, ranked_page_chunks)
+        debug["ranked_chunks"] = self._debug_chunk_refs(ranked_page_chunks)
+        ranked_page_chunks = self._llm_rerank_chunks(query, ranked_page_chunks, debug)
         relevant_page_chunks = self._high_relevance_chunks(ranked_page_chunks)
+        debug["relevant_chunks"] = self._debug_chunk_refs(relevant_page_chunks)
 
         if all_page_chunks and self._is_page_wide_query(query, intent):
-            selected_page_chunks = self._select_page_context(all_page_chunks)
+            selected_page_chunks = self._select_page_context(
+                all_page_chunks,
+                relevant_page_chunks,
+            )
+            debug["page_wide_query"] = True
+            debug["quality_selected_page_chunks"] = self._debug_chunk_refs(selected_page_chunks)
             answer, source_type, selected_chunks = self._answer_with_policy(
                 query,
                 intent["fallback_policy"],
                 selected_page_chunks,
                 selected_page_chunks,
                 [],
+                debug,
             )
+            debug["selected_chunks"] = self._debug_chunk_refs(selected_chunks)
             return self._chat_response(
                 answer=answer,
                 sources=self._build_sources(selected_chunks, query),
                 source_type=source_type,
                 intent=intent,
                 retrieval_scope="page_first",
+                debug=debug,
             )
 
         if relevant_page_chunks:
@@ -123,19 +151,23 @@ class ChatService:
                 relevant_page_chunks,
                 all_page_chunks,
             )
+            debug["expanded_chunks"] = self._debug_chunk_refs(expanded_page_chunks)
             answer, source_type, selected_chunks = self._answer_with_policy(
                 query,
                 intent["fallback_policy"],
                 expanded_page_chunks,
                 expanded_page_chunks,
                 [],
+                debug,
             )
+            debug["selected_chunks"] = self._debug_chunk_refs(selected_chunks)
             return self._chat_response(
                 answer=answer,
                 sources=self._build_sources(selected_chunks, query),
                 source_type=source_type,
                 intent=intent,
                 retrieval_scope="page_first",
+                debug=debug,
             )
 
         saved_sources = [
@@ -143,6 +175,7 @@ class ChatService:
             for source in vector_store.list_sources()
             if source.get("url") != url
         ]
+        debug["suggested_source_count"] = len(saved_sources)
         answer = (
             "当前网页没有找到可用于回答的内容。"
             "你可以改为询问知识库中已有内容，或从下方已保存文章中选择一个继续提问。"
@@ -154,9 +187,10 @@ class ChatService:
             source_type="page_not_found_with_suggestions",
             intent=intent,
             retrieval_scope="page_first",
+            debug=debug,
         )
 
-    def _no_retrieval_response(self, intent: dict) -> dict:
+    def _no_retrieval_response(self, intent: dict, debug: dict | None = None) -> dict:
         if intent["fallback_policy"] == "ask_for_page":
             answer = "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。"
             source_type = "need_page_context"
@@ -173,7 +207,35 @@ class ChatService:
             source_type=source_type,
             intent=intent,
             retrieval_scope=intent["retrieval_scope"],
+            debug=debug,
         )
+
+    def _new_debug(
+        self,
+        query: str,
+        url: str | None,
+        mode: str,
+        intent: dict,
+    ) -> dict:
+        return {
+            "query": query,
+            "url": url or "",
+            "mode": mode,
+            "intent": intent["intent"],
+            "retrieval_scope": intent["retrieval_scope"],
+            "fallback_policy": intent["fallback_policy"],
+            "rewritten_query": "",
+            "search_queries": [],
+            "ranking_query": "",
+            "retrieval_steps": [],
+            "retrieved_chunk_count": 0,
+            "page_chunk_count": 0,
+            "ranked_chunks": [],
+            "relevant_chunks": [],
+            "expanded_chunks": [],
+            "selected_chunks": [],
+            "context": {},
+        }
 
     def _rewrite_query(self, query: str, url: str | None = None) -> str:
         try:
@@ -221,18 +283,37 @@ class ChatService:
         *,
         metadata_filter: dict | None = None,
         all_chunks: list[dict] | None = None,
+        scope: str = "global",
+        debug: dict | None = None,
     ) -> list[dict]:
         retrieved_chunks = []
         keyword_source_chunks = all_chunks or []
         for search_query in queries:
-            retrieved_chunks.extend(
-                vector_store.query(search_query, metadata_filter=metadata_filter)
+            vector_chunks = vector_store.query(
+                search_query,
+                metadata_filter=metadata_filter,
             )
-            retrieved_chunks.extend(
-                self._keyword_retrieve_chunks(search_query, keyword_source_chunks)
+            keyword_chunks = self._keyword_retrieve_chunks(
+                search_query,
+                keyword_source_chunks,
             )
+            retrieved_chunks.extend(vector_chunks)
+            retrieved_chunks.extend(keyword_chunks)
+            if debug is not None:
+                debug["retrieval_steps"].append(
+                    {
+                        "scope": scope,
+                        "query": search_query,
+                        "metadata_filter": metadata_filter or {},
+                        "vector_count": len(vector_chunks),
+                        "keyword_count": len(keyword_chunks),
+                    }
+                )
 
-        return self._merge_chunks([], retrieved_chunks)
+        merged_chunks = self._merge_chunks([], retrieved_chunks)
+        if debug is not None:
+            debug["retrieved_chunk_count"] = len(merged_chunks)
+        return merged_chunks
 
     def _chat_response(
         self,
@@ -241,6 +322,7 @@ class ChatService:
         source_type: str,
         intent: dict,
         retrieval_scope: str,
+        debug: dict | None = None,
     ) -> dict:
         error_code = self._error_code(source_type, answer)
         return {
@@ -254,6 +336,7 @@ class ChatService:
             "intent_reason": intent["reason"],
             "retrieval_scope": retrieval_scope,
             "fallback_policy": intent["fallback_policy"],
+            "debug": debug or {},
         }
 
     def _error_code(self, source_type: str, answer: str) -> str | None:
@@ -275,6 +358,7 @@ class ChatService:
         relevant_chunks: list[dict],
         page_chunks: list[dict],
         global_chunks: list[dict],
+        debug: dict | None = None,
     ) -> tuple[str, str, list[dict]]:
         source_type = self._source_type(page_chunks, global_chunks, relevant_chunks)
 
@@ -282,7 +366,7 @@ class ChatService:
             prefix = ""
             if fallback_policy == "no_guess_realtime":
                 prefix = "以下回答基于知识库中已保存内容，可能不是实时最新。\n\n"
-            return prefix + self._build_context_answer(query, relevant_chunks), source_type, relevant_chunks
+            return prefix + self._build_context_answer(query, relevant_chunks, debug), source_type, relevant_chunks
 
         if fallback_policy == "llm_allowed":
             return (
@@ -347,12 +431,33 @@ class ChatService:
             term in normalized for term in page_wide_terms
         )
 
-    def _select_page_context(self, chunks: list[dict]) -> list[dict]:
-        sorted_chunks = sorted(
-            chunks,
+    def _select_page_context(
+        self,
+        chunks: list[dict],
+        relevant_chunks: list[dict] | None = None,
+    ) -> list[dict]:
+        quality_chunks = [
+            chunk
+            for chunk in chunks
+            if self._chunk_quality_score(chunk) >= 0.35
+        ]
+        if not quality_chunks:
+            quality_chunks = chunks
+
+        target_section = self._primary_section(relevant_chunks or quality_chunks)
+        if target_section is not None:
+            section_chunks = [
+                chunk
+                for chunk in quality_chunks
+                if chunk.get("metadata", {}).get("section_index") == target_section
+            ]
+            if section_chunks:
+                quality_chunks = section_chunks
+
+        return sorted(
+            quality_chunks,
             key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
-        )
-        return sorted_chunks[: self.FULL_PAGE_CONTEXT_CHUNK_LIMIT]
+        )[: self.PAGE_WIDE_CONTEXT_CHUNK_LIMIT]
 
     def _expand_page_context(
         self,
@@ -424,6 +529,91 @@ class ChatService:
 
         selected_indexes = sorted(selected_indexes)[:limit]
         return [by_index[index] for index in selected_indexes]
+
+    def _primary_section(self, chunks: list[dict]) -> int | None:
+        section_scores = {}
+        section_counts = {}
+        for chunk in chunks:
+            metadata = chunk.get("metadata", {})
+            section_index = metadata.get("section_index")
+            if section_index is None:
+                continue
+            section_scores[section_index] = section_scores.get(section_index, 0) + max(
+                0.1,
+                self._chunk_quality_score(chunk),
+            )
+            section_counts[section_index] = section_counts.get(section_index, 0) + 1
+
+        if not section_scores:
+            return None
+        section_index, score = max(section_scores.items(), key=lambda item: item[1])
+        if score < 0.7 and section_counts.get(section_index, 0) <= 1:
+            return None
+        return section_index
+
+    def _chunk_quality_score(self, chunk: dict) -> float:
+        content = re.sub(r"\s+", " ", chunk.get("content", "").strip())
+        if not content:
+            return 0.0
+
+        length = len(content)
+        score = min(length / 280, 1.0)
+
+        link_count = (
+            content.count("http://")
+            + content.count("https://")
+            + content.count("](")
+            + content.count("[](")
+        )
+        if link_count:
+            score -= min(0.7, link_count * 0.12)
+
+        noise_terms = (
+            "adtrace",
+            "fromSource",
+            "utm",
+            "关注作者",
+            "作者相关精选",
+            "关联问题",
+            "换一批",
+            "举报",
+            "原创声明",
+            "本文参与",
+            "社区规范",
+            "联系我们",
+            "友情链接",
+            "喜欢点赞收藏",
+            "阅读原文",
+            "控制台",
+            "发布",
+            "登录",
+            "立即使用",
+            "广告",
+        )
+        noise_hits = sum(1 for term in noise_terms if term in content)
+        score -= min(0.8, noise_hits * 0.16)
+
+        chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", content))
+        if chinese_chars >= 80:
+            score += 0.2
+
+        structure_terms = (
+            "一.",
+            "二.",
+            "三.",
+            "四.",
+            "1.",
+            "2.",
+            "3.",
+            "算法",
+            "方法",
+            "步骤",
+            "包括",
+        )
+        structure_hits = sum(1 for term in structure_terms if term in content)
+        score += min(0.35, structure_hits * 0.05)
+
+        return max(0.0, min(score, 1.0))
 
     def _merge_chunks(self, primary_chunks: list[dict], secondary_chunks: list[dict]) -> list[dict]:
         merged = []
@@ -506,7 +696,12 @@ class ChatService:
 
         return sorted(chunks, key=rank_score, reverse=True)
 
-    def _llm_rerank_chunks(self, query: str, chunks: list[dict]) -> list[dict]:
+    def _llm_rerank_chunks(
+        self,
+        query: str,
+        chunks: list[dict],
+        debug: dict | None = None,
+    ) -> list[dict]:
         if len(chunks) <= 1:
             return chunks
 
@@ -530,7 +725,15 @@ class ChatService:
             for index, chunk in enumerate(candidates)
             if index not in selected_ids
         ]
-        return selected + remaining_candidates + chunks[self.LLM_RERANK_CANDIDATE_LIMIT :]
+        reranked_chunks = selected + remaining_candidates + chunks[self.LLM_RERANK_CANDIDATE_LIMIT :]
+        if debug is not None:
+            debug["llm_rerank"] = {
+                "candidate_count": len(candidates),
+                "selected_candidate_indexes": indexes,
+                "before": self._debug_chunk_refs(candidates),
+                "after": self._debug_chunk_refs(reranked_chunks),
+            }
+        return reranked_chunks
 
     def _query_terms(self, query: str) -> list[str]:
         normalized = re.sub(r"\s+", "", query.strip())
@@ -572,7 +775,12 @@ class ChatService:
         except Exception:
             return "LLM unavailable"
 
-    def _build_context_answer(self, query: str, chunks: list[dict]) -> str:
+    def _build_context_answer(
+        self,
+        query: str,
+        chunks: list[dict],
+        debug: dict | None = None,
+    ) -> str:
         try:
             llm_service = self.llm_service_factory()
             context_chunks = [
@@ -581,6 +789,13 @@ class ChatService:
             ]
             compressed_context = self._compress_context(query, context_chunks, llm_service)
             answer_context = [compressed_context] if compressed_context else context_chunks
+            if debug is not None:
+                debug["context"] = {
+                    "chunk_count": len(context_chunks),
+                    "compressed": bool(compressed_context),
+                    "compressed_length": len(compressed_context),
+                    "raw_length": sum(len(chunk) for chunk in context_chunks),
+                }
             answer = llm_service.answer(question=query, context_chunks=answer_context)
             if answer.startswith("LLM unavailable"):
                 return "LLM unavailable"
@@ -625,6 +840,7 @@ class ChatService:
 
     def _build_sources(self, chunks: list[dict], query: str | None = None) -> list[dict]:
         sources = self._group_source_chunks(chunks)
+        sources = self._select_display_sources(sources)
         if query and sources:
             self._attach_source_notes(query, sources)
         return sources
@@ -686,6 +902,45 @@ class ChatService:
 
         return sources
 
+    def _select_display_sources(self, sources: list[dict]) -> list[dict]:
+        if len(sources) <= self.SOURCE_LIMIT:
+            return sources
+
+        def source_score(source: dict) -> float:
+            preview = source.get("content_preview", "")
+            noise_penalty = 0.0
+            for term in ("adtrace", "关注作者", "关联问题", "原创声明", "友情链接", "登录"):
+                if term in preview:
+                    noise_penalty += 0.2
+            chunk_count = len(source.get("chunk_indexes", []))
+            return (
+                float(source.get("score", 0) or 0)
+                + min(chunk_count, 4) * 0.08
+                + min(len(preview) / 800, 0.3)
+                - noise_penalty
+            )
+
+        ranked_sources = sorted(sources, key=source_score, reverse=True)
+        selected_sources = ranked_sources[: self.SOURCE_LIMIT]
+        selected_keys = {
+            (
+                source.get("url", ""),
+                source.get("section_index"),
+                source.get("chunk_index"),
+            )
+            for source in selected_sources
+        }
+        return [
+            source
+            for source in sources
+            if (
+                source.get("url", ""),
+                source.get("section_index"),
+                source.get("chunk_index"),
+            )
+            in selected_keys
+        ]
+
     def _readable_preview(self, content: str) -> str:
         normalized = re.sub(r"\n{3,}", "\n\n", content.strip())
         if len(normalized) <= self.SOURCE_PREVIEW_LENGTH:
@@ -711,5 +966,34 @@ class ChatService:
         for index, source in enumerate(sources):
             note = notes[index].strip() if index < len(notes) and notes[index] else ""
             if note and not note.startswith("LLM unavailable"):
+                note = self._clean_source_note(note)
                 source["source_note"] = note
                 source["source_summary"] = note
+
+    def _clean_source_note(self, note: str) -> str:
+        cleaned = re.sub(r"(来源|片段|source)\s*\[\s*\d+\s*\]", "这段内容", note, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    def _debug_chunk_refs(self, chunks: list[dict], limit: int = 10) -> list[dict]:
+        refs = []
+        for chunk in chunks[:limit]:
+            metadata = chunk.get("metadata", {})
+            refs.append(
+                {
+                    "url": metadata.get("url", ""),
+                    "title": metadata.get("title", ""),
+                    "section_title": metadata.get("section_title", ""),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "section_index": metadata.get("section_index"),
+                    "score": chunk.get("score", 0),
+                    "preview": self._debug_preview(chunk.get("content", "")),
+                }
+            )
+        return refs
+
+    def _debug_preview(self, content: str, limit: int = 120) -> str:
+        normalized = re.sub(r"\s+", " ", content.strip())
+        if len(normalized) <= limit:
+            return normalized
+        return normalized[:limit].rstrip() + "..."

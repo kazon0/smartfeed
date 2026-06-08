@@ -46,6 +46,7 @@ Backend 已实现：
 * 当前网页 hybrid retrieval
 * 全局 hybrid retrieval
 * `/chat` 稳定字段：`status`、`error_code`、`message`
+* `/chat` 返回 `debug` 诊断字段，仅用于开发排查，不作为 Android 核心业务协议
 * pytest 最小测试
 * API 文档和测试计划
 * Android Compose MVP
@@ -192,6 +193,7 @@ Runtime/generated files that should not be committed:
   * `intent`
   * `retrieval_scope`
   * `fallback_policy`
+  * `debug` 可以扩展，但 Android 不应依赖其内部结构
 
 ## Preferred Codex Working Mode
 

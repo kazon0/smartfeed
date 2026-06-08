@@ -30,6 +30,12 @@ def debug_page():
     details { border-top: 1px solid #e5e7eb; padding: 10px 0; }
     summary { cursor: pointer; font-weight: 600; }
     .muted { color: #6b7280; font-size: 13px; }
+    .debug-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin: 8px 0; }
+    .debug-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
+    .debug-card strong { display: block; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f9fafb; }
   </style>
 </head>
 <body>
@@ -55,6 +61,8 @@ def debug_page():
     <p class="muted">If URL is filled above, chat will prefer that page. Leave URL empty for global knowledge base search.</p>
     <button id="chatButton" onclick="chat()">Chat</button>
     <div id="chatResult"></div>
+    <h4>Diagnostics</h4>
+    <div id="diagnosticsResult"><p class='muted'>Run Chat to inspect retrieval diagnostics.</p></div>
   </section>
 </main>
 
@@ -103,6 +111,51 @@ function renderSources(sources) {
   `).join("");
 }
 
+function renderDebug(debug) {
+  if (!debug || Object.keys(debug).length === 0) return "<p class='muted'>No diagnostics.</p>";
+  const retrievalRows = (debug.retrieval_steps || []).map((step) => `
+    <tr>
+      <td>${escapeHtml(step.scope)}</td>
+      <td>${escapeHtml(step.query)}</td>
+      <td>${escapeHtml(step.vector_count)}</td>
+      <td>${escapeHtml(step.keyword_count)}</td>
+      <td>${escapeHtml(JSON.stringify(step.metadata_filter || {}))}</td>
+    </tr>
+  `).join("");
+  const selected = (debug.selected_chunks || []).map((chunk, index) => `
+    <details>
+      <summary>Selected ${index + 1} | chunk ${escapeHtml(chunk.chunk_index)} | score ${escapeHtml(chunk.score)}</summary>
+      <div class="meta">
+        ${pill("title", chunk.title)}
+        ${pill("section", chunk.section_title || "n/a")}
+        ${pill("url", chunk.url)}
+      </div>
+      <pre>${escapeHtml(chunk.preview)}</pre>
+    </details>
+  `).join("");
+  return `
+    <div class="debug-grid">
+      <div class="debug-card"><strong>Rewritten query</strong>${escapeHtml(debug.rewritten_query || "")}</div>
+      <div class="debug-card"><strong>Search queries</strong>${escapeHtml((debug.search_queries || []).join(" | "))}</div>
+      <div class="debug-card"><strong>Retrieved chunks</strong>${escapeHtml(debug.retrieved_chunk_count ?? 0)}</div>
+      <div class="debug-card"><strong>Context</strong>compressed: ${escapeHtml(Boolean(debug.context && debug.context.compressed))}, raw: ${escapeHtml(debug.context?.raw_length ?? 0)}, compressed: ${escapeHtml(debug.context?.compressed_length ?? 0)}</div>
+    </div>
+    <h5>Retrieval steps</h5>
+    ${retrievalRows ? `
+      <table>
+        <thead><tr><th>Scope</th><th>Query</th><th>Vector</th><th>Keyword</th><th>Filter</th></tr></thead>
+        <tbody>${retrievalRows}</tbody>
+      </table>
+    ` : "<p class='muted'>No retrieval steps.</p>"}
+    <h5>Selected chunks</h5>
+    ${selected || "<p class='muted'>No selected chunks.</p>"}
+    <details>
+      <summary>Raw diagnostics JSON</summary>
+      <pre>${escapeHtml(JSON.stringify(debug, null, 2))}</pre>
+    </details>
+  `;
+}
+
 async function upload() {
   const button = document.getElementById("uploadButton");
   const result = document.getElementById("uploadResult");
@@ -146,12 +199,14 @@ async function upload() {
 async function chat() {
   const button = document.getElementById("chatButton");
   const result = document.getElementById("chatResult");
+  const diagnostics = document.getElementById("diagnosticsResult");
   const query = document.getElementById("query").value.trim();
   const url = document.getElementById("url").value.trim();
   if (!query) return;
 
   button.disabled = true;
   result.innerHTML = "<p class='muted'>Asking...</p>";
+  diagnostics.innerHTML = "<p class='muted'>Collecting diagnostics...</p>";
 
   try {
     const payload = url ? { query, url } : { query };
@@ -172,8 +227,10 @@ async function chat() {
       <h4>Sources</h4>
       ${renderSources(data.sources)}
     `;
+    diagnostics.innerHTML = renderDebug(data.debug);
   } catch (error) {
     result.innerHTML = `<pre>${escapeHtml(error)}</pre>`;
+    diagnostics.innerHTML = "<p class='muted'>No diagnostics.</p>";
   } finally {
     button.disabled = false;
   }
