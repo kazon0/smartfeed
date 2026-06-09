@@ -77,6 +77,8 @@ Backend 已实现：
   * `ui/common`
   * `ui/profile`
 * Android main screens have Compose previews
+* Android local conversation rules are split into `ui/home/ConversationManager.kt`
+* Android Room conversation mappers are split into `ui/home/ConversationMappers.kt`
 
 当前未实现：
 

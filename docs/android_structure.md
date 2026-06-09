@@ -16,7 +16,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
     ├── articles/           # 已保存文章管理页
     ├── chat/               # 聊天详情页、气泡、输入栏、sources
     ├── common/             # 通用颜色、ResultCard、ResultRow
-    ├── home/               # Home 入口、HomeViewModel、UI state、会话模型
+    ├── home/               # Home 入口、HomeViewModel、UI state、会话模型和会话规则
     ├── navigation/         # Bottom navigation
     ├── profile/            # Profile 占位页
     └── theme/              # Compose theme
@@ -34,6 +34,8 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - ViewModel：`ui/home/HomeViewModel.kt`
 - State：`ui/home/HomeUiState.kt`
 - Model：`ui/home/Conversation.kt`、`ui/home/ChatMessage.kt`
+- Local conversation rules：`ui/home/ConversationManager.kt`
+- Local persistence mapper：`ui/home/ConversationMappers.kt`
 - Repository：`data/repository/*`
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Local persistence：`data/local/ConversationStore.kt`
@@ -52,7 +54,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 ## 后续建议
 
-当前为了降低风险，`HomeViewModel` 和会话模型仍保留在 `ui/home`。后续如果继续规范化，可以再拆：
+当前为了降低风险，`HomeViewModel` 和会话模型仍保留在 `ui/home`。本地对话规则已从 `HomeViewModel` 拆到 `ConversationManager`，Room 映射已拆到 `ConversationMappers`。后续如果继续规范化，可以再拆：
 
 - `ui/model/Conversation.kt`
 - `ui/model/ChatMessage.kt`

@@ -7,14 +7,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.local.ConversationStore
-import com.example.smartfeedandroid.data.local.StoredChatMessage
-import com.example.smartfeedandroid.data.local.StoredConversation
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.data.repository.StatsRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
 import kotlinx.coroutines.launch
-import java.net.URI
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val uploadRepository = UploadRepository()
@@ -22,6 +19,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val statsRepository = StatsRepository()
     private val articleRepository = ArticleRepository()
     private val conversationStore = ConversationStore(application.applicationContext)
+    private val conversationManager = ConversationManager()
 
     var uiState by mutableStateOf(HomeUiState())
         private set
@@ -120,11 +118,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startGlobalConversation() {
-        val conversation = Conversation(
-            id = createConversationId(),
-            title = "Global knowledge chat",
-            updatedAtMillis = System.currentTimeMillis()
-        )
+        val conversation = conversationManager.createGlobalConversation()
 
         uiState = uiState.copy(
             activeConversationId = conversation.id,
@@ -161,7 +155,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { response ->
                     val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
                     val title = response.data?.title?.takeIf { it.isNotBlank() } ?: parsedUrl
-                    val conversations = upsertUploadedConversation(
+                    val conversations = conversationManager.upsertUploadedConversation(
+                        conversations = uiState.conversations,
                         url = parsedUrl,
                         title = title,
                         summary = response.summary,
@@ -206,7 +201,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val updatedMessages = conversation.messages + userMessage
 
         uiState = uiState.copy(
-            conversations = updateConversationMessages(
+            conversations = conversationManager.updateMessages(
+                conversations = uiState.conversations,
                 conversationId = conversationId,
                 messages = updatedMessages
             ),
@@ -225,7 +221,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             chatRepository.ask(cleanQuery, activeUrl)
                 .onSuccess { response ->
-                    val conversations = appendConversationMessage(
+                    val conversations = conversationManager.appendMessage(
+                        conversations = uiState.conversations,
                         conversationId = conversationId,
                         message = ChatMessage.Assistant(response)
                     )
@@ -236,7 +233,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     persistConversations(conversations)
                 }
                 .onFailure { error ->
-                    val conversations = appendConversationMessage(
+                    val conversations = conversationManager.appendMessage(
+                        conversations = uiState.conversations,
                         conversationId = conversationId,
                         message = ChatMessage.Error(error.message ?: "Chat request failed.")
                     )
@@ -327,11 +325,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return activeConversation
         }
 
-        val conversation = Conversation(
-            id = createConversationId(),
-            title = "Global knowledge chat",
-            updatedAtMillis = System.currentTimeMillis()
-        )
+        val conversation = conversationManager.createGlobalConversation()
         uiState = uiState.copy(
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
@@ -345,38 +339,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return conversation
     }
 
-    private fun updateConversationMessages(
-        conversationId: String,
-        messages: List<ChatMessage>
-    ): List<Conversation> {
-        return uiState.conversations.map { conversation ->
-            if (conversation.id == conversationId) {
-                conversation.copy(
-                    messages = messages,
-                    updatedAtMillis = System.currentTimeMillis()
-                )
-            } else {
-                conversation
-            }
-        }
-    }
-
-    private fun appendConversationMessage(
-        conversationId: String,
-        message: ChatMessage
-    ): List<Conversation> {
-        return uiState.conversations.map { conversation ->
-            if (conversation.id == conversationId) {
-                conversation.copy(
-                    messages = conversation.messages + message,
-                    updatedAtMillis = System.currentTimeMillis()
-                )
-            } else {
-                conversation
-            }
-        }
-    }
-
     private fun activeMessagesFrom(
         conversations: List<Conversation>,
         updatedConversationId: String
@@ -388,143 +350,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun upsertUploadedConversation(
-        url: String,
-        title: String,
-        summary: String,
-        status: String,
-        storedChunks: Int
-    ): List<Conversation> {
-        val now = System.currentTimeMillis()
-        val existingConversation = uiState.conversations.firstOrNull {
-            sameArticleUrl(it.url, url)
-        }
-        val updatedConversation = if (existingConversation == null) {
-            Conversation(
-                id = createConversationId(),
-                title = title,
-                url = url,
-                summary = summary,
-                status = status,
-                storedChunks = storedChunks,
-                updatedAtMillis = now,
-                messages = summaryMessages(summary)
-            )
-        } else {
-            val messagesWithoutOldSummary = existingConversation.messages.filterNot {
-                it is ChatMessage.Summary
-            }
-            existingConversation.copy(
-                title = title,
-                url = url,
-                summary = summary,
-                status = status,
-                storedChunks = storedChunks,
-                updatedAtMillis = now,
-                messages = summaryMessages(summary) + messagesWithoutOldSummary
-            )
-        }
-
-        return listOf(updatedConversation) + uiState.conversations.filterNot {
-            it.id == updatedConversation.id
-        }
-    }
-
-    private fun summaryMessages(summary: String): List<ChatMessage> {
-        return summary
-            .takeIf { it.isNotBlank() }
-            ?.let { listOf(ChatMessage.Summary(it)) }
-            ?: emptyList()
-    }
-
-    private fun sameArticleUrl(left: String, right: String): Boolean {
-        return normalizeArticleUrl(left) == normalizeArticleUrl(right)
-    }
-
-    private fun normalizeArticleUrl(url: String): String {
-        val trimmed = url.trim()
-        if (trimmed.isBlank()) {
-            return ""
-        }
-
-        return runCatching {
-            val uri = URI(trimmed)
-            val scheme = uri.scheme?.lowercase().orEmpty()
-            val host = uri.host?.lowercase()?.removePrefix("www.").orEmpty()
-            val path = uri.path.orEmpty().trimEnd('/')
-            val query = uri.query?.let { "?$it" }.orEmpty()
-            if (scheme.isBlank() || host.isBlank()) {
-                trimmed.trimEnd('/')
-            } else {
-                "$scheme://$host$path$query"
-            }
-        }.getOrElse {
-            trimmed.trimEnd('/')
-        }
-    }
-
-    private fun createConversationId(): String {
-        return "${System.currentTimeMillis()}-${System.nanoTime()}"
-    }
-
     private fun persistConversations(conversations: List<Conversation>) {
         viewModelScope.launch {
             conversationStore.save(conversations.map { it.toStoredConversation() })
         }
-    }
-
-    private fun StoredConversation.toConversation(): Conversation {
-        return Conversation(
-            id = id,
-            title = title,
-            url = url,
-            summary = summary,
-            status = status,
-            storedChunks = storedChunks,
-            updatedAtMillis = updatedAtMillis,
-            messages = messages.mapNotNull { it.toChatMessage() }
-        )
-    }
-
-    private fun Conversation.toStoredConversation(): StoredConversation {
-        return StoredConversation(
-            id = id,
-            title = title,
-            url = url,
-            summary = summary,
-            status = status,
-            storedChunks = storedChunks,
-            updatedAtMillis = updatedAtMillis,
-            messages = messages.map { it.toStoredChatMessage() }
-        )
-    }
-
-    private fun StoredChatMessage.toChatMessage(): ChatMessage? {
-        return when (type) {
-            MESSAGE_TYPE_USER -> ChatMessage.User(text)
-            MESSAGE_TYPE_SUMMARY -> ChatMessage.Summary(text)
-            MESSAGE_TYPE_ASSISTANT -> response?.let { ChatMessage.Assistant(it) }
-            MESSAGE_TYPE_ERROR -> ChatMessage.Error(text)
-            else -> null
-        }
-    }
-
-    private fun ChatMessage.toStoredChatMessage(): StoredChatMessage {
-        return when (this) {
-            is ChatMessage.User -> StoredChatMessage(type = MESSAGE_TYPE_USER, text = text)
-            is ChatMessage.Summary -> StoredChatMessage(type = MESSAGE_TYPE_SUMMARY, text = text)
-            is ChatMessage.Assistant -> StoredChatMessage(
-                type = MESSAGE_TYPE_ASSISTANT,
-                response = response
-            )
-            is ChatMessage.Error -> StoredChatMessage(type = MESSAGE_TYPE_ERROR, text = text)
-        }
-    }
-
-    private companion object {
-        const val MESSAGE_TYPE_USER = "user"
-        const val MESSAGE_TYPE_SUMMARY = "summary"
-        const val MESSAGE_TYPE_ASSISTANT = "assistant"
-        const val MESSAGE_TYPE_ERROR = "error"
     }
 }

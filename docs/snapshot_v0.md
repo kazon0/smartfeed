@@ -275,6 +275,8 @@
   - Profile tab 当前为占位页。
   - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
+  - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、追加消息、更新消息、上传 URL 后创建或更新已有对话。
+  - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
   - Room 当前表：`conversations`。
@@ -399,6 +401,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现本地聊天消息列表。
 - Android 端已实现调用当前 `/chat` 并展示 answer 和 sources。
 - Android 端已将上传和聊天状态迁入 `HomeViewModel`。
+- Android 端已将本地 conversation 操作从 `HomeViewModel` 拆到 `ConversationManager`。
+- Android 端已将 Room conversation 映射从 `HomeViewModel` 拆到 `ConversationMappers`。
 - Android 端已实现内存级 conversations 列表。
 - Android 端已实现上传 URL 后创建新 conversation。
 - Android 端已实现 summary 作为聊天消息展示。
