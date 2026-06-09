@@ -68,6 +68,15 @@ Backend 已实现：
 * Android 已保存文章按 topic 分组展示
 * Android 文章列表点击打开原网页
 * Android 文章列表左滑显示删除按钮
+* Android UI feature folders:
+  * `ui/home`
+  * `ui/chat`
+  * `ui/analysis`
+  * `ui/articles`
+  * `ui/navigation`
+  * `ui/common`
+  * `ui/profile`
+* Android main screens have Compose previews
 
 当前未实现：
 
@@ -158,6 +167,7 @@ Docs:
 * `docs/test_plan.md`
 * `docs/snapshot_v0.md`
 * `docs/roadmap.md`
+* `docs/android_structure.md`
 
 Tests:
 

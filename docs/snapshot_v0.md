@@ -254,20 +254,26 @@
   - 已封装 `SmartFeedApi`、`SmartFeedNetwork`、`UploadRepository`、`ChatRepository`。
   - 已实现 `/upload` 请求模型和响应模型。
   - 已实现 `/chat` 请求模型和响应模型。
-  - `SmartFeedScreen` 使用 Jetpack Compose 展示 Home / Analysis / Profile 三个底部 tab。
+  - `SmartFeedScreen` 使用 Jetpack Compose 组装 Home / Analysis / Profile 三个底部 tab。
+  - Android UI 已按 feature 拆分到 `ui/home`、`ui/chat`、`ui/analysis`、`ui/articles`、`ui/navigation`、`ui/common`、`ui/profile`。
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
+  - Home 页面实现位置：`ui/home/HomeScreen.kt`。
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
+  - Chat 页面实现位置：`ui/chat/ChatDetailScreen.kt`。
   - Analysis tab 当前调用后端 `/stats` 展示知识库文章数、chunks 数和来源域名占比。
   - Analysis tab 的 Topic share 当前基于 `/articles` 返回的文章 `topic` 按文章数量统计。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
+  - Analysis 页面实现位置：`ui/analysis/AnalysisScreen.kt`。
   - Analysis tab 右上角提供文章管理入口。
   - 文章管理页调用后端 `/articles` 展示已保存文章列表。
   - 文章管理页用顶部 topic tabs 切换文章分类。
   - 文章管理页点击文章可以跳转原网页。
   - 文章管理页左滑文章会显示 Delete 按钮，点击按钮后调用后端 `DELETE /articles` 按 URL 删除知识库文章。
+  - 文章管理页面实现位置：`ui/articles/ArticleManagerScreen.kt`。
   - 删除文章后会刷新文章列表和知识库统计。
   - Profile tab 当前为占位页。
+  - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
   - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
