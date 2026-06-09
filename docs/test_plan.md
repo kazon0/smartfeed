@@ -20,6 +20,13 @@ Open the debug page:
 http://127.0.0.1:8000/debug
 ```
 
+Run automated regression tests:
+
+```bash
+venv/bin/python -m pytest tests/test_mvp.py -q
+venv/bin/python -m pytest tests/test_rag_eval.py -q
+```
+
 ## 1. Clear ChromaDB
 
 Stop the backend, then remove the local vector database:

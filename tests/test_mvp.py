@@ -684,6 +684,76 @@ def test_chat_realtime_without_knowledge_does_not_guess(monkeypatch):
     assert data["sources"] == []
 
 
+def test_chat_realtime_ignores_weak_unrelated_knowledge(monkeypatch):
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [
+                {
+                    "content": "今天我们继续学习排序算法，快速排序使用基准元素分治。",
+                    "metadata": {
+                        "url": "https://example.com/sort",
+                        "title": "排序算法",
+                        "chunk_index": 0,
+                    },
+                    "score": 0.9,
+                }
+            ]
+
+        def get_all_chunks(self):
+            return []
+
+    class FakeLLMService:
+        def answer(self, *args, **kwargs):
+            raise AssertionError("weak realtime match should not call context LLM")
+
+        def answer_without_context(self, *args, **kwargs):
+            raise AssertionError("realtime fallback should not call general LLM")
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "今天星期几"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "failed"
+    assert data["source_type"] == "unsupported_realtime"
+    assert data["sources"] == []
+
+
+def test_chat_weekday_query_requires_direct_weekday_knowledge(monkeypatch):
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return [
+                {
+                    "content": "这篇财经文章包含发布日期、交易时间和市场走势，但没有提供实时日历信息。",
+                    "metadata": {
+                        "url": "https://example.com/finance",
+                        "title": "财经新闻",
+                        "chunk_index": 0,
+                    },
+                    "score": 0.9,
+                }
+            ]
+
+        def get_all_chunks(self):
+            return []
+
+    class FakeLLMService:
+        def answer(self, *args, **kwargs):
+            raise AssertionError("weekday query should require direct weekday knowledge")
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "今天星期几"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "failed"
+    assert data["source_type"] == "unsupported_realtime"
+
+
 def test_chat_search_history_without_results_no_general_answer(monkeypatch):
     class FakeVectorStoreService:
         def query(self, text, top_k=5, metadata_filter=None):
@@ -1160,6 +1230,117 @@ def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypa
     assert "方法1" in "\n".join(captured_context)
     assert "方法2" in "\n".join(captured_context)
     assert "方法3" in "\n".join(captured_context)
+
+
+def test_chat_page_wide_query_trims_related_content_from_sources(monkeypatch):
+    captured_context = []
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            if metadata_filter:
+                return [
+                    {
+                        "content": "常用的算法类别及其应用如下：一. 排序算法 1.冒泡排序 2.快速排序 3.归并排序。",
+                        "metadata": {
+                            "url": "https://cloud.tencent.com/developer/article/2352039",
+                            "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                            "section_index": 2,
+                            "section_title": "程序员应该知道的十个基础算法",
+                            "chunk_index": 2,
+                        },
+                        "score": 0.9,
+                    }
+                ]
+            return []
+
+        def get_chunks_by_url(self, url):
+            return [
+                {
+                    "content": "原创 小齐来了 关注作者 关联问题 换一批 程序员常用的基础算法有哪些？",
+                    "metadata": {
+                        "url": url,
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "section_index": 2,
+                        "section_title": "程序员应该知道的十个基础算法",
+                        "chunk_index": 1,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "作为一名程序员，掌握各种算法可以帮助我们解决复杂问题。常用的算法类别及其应用如下：一. 排序算法 1.冒泡排序 2.快速排序 3.归并排序。",
+                    "metadata": {
+                        "url": url,
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "section_index": 2,
+                        "section_title": "程序员应该知道的十个基础算法",
+                        "chunk_index": 2,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "二. 搜索算法 1.二分查找 2.广度优先搜索 3.深度优先搜索。三. 图算法 1.最短路径算法 2.最小生成树算法。",
+                    "metadata": {
+                        "url": url,
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "section_index": 2,
+                        "section_title": "程序员应该知道的十个基础算法",
+                        "chunk_index": 3,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "四. 动态规划 1.背包问题 2.最长公共子序列。喜欢点赞收藏，下期再见。原创声明：本文系作者授权腾讯云开发者社区发表。",
+                    "metadata": {
+                        "url": url,
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "section_index": 2,
+                        "section_title": "程序员应该知道的十个基础算法",
+                        "chunk_index": 4,
+                    },
+                    "score": 1.0,
+                },
+                {
+                    "content": "作者相关精选 [](https://cloud.tencent.com/developer/user/1) 推荐文章 JavaScript 算法与数据结构。",
+                    "metadata": {
+                        "url": url,
+                        "title": "程序员应该知道的十个基础算法-腾讯云开发者社区-腾讯云",
+                        "section_index": 2,
+                        "section_title": "程序员应该知道的十个基础算法",
+                        "chunk_index": 5,
+                    },
+                    "score": 1.0,
+                },
+            ]
+
+    class FakeLLMService:
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "根据《程序员应该知道的十个基础算法》，十大算法包括排序、搜索、图算法和动态规划相关算法。"
+
+        def describe_sources(self, question, source_texts):
+            return ["这段来源列出了文章中的十大基础算法。"]
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "十大算法是什么",
+            "url": "https://cloud.tencent.com/developer/article/2352039",
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["source_type"] == "page"
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["display_title"] == "程序员应该知道的十个基础算法"
+    assert "冒泡排序" in data["sources"][0]["content_preview"]
+    assert "最长公共子序列" in data["sources"][0]["content_preview"]
+    assert "作者相关精选" not in data["sources"][0]["content_preview"]
+    assert "原创声明" not in data["sources"][0]["content_preview"]
+    assert "推荐文章" not in "\n".join(captured_context)
 
 
 def test_chat_source_display_title_removes_tencent_suffix(monkeypatch):

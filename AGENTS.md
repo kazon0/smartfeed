@@ -48,6 +48,7 @@ Backend 已实现：
 * `/chat` 稳定字段：`status`、`error_code`、`message`
 * `/chat` 返回 `debug` 诊断字段，仅用于开发排查，不作为 Android 核心业务协议
 * pytest 最小测试
+* RAG 回归评测测试
 * API 文档和测试计划
 * Android Compose MVP
 * Android Retrofit 网络层
@@ -167,6 +168,7 @@ Docs:
 
 * `docs/api.md`
 * `docs/test_plan.md`
+* `docs/rag_eval.md`
 * `docs/snapshot_v0.md`
 * `docs/roadmap.md`
 * `docs/android_structure.md`
@@ -174,6 +176,7 @@ Docs:
 Tests:
 
 * `tests/test_mvp.py`
+* `tests/test_rag_eval.py`
 
 Runtime/generated files that should not be committed:
 
@@ -221,6 +224,7 @@ Runtime/generated files that should not be committed:
 ```bash
 venv/bin/python -m compileall app tests
 venv/bin/python -m pytest tests/test_mvp.py -q
+venv/bin/python -m pytest tests/test_rag_eval.py -q
 ```
 
 7. 最后说明：

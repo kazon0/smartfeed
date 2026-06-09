@@ -501,7 +501,7 @@ When `url` is provided, SmartFeed treats the request as current-page chat:
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
 - `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
 - `/chat` limits returned sources to the most useful display sources. The current limit is 3.
-- `content_preview` is kept for debugging or "view evidence" expansion. It should not be the default main UI text.
+- `content_preview` is display-cleaned: Markdown links are removed, and preview text is truncated before visible noise such as author picks, related recommendations, and copyright/original-declaration blocks. It is still best used as expandable evidence text, not the default main UI text.
 
 When `url` is not provided, SmartFeed searches the global knowledge base with lightweight hybrid retrieval:
 

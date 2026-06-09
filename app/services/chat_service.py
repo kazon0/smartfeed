@@ -360,6 +360,12 @@ class ChatService:
         global_chunks: list[dict],
         debug: dict | None = None,
     ) -> tuple[str, str, list[dict]]:
+        if fallback_policy == "no_guess_realtime":
+            supported_chunks = self._realtime_supported_chunks(query, relevant_chunks)
+            if debug is not None:
+                debug["realtime_supported_chunks"] = self._debug_chunk_refs(supported_chunks)
+            relevant_chunks = supported_chunks
+
         source_type = self._source_type(page_chunks, global_chunks, relevant_chunks)
 
         if relevant_chunks:
@@ -400,6 +406,40 @@ class ChatService:
 
         return "当前请求无法处理。", "unsupported_action", []
 
+    def _realtime_supported_chunks(self, query: str, chunks: list[dict]) -> list[dict]:
+        if not chunks:
+            return []
+
+        normalized_query = re.sub(r"\s+", "", query.strip().lower())
+        if "星期" in normalized_query or "周几" in normalized_query:
+            required_terms = ("星期", "周几")
+        elif "几点" in normalized_query:
+            required_terms = ("几点", "现在时间", "当前时间")
+        elif "日期" in normalized_query or "几号" in normalized_query:
+            required_terms = ("日期", "几号", "年月日")
+        elif "天气" in normalized_query:
+            required_terms = ("天气", "气温", "降雨", "温度")
+        elif any(term in normalized_query for term in ("汇率", "股价", "价格")):
+            required_terms = ("汇率", "股价", "价格", "美元", "人民币", "股票")
+        elif any(term in normalized_query for term in ("新闻", "最新")):
+            required_terms = ("新闻", "最新", "报道", "消息", "发布")
+        else:
+            required_terms = tuple(
+                term
+                for term in self._query_terms(query)
+                if term not in {"今天", "现在", "当前", "最新", "实时", "今年"}
+            )
+
+        if not required_terms:
+            return []
+
+        supported = []
+        for chunk in chunks:
+            searchable_text = self._chunk_search_text(chunk).lower()
+            if any(term.lower() in searchable_text for term in required_terms):
+                supported.append(chunk)
+        return supported
+
     def _high_relevance_chunks(self, chunks: list[dict]) -> list[dict]:
         return [chunk for chunk in chunks if chunk.get("score", 0) >= self.RELEVANCE_THRESHOLD]
 
@@ -439,7 +479,9 @@ class ChatService:
         quality_chunks = [
             chunk
             for chunk in chunks
-            if self._chunk_quality_score(chunk) >= 0.35
+            if self._chunk_quality_score(chunk) >= 0.25
+            or self._contains_article_end_marker(chunk.get("content", ""))
+            or self._looks_like_list_content(chunk.get("content", ""))
         ]
         if not quality_chunks:
             quality_chunks = chunks
@@ -454,10 +496,132 @@ class ChatService:
             if section_chunks:
                 quality_chunks = section_chunks
 
+        quality_chunks = self._trim_to_article_region(
+            quality_chunks,
+            relevant_chunks or quality_chunks,
+        )
+
         return sorted(
             quality_chunks,
             key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
         )[: self.PAGE_WIDE_CONTEXT_CHUNK_LIMIT]
+
+    def _trim_to_article_region(
+        self,
+        chunks: list[dict],
+        anchors: list[dict],
+    ) -> list[dict]:
+        if len(chunks) <= 1:
+            return chunks
+
+        sorted_chunks = sorted(
+            chunks,
+            key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
+        )
+        anchor_indexes = {
+            chunk.get("metadata", {}).get("chunk_index")
+            for chunk in anchors
+            if isinstance(chunk.get("metadata", {}).get("chunk_index"), int)
+        }
+        if not anchor_indexes:
+            return sorted_chunks
+
+        min_anchor = min(anchor_indexes)
+        start = 0
+        for index, chunk in enumerate(sorted_chunks):
+            chunk_index = chunk.get("metadata", {}).get("chunk_index")
+            content = chunk.get("content", "")
+            if isinstance(chunk_index, int) and chunk_index <= min_anchor:
+                if self._looks_like_article_start(content):
+                    start = index
+                    break
+                start = index
+
+        selected = []
+        for chunk in sorted_chunks[start:]:
+            content = chunk.get("content", "")
+            if self._looks_like_related_content(content) and selected:
+                break
+            selected.append(chunk)
+            if self._contains_article_end_marker(content):
+                break
+
+        return selected or sorted_chunks
+
+    def _looks_like_article_start(self, content: str) -> bool:
+        normalized = re.sub(r"\s+", " ", content.strip())
+        start_terms = (
+            "作为一名",
+            "本文",
+            "在本文",
+            "首先",
+            "一.",
+            "一、",
+            "1.",
+            "方法1",
+            "背景",
+            "近日",
+        )
+        return any(term in normalized for term in start_terms)
+
+    def _contains_article_end_marker(self, content: str) -> bool:
+        normalized = re.sub(r"\s+", " ", content.strip())
+        end_terms = (
+            "喜欢点赞收藏",
+            "下期再见",
+            "原创声明",
+            "本文系作者授权",
+            "未经许可，不得转载",
+            "阅读原文可查看",
+        )
+        return any(term in normalized for term in end_terms)
+
+    def _looks_like_related_content(self, content: str) -> bool:
+        normalized = re.sub(r"\s+", " ", content.strip())
+        related_terms = (
+            "作者相关精选",
+            "关联问题",
+            "换一批",
+            "相关文章",
+            "相关推荐",
+            "精选推荐",
+        )
+        if any(term in normalized for term in related_terms):
+            return True
+
+        link_count = (
+            normalized.count("http://")
+            + normalized.count("https://")
+            + normalized.count("](")
+            + normalized.count("[](")
+        )
+        author_link_terms = (
+            "developer/user",
+            "关注作者",
+            "阅读原文",
+        )
+        return link_count >= 2 and any(term in normalized for term in author_link_terms)
+
+    def _looks_like_list_content(self, content: str) -> bool:
+        normalized = re.sub(r"\s+", " ", content.strip())
+        list_markers = (
+            "一.",
+            "二.",
+            "三.",
+            "四.",
+            "一、",
+            "二、",
+            "三、",
+            "四、",
+            "1.",
+            "2.",
+            "3.",
+            "方法1",
+            "方法2",
+            "算法",
+            "步骤",
+        )
+        return sum(1 for marker in list_markers if marker in normalized) >= 2
 
     def _expand_page_context(
         self,
@@ -942,10 +1106,68 @@ class ChatService:
         ]
 
     def _readable_preview(self, content: str) -> str:
-        normalized = re.sub(r"\n{3,}", "\n\n", content.strip())
+        normalized = self._clean_source_preview_content(content)
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized.strip())
         if len(normalized) <= self.SOURCE_PREVIEW_LENGTH:
             return normalized
         return normalized[: self.SOURCE_PREVIEW_LENGTH].rstrip() + "..."
+
+    def _clean_source_preview_content(self, content: str) -> str:
+        cleaned = content.strip()
+        if not cleaned:
+            return ""
+
+        cleaned = re.sub(r"!\[[^\]]*]\([^)]+\)", "", cleaned)
+        cleaned = re.sub(r"\[\]\([^)]+\)", "", cleaned)
+        cleaned = re.sub(r"\[([^\]]+)]\([^)]+\)", r"\1", cleaned)
+        cleaned = re.sub(r"https?://\S+", "", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+        for marker in (
+            "喜欢点赞收藏",
+            "下期再见",
+            "原创声明",
+            "本文系作者授权",
+            "未经许可，不得转载",
+            "作者相关精选",
+            "关联问题",
+            "换一批",
+            "相关推荐",
+        ):
+            marker_index = cleaned.find(marker)
+            if marker_index > 0:
+                cleaned = cleaned[:marker_index].strip()
+
+        start_markers = (
+            "作为一名",
+            "常用的算法类别",
+            "一.",
+            "一、",
+            "1.",
+            "方法1",
+            "背景",
+            "近日",
+        )
+        noise_before_start = (
+            "关注",
+            "举报",
+            "关联问题",
+            "换一批",
+            "作者相关精选",
+            "控制台",
+            "登录",
+            "发布",
+            "adtrace",
+        )
+        for marker in start_markers:
+            marker_index = cleaned.find(marker)
+            if marker_index > 0:
+                prefix = cleaned[:marker_index]
+                if any(term in prefix for term in noise_before_start):
+                    cleaned = cleaned[marker_index:].strip()
+                break
+
+        return cleaned
 
     def _display_title(self, title: str, url: str) -> str:
         cleaned = re.sub(r"[-_|]腾讯云开发者社区[-_]?.*$", "", title or "").strip()

@@ -120,6 +120,7 @@
     - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
     - 返回 sources 时会合并同一 URL、同一 section 下连续 chunks，形成更适合前端展示的引用块。
+    - sources 的 `content_preview` 会做展示层清洗，去除 Markdown 链接，并在原创声明、相关推荐、作者精选等展示噪声前截断。
     - sources 包含 `display_title`，用于前端展示更干净的文章标题。
     - sources 包含 `section_title` 和 `section_index`，用于展示来源章节。
     - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
@@ -318,6 +319,10 @@ ChromaDB articles → article topic grouping → Android Analysis topic pie char
 
 query + optional url → ChatService → query intent classification → query rewrite → multi-query generation → retrieval scope decision → page/global hybrid retrieval → keyword rerank / LLM rerank / page context selection → context compression → relevance or policy decision → LLM answer → status + error_code + merged sources + source_type
 
+### RAG 回归评测
+
+fake saved corpus → ChatService → intent / retrieval / source policy → deterministic fake LLM → pytest assertions
+
 ### `/debug`
 
 browser page → calls `/upload` and `/chat` → displays parser, chunks, summary, answer, sources and chat diagnostics
@@ -376,6 +381,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat sources 返回 `section_title` 和 `section_index` 已实现。
 - chat sources 返回 `source_summary` 已实现。
 - chat sources 返回 `content_preview` 已实现，当前长度最多为前 1200 字。
+- chat sources `content_preview` 展示层清洗已实现，会去除链接并截断推荐、原创声明等噪声。
 - chat sources 返回 `chunk_indexes` 已实现。
 - chat sources 返回可选 `source_note` 已实现。
 - chat sources 最多返回 3 个展示来源已实现。
@@ -395,6 +401,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - `docs/api.md` 接口文档已创建。
 - `docs/test_plan.md` 手动测试计划已创建。
 - `tests/test_mvp.py` 最小自动化测试已创建。
+- `docs/rag_eval.md` RAG 回归评测文档已创建。
+- `tests/test_rag_eval.py` RAG 回归评测测试已创建。
 - `requirements.txt` 已包含 `pytest`。
 - Android Compose 项目已接入 Retrofit。
 - Android 端已实现上传 URL 并展示 summary、status、stored chunks。
