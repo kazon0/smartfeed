@@ -11,16 +11,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,11 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.smartfeedandroid.data.remote.UploadResponse
-import com.example.smartfeedandroid.ui.common.AppBackground
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.ResultRow
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
+import androidx.compose.ui.res.painterResource
+import com.example.smartfeedandroid.R
+import androidx.compose.material3.Icon
 
 @Composable
 fun HomeScreen(
@@ -48,7 +52,6 @@ fun HomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(AppBackground)
     ) {
         Column(
             modifier = Modifier
@@ -58,11 +61,29 @@ fun HomeScreen(
                 .padding(bottom = 84.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Text(
-                text = "SmartFeed",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SmartFeed",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onStartGlobalConversation,
+                    modifier = Modifier
+                        .size(48.dp) // 控制整个按钮的点击热区大小
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_new_chat),
+                        contentDescription = "Start New Chat",
+                        tint = Color.Black,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
 
             Text(
                 text = "Save articles and continue reading through conversation.",
@@ -70,45 +91,52 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Card(
+            OutlinedTextField(
+                value = uiState.url,
+                onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = uiState.url,
-                        onValueChange = onUrlChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Paste article link") },
-                        placeholder = { Text("https://example.com/article") },
-                        shape = RoundedCornerShape(18.dp),
-                        singleLine = true
-                    )
-
-                    Button(
-                        onClick = onUpload,
-                        enabled = !uiState.isUploading,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (uiState.isUploading) "Saving..." else "Save article")
-                    }
-
+                placeholder = { Text("Paste article link...") },
+                shape = RoundedCornerShape(24.dp), // 调大圆角，更有搜索框的胶囊感
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = SoftBlue,
+                    unfocusedBorderColor = Color.LightGray
+                ),
+                trailingIcon = {
                     if (uiState.isUploading) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
+                        // 1. 如果正在保存，右侧直接展示一个精致的小转圈
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(24.dp), // 限制大小，使其刚好嵌入框内
+                            color = SoftBlue,
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        // 2. 正常状态下，是一个圆形的小图标按钮
+                        IconButton(
+                            onClick = onUpload,
+                            enabled = uiState.url.isNotBlank(), // URL 有内容时才允许点击
+                            modifier = Modifier
+                                .padding(end = 10.dp)
+                                .size(36.dp)
+                                .background(
+                                    color = if (uiState.url.isNotBlank()) SoftBlue else Color.LightGray,
+                                    shape = CircleShape // 变成正圆背景
+                                )
                         ) {
-                            CircularProgressIndicator()
+                            // 这里可以用你想要的图标，比如一个向右的箭头 ➔ 或者保存图标
+                            Text(
+                                text = "➔",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
-            }
-
+            )
             uiState.uploadResponse?.let {
                 UploadResult(response = it)
             }
@@ -118,17 +146,6 @@ fun HomeScreen(
                 activeConversationId = uiState.activeConversationId,
                 onSelectConversation = onSelectConversation
             )
-        }
-
-        FloatingActionButton(
-            onClick = onStartGlobalConversation,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
-            containerColor = SoftBlue,
-            contentColor = Color.White
-        ) {
-            Text("+", style = MaterialTheme.typography.headlineSmall)
         }
     }
 }

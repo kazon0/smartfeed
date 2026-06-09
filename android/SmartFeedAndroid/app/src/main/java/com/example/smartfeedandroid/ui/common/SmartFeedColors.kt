@@ -2,7 +2,7 @@ package com.example.smartfeedandroid.ui.common
 
 import androidx.compose.ui.graphics.Color
 
-val AppBackground = Color(0xFFF6F3EE)
+val AppBackground = Color.White
 val SoftBlue = Color(0xFF8FAADC)
 val SoftBlueLight = Color(0xFFE7EEF8)
 val SoftGreen = Color(0xFFA8C7A3)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -23,7 +24,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,9 +38,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.res.painterResource
+import com.example.smartfeedandroid.R
 import com.example.smartfeedandroid.data.remote.ChatResponse
 import com.example.smartfeedandroid.data.remote.ChatSource
-import com.example.smartfeedandroid.ui.common.AppBackground
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
@@ -62,9 +71,6 @@ fun ChatDetailScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AppBackground)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         ChatHeader(
             activeUrl = activeUrl,
@@ -75,7 +81,9 @@ fun ChatDetailScreen(
         MessageList(
             messages = messages,
             isAsking = isAsking,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp)
         )
 
         ChatInputBar(
@@ -97,11 +105,20 @@ private fun ChatHeader(
     var menuExpanded by remember { mutableStateOf(false) }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .padding(horizontal = 0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(onClick = onBack) {
-            Text("‹", style = MaterialTheme.typography.headlineMedium)
+        IconButton(
+            onClick = onBack,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                contentDescription = "Back",
+                tint = Color.Black,
+            )
         }
 
         Column(
@@ -118,9 +135,14 @@ private fun ChatHeader(
         }
 
         Box {
-            TextButton(onClick = { menuExpanded = true }) {
-                Text("⋯", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    tint = Color.Black
+                )
             }
+
             DropdownMenu(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
@@ -138,8 +160,12 @@ private fun ChatHeader(
             }
         }
     }
+    HorizontalDivider(
+        modifier = Modifier.fillMaxWidth(),
+        thickness = 0.5.dp,
+        color = Color.LightGray.copy(alpha = 0.6f)
+    )
 }
-
 @Composable
 private fun MessageList(
     messages: List<ChatMessage>,
@@ -184,29 +210,52 @@ private fun ChatInputBar(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(2.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.LightGray.copy(alpha = 0.1f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
+            TextField(
                 value = query,
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Ask anything") },
                 shape = RoundedCornerShape(18.dp),
                 minLines = 1,
-                maxLines = 3
+                maxLines = 3,
+                singleLine = false,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,     // 聚焦纯白
+                    unfocusedContainerColor = Color.White,   // 未聚焦纯白
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                )
             )
 
-            Button(
+// 动态判断当前按钮是否可用（既没在思考，输入框也有字）
+            val isSendEnabled = !isAsking && query.isNotBlank()
+
+            IconButton(
                 onClick = onAsk,
-                enabled = !isAsking && query.isNotBlank(),
+                enabled = isSendEnabled,
+                modifier = Modifier
+                    .padding(bottom = 4.dp, start = 8.dp, end = 4.dp)
+                    .size(35.dp)
+                    .background(
+                        color = if (isSendEnabled) SoftBlue else Color(0xFFE0E0E0),
+                        shape = CircleShape // 裁剪成正圆
+                    )
             ) {
-                Text("Send")
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_send_message),
+                    contentDescription = "Send",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
