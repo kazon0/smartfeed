@@ -15,6 +15,7 @@ class ChatRequest(BaseModel):
     query: str
     mode: Literal["page", "global"] = "global"
     url: str | None = None
+    history: list[dict[str, str]] = []
 
 
 @router.post("/chat")
@@ -27,4 +28,5 @@ def chat(request: ChatRequest):
         query=request.query,
         url=request.url,
         mode=request.mode,
+        history=request.history,
     )

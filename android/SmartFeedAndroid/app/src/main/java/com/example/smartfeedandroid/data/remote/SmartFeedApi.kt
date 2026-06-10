@@ -87,7 +87,14 @@ data class PageMetadata(
 @Serializable
 data class ChatRequest(
     val query: String,
-    val url: String? = null
+    val url: String? = null,
+    val history: List<ChatHistoryItem> = emptyList()
+)
+
+@Serializable
+data class ChatHistoryItem(
+    val role: String,
+    val content: String
 )
 
 @Serializable

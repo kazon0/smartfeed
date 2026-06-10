@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.local.ConversationStore
+import com.example.smartfeedandroid.data.remote.ChatHistoryItem
 import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.ChatRepository
@@ -234,6 +235,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val conversation = ensureActiveConversation()
         val conversationId = conversation.id
         val activeUrl = conversation.url
+        val history = chatHistoryFrom(conversation.messages)
         val userMessage = ChatMessage.User(cleanQuery)
         val updatedMessages = conversation.messages + userMessage
 
@@ -256,7 +258,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         persistConversations(uiState.conversations)
 
         viewModelScope.launch {
-            chatRepository.ask(cleanQuery, activeUrl)
+            chatRepository.ask(cleanQuery, activeUrl, history)
                 .onSuccess { response ->
                     val conversations = conversationManager.appendMessage(
                         conversations = uiState.conversations,
@@ -408,5 +410,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             conversationStore.save(conversations.map { it.toStoredConversation() })
         }
+    }
+
+    private fun chatHistoryFrom(messages: List<ChatMessage>): List<ChatHistoryItem> {
+        return messages
+            .mapNotNull { message ->
+                when (message) {
+                    is ChatMessage.User -> ChatHistoryItem("user", message.text)
+                    is ChatMessage.Summary -> ChatHistoryItem("summary", message.text)
+                    is ChatMessage.Assistant -> {
+                        val content = message.response.answer.ifBlank {
+                            message.response.message
+                        }
+                        content.takeIf { it.isNotBlank() }?.let {
+                            ChatHistoryItem("assistant", it)
+                        }
+                    }
+                    is ChatMessage.Error -> null
+                }
+            }
+            .takeLast(8)
     }
 }

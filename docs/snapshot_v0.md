@@ -104,6 +104,7 @@
     - `query`
     - `url` 可选
     - `mode` 保留，默认 `global`
+    - `history` 可选，用于发送当前对话最近消息
   - 当前流程：
     - 调用 `QueryIntentService.classify(query, has_url)`。
     - 如果 `retrieval_scope == "none"`，根据 fallback policy 直接返回，不检索。
@@ -111,6 +112,7 @@
     - query rewrite 不可用时回退使用用户原始 query。
     - 调用 `LLMService.generate_search_queries()` 基于用户原始 query 和 rewritten query 生成 2 到 4 个检索查询变体。
     - multi-query 不可用时至少使用 rewritten query 和用户原始 query。
+    - 如果请求包含 `history`，会把最近对话上下文用于 query rewrite、检索和回答，帮助处理“继续说”“上一个问题”等追问。
     - 向量检索、关键词召回和轻量重排使用 multi-query 合并后的查询集合。
     - 最终回答仍使用用户原始 query。
     - 如果请求包含 `url`，进入当前网页聊天逻辑。
@@ -380,6 +382,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - insights DeepSeek 生成和规则 fallback 已实现。
 - `POST /chat` 问答接口已实现。
 - chat query intent classification 已实现。
+- chat 可选 history 上下文已实现。
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
 - chat 支持可选 url 优先检索当前网页已实现。
 - chat 对当前网页页面级问题使用该 URL 已入库页面上下文已实现。
@@ -426,6 +429,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现上传 URL 并展示 summary、status、stored chunks。
 - Android 端已实现本地聊天消息列表。
 - Android 端已实现调用当前 `/chat` 并展示 answer 和 sources。
+- Android 端调用 `/chat` 时会发送当前对话最近 messages 作为 history。
 - Android 端已将上传和聊天状态迁入 `HomeViewModel`。
 - Android 端已将本地 conversation 操作从 `HomeViewModel` 拆到 `ConversationManager`。
 - Android 端已将 Room conversation 映射从 `HomeViewModel` 拆到 `ConversationMappers`。

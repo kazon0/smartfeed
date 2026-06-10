@@ -391,6 +391,25 @@ Page-preferred chat:
 }
 ```
 
+Follow-up chat with optional recent local history:
+
+```json
+{
+  "query": "继续说",
+  "url": "https://example.com",
+  "history": [
+    {
+      "role": "user",
+      "content": "这篇文章讲了什么"
+    },
+    {
+      "role": "assistant",
+      "content": "这篇文章主要介绍了野生菌中毒风险。"
+    }
+  ]
+}
+```
+
 `mode` is still accepted for backward compatibility:
 
 ```json
@@ -419,9 +438,9 @@ Page-preferred chat:
       "chunk_index": 0,
       "chunk_indexes": [0, 1, 2],
       "score": 0.82,
-      "source_summary": "这段来源解释了与问题相关的核心内容。",
+      "source_summary": "《Example Domain》解释了与问题相关的核心内容。",
       "content_preview": "merged source text preview...",
-      "source_note": "这段来源解释了与问题相关的核心内容。"
+      "source_note": "《Example Domain》解释了与问题相关的核心内容。"
     }
   ],
   "source_type": "knowledge_base",

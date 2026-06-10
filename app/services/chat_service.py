@@ -36,19 +36,24 @@ class ChatService:
         query: str,
         url: str | None = None,
         mode: str = "global",
+        history: list[dict[str, str]] | None = None,
     ) -> dict:
+        history_context = self._history_context(history or [])
+        contextual_query = self._contextual_query(query, history_context)
         intent = self.intent_service_factory().classify(
             query,
             has_url=bool(url),
         )
         debug = self._new_debug(query, url, mode, intent)
+        debug["history_count"] = len(history or [])
+        debug["history_used"] = bool(history_context)
 
         if intent["retrieval_scope"] == "none":
             return self._no_retrieval_response(intent, debug)
 
         vector_store = self.vector_store_factory()
-        rewritten_query = self._rewrite_query(query, url)
-        search_queries = self._search_queries(query, rewritten_query, url)
+        rewritten_query = self._rewrite_query(contextual_query, url)
+        search_queries = self._search_queries(contextual_query, rewritten_query, url)
         ranking_query = " ".join(search_queries)
         debug["rewritten_query"] = rewritten_query
         debug["search_queries"] = search_queries
@@ -56,6 +61,7 @@ class ChatService:
         if url:
             return self._chat_with_current_page(
                 query,
+                contextual_query,
                 search_queries,
                 ranking_query,
                 url,
@@ -77,7 +83,7 @@ class ChatService:
         relevant_chunks = self._high_relevance_chunks(ranked_chunks)
         debug["relevant_chunks"] = self._debug_chunk_refs(relevant_chunks)
         answer, source_type, selected_chunks = self._answer_with_policy(
-            query,
+            contextual_query,
             intent["fallback_policy"],
             relevant_chunks,
             [],
@@ -98,6 +104,7 @@ class ChatService:
     def _chat_with_current_page(
         self,
         query: str,
+        contextual_query: str,
         search_queries: list[str],
         ranking_query: str,
         url: str,
@@ -129,7 +136,7 @@ class ChatService:
             debug["page_wide_query"] = True
             debug["quality_selected_page_chunks"] = self._debug_chunk_refs(selected_page_chunks)
             answer, source_type, selected_chunks = self._answer_with_policy(
-                query,
+                contextual_query,
                 intent["fallback_policy"],
                 selected_page_chunks,
                 selected_page_chunks,
@@ -153,7 +160,7 @@ class ChatService:
             )
             debug["expanded_chunks"] = self._debug_chunk_refs(expanded_page_chunks)
             answer, source_type, selected_chunks = self._answer_with_policy(
-                query,
+                contextual_query,
                 intent["fallback_policy"],
                 expanded_page_chunks,
                 expanded_page_chunks,
@@ -236,6 +243,32 @@ class ChatService:
             "selected_chunks": [],
             "context": {},
         }
+
+    def _history_context(self, history: list[dict[str, str]], limit: int = 8) -> str:
+        clean_items = []
+        for item in history[-limit:]:
+            role = str(item.get("role", "")).strip().lower()
+            content = str(item.get("content", "")).strip()
+            if role not in {"user", "assistant", "summary"} or not content:
+                continue
+            label = {
+                "user": "用户",
+                "assistant": "助手",
+                "summary": "文章总结",
+            }[role]
+            clean_items.append(f"{label}: {content[:600]}")
+        return "\n".join(clean_items)
+
+    def _contextual_query(self, query: str, history_context: str) -> str:
+        clean_query = query.strip()
+        if not history_context:
+            return clean_query
+        return (
+            "以下是当前对话最近上下文，用于理解用户当前问题中的指代。"
+            "回答时仍应以当前问题为准。\n"
+            f"{history_context}\n\n"
+            f"当前问题: {clean_query}"
+        )
 
     def _rewrite_query(self, query: str, url: str | None = None) -> str:
         try:

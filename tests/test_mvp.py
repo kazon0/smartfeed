@@ -471,6 +471,44 @@ def test_chat_uses_rewritten_query_for_global_retrieval(monkeypatch):
     assert data["answer"]
 
 
+def test_chat_uses_history_for_follow_up_retrieval(monkeypatch):
+    captured_rewrite_question = ""
+
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return []
+
+        def get_all_chunks(self):
+            return []
+
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            nonlocal captured_rewrite_question
+            captured_rewrite_question = question
+            return {"query": "野生菌中毒 症状", "source": "llm", "reason": ""}
+
+        def answer_without_context(self, question, reason):
+            return f"{reason}。general answer"
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post(
+        "/chat",
+        json={
+            "query": "继续说",
+            "history": [
+                {"role": "user", "content": "野生菌中毒会怎么样"},
+                {"role": "assistant", "content": "可能出现恶心、幻觉等症状。"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "野生菌中毒会怎么样" in captured_rewrite_question
+    assert "当前问题: 继续说" in captured_rewrite_question
+
+
 def test_chat_reranks_and_compresses_context(monkeypatch):
     captured_context = []
 

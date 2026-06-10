@@ -53,6 +53,7 @@ Backend 已实现：
 * Android Compose MVP
 * Android Retrofit 网络层
 * Android `/upload` 和 `/chat` 接入
+* `/chat` 可选 history 上下文
 * Android 内存级 conversation/message 结构
 * Android Home / Analysis / Profile 底部 tab
 * Android 历史对话列表和聊天详情页分层
@@ -61,6 +62,7 @@ Backend 已实现：
 * Android 重复分享同 URL 打开已有对话
 * Android Room 本地历史对话保存
 * Android Room messages 独立表保存
+* Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
 * `GET /articles`
