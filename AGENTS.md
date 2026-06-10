@@ -63,11 +63,15 @@ Backend 已实现：
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
 * `GET /articles`
+* `GET /insights`
 * `DELETE /articles`
 * Android Analysis 主题占比饼图
+* Android Analysis 智能总结展示
+* Android Analysis 知识库画像和内容厚度展示
 * Android Analysis 右上角文章管理入口
 * Android 已保存文章按 topic 分组展示
-* Android 文章列表点击打开原网页
+* Android 文章列表点击新建文章聊天
+* Android 主要用户可见文案开始抽离到 `strings.xml`
 * Android 文章列表左滑显示删除按钮
 * Android UI feature folders:
   * `ui/home`

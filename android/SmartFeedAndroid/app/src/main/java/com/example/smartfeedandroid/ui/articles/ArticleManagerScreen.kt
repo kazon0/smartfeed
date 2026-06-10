@@ -32,7 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -57,6 +57,7 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.example.smartfeedandroid.R
 
 @Composable
 fun ArticleManagerScreen(
@@ -65,6 +66,7 @@ fun ArticleManagerScreen(
     deletingArticleUrl: String?,
     articlesErrorMessage: String?,
     onBack: () -> Unit,
+    onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -108,14 +110,14 @@ fun ArticleManagerScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                     tint = Color.Black,
                     modifier = Modifier.size(28.dp)
                 )
             }
 
             Text(
-                text = "Saved articles",
+                text = stringResource(R.string.saved_articles),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -125,7 +127,7 @@ fun ArticleManagerScreen(
         }
 
         articlesErrorMessage?.let { errorMessage ->
-            ResultCard(title = "Articles Error") {
+            ResultCard(title = stringResource(R.string.articles_error)) {
                 Text(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error
@@ -155,9 +157,9 @@ fun ArticleManagerScreen(
             }
 
             articles.isEmpty() -> {
-                ResultCard(title = "No saved articles") {
+                ResultCard(title = stringResource(R.string.no_saved_articles)) {
                     Text(
-                        text = "Upload or share articles first.",
+                        text = stringResource(R.string.upload_articles_first),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -176,6 +178,7 @@ fun ArticleManagerScreen(
                         SwipeDeleteArticleRow(
                             article = article,
                             isDeleting = deletingArticleUrl == article.url,
+                            onOpenArticleChat = onOpenArticleChat,
                             onDeleteArticle = onDeleteArticle
                         )
                     }
@@ -219,6 +222,7 @@ private fun TopicTabs(
 private fun SwipeDeleteArticleRow(
     article: SavedArticle,
     isDeleting: Boolean,
+    onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -274,7 +278,7 @@ private fun SwipeDeleteArticleRow(
                 enabled = !isDeleting
             ) {
                 Text(
-                    text = if (isDeleting) "Deleting..." else "Delete",
+                    text = if (isDeleting) stringResource(R.string.deleting) else stringResource(R.string.delete),
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
@@ -323,7 +327,11 @@ private fun SwipeDeleteArticleRow(
                     }
                 }
         ) {
-            PureSavedArticleCard(article = article, isDeleting = isDeleting)
+            PureSavedArticleCard(
+                article = article,
+                isDeleting = isDeleting,
+                onOpenArticleChat = onOpenArticleChat
+            )
         }
     }
 }
@@ -331,15 +339,14 @@ private fun SwipeDeleteArticleRow(
 @Composable
 private fun PureSavedArticleCard(
     article: SavedArticle,
-    isDeleting: Boolean
+    isDeleting: Boolean,
+    onOpenArticleChat: (SavedArticle) -> Unit
 ) {
-    val uriHandler = LocalUriHandler.current
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = article.url.isNotBlank() && !isDeleting) {
-                uriHandler.openUri(article.url)
+                onOpenArticleChat(article)
             },
         shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(
@@ -351,7 +358,7 @@ private fun PureSavedArticleCard(
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Text(
-                text = article.title.ifBlank { article.url.ifBlank { "Untitled article" } },
+                text = article.title.ifBlank { article.url.ifBlank { stringResource(R.string.untitled_article) } },
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -365,7 +372,7 @@ private fun PureSavedArticleCard(
                 )
             }
             Text(
-                text = "${article.chunkCount} chunks",
+                text = "${article.chunkCount} ${stringResource(R.string.chunk_count)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -397,6 +404,7 @@ private fun ArticleManagerScreenPreview() {
         deletingArticleUrl = null,
         articlesErrorMessage = null,
         onBack = {},
+        onOpenArticleChat = {},
         onDeleteArticle = {}
     )
 }

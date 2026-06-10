@@ -83,6 +83,20 @@
     - `domains`
     - `articles`
 
+- `GET /insights`
+  - 定义位置：`app/routes/insights.py`
+  - 当前流程：
+    - 调用 `VectorStoreService.list_articles()` 获取已保存文章。
+    - 调用 `LLMService.summarize_knowledge_base()` 生成知识库智能总结。
+    - DeepSeek 不可用或返回异常时使用规则 fallback。
+  - 返回字段：
+    - `status`
+    - `total_articles`
+    - `summary`
+    - `highlights`
+    - `suggestions`
+    - `source`
+
 - `POST /chat`
   - 定义位置：`app/routes/chat.py`
   - 业务实现位置：`app/services/chat_service.py`
@@ -262,14 +276,14 @@
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
   - Chat 页面实现位置：`ui/chat/ChatDetailScreen.kt`。
-  - Analysis tab 当前调用后端 `/stats` 展示知识库文章数、chunks 数和来源域名占比。
+  - Analysis tab 当前调用后端 `/stats`、`/articles` 和 `/insights` 展示智能总结、知识库画像、主题占比、内容厚度和来源域名。
   - Analysis tab 的 Topic share 当前基于 `/articles` 返回的文章 `topic` 按文章数量统计。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
   - Analysis 页面实现位置：`ui/analysis/AnalysisScreen.kt`。
   - Analysis tab 右上角提供文章管理入口。
   - 文章管理页调用后端 `/articles` 展示已保存文章列表。
   - 文章管理页用顶部 topic tabs 切换文章分类。
-  - 文章管理页点击文章可以跳转原网页。
+  - 文章管理页点击文章会基于该文章新建一条聊天，并进入聊天详情页。
   - 文章管理页左滑文章会显示 Delete 按钮，点击按钮后调用后端 `DELETE /articles` 按 URL 删除知识库文章。
   - 文章管理页面实现位置：`ui/articles/ArticleManagerScreen.kt`。
   - 删除文章后会刷新文章列表和知识库统计。
@@ -360,6 +374,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - stats 返回主题占比、来源域名占比和文章占比已实现。
 - stats chunks 主题分类当前使用轻量关键词规则已实现。
 - articles topic 优先使用上传时保存的 LLM 分类结果已实现。
+- `GET /insights` 知识库智能总结接口已实现。
+- insights DeepSeek 生成和规则 fallback 已实现。
 - `POST /chat` 问答接口已实现。
 - chat query intent classification 已实现。
 - chat 支持 `page_reference`、`knowledge_or_general_query`、`realtime_or_current_query`、`search_history`、`unsupported_action`。
@@ -425,11 +441,11 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
 - Android 端已实现知识库主题占比饼图。
-- Android 端已展示主题、文章和来源域名分布。
+- Android 端已展示智能总结、知识库画像、主题占比、内容厚度和来源域名分布。
 - Android 端已通过 Analysis 右上角入口进入文章管理页。
 - Android Analysis Topic share 已改为按文章数量统计 topic。
 - Android 文章管理页已使用 topic tabs 展示已保存文章。
-- Android 文章管理页已支持点击打开原网页。
+- Android 文章管理页已支持点击文章后新建文章聊天。
 - Android 文章管理页已支持左滑显示删除按钮。
 
 ## 5. 当前系统边界

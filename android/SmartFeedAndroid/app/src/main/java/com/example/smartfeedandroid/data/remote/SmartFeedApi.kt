@@ -17,6 +17,9 @@ interface SmartFeedApi {
     @GET("stats")
     suspend fun stats(): StatsResponse
 
+    @GET("insights")
+    suspend fun insights(): InsightsResponse
+
     @POST("upload")
     suspend fun upload(@Body request: UploadRequest): UploadResponse
 
@@ -126,6 +129,17 @@ data class StatsResponse(
     val topics: List<TopicDistribution> = emptyList(),
     val domains: List<DomainDistribution> = emptyList(),
     val articles: List<ArticleDistribution> = emptyList()
+)
+
+@Serializable
+data class InsightsResponse(
+    val status: String = "",
+    val summary: String = "",
+    val highlights: List<String> = emptyList(),
+    val suggestions: List<String> = emptyList(),
+    val source: String = "",
+    @SerialName("total_articles")
+    val totalArticles: Int = 0
 )
 
 @Serializable

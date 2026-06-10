@@ -9,7 +9,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.smartfeedandroid.R
+import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.ui.analysis.AnalysisScreen
 import com.example.smartfeedandroid.ui.articles.ArticleManagerScreen
 import com.example.smartfeedandroid.ui.chat.ChatDetailScreen
@@ -34,6 +37,7 @@ fun SmartFeedScreen(
         onBackToConversations = viewModel::showConversationList,
         onOpenArticleManager = viewModel::openArticleManager,
         onCloseArticleManager = viewModel::closeArticleManager,
+        onOpenArticleChat = viewModel::startArticleConversation,
         onDeleteArticle = viewModel::deleteArticle,
         onDismissError = viewModel::clearError,
         modifier = modifier
@@ -54,6 +58,7 @@ private fun SmartFeedContent(
     onBackToConversations: () -> Unit,
     onOpenArticleManager: () -> Unit,
     onCloseArticleManager: () -> Unit,
+    onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier
@@ -78,11 +83,11 @@ private fun SmartFeedContent(
             uiState.errorMessage?.let { errorMessage ->
                 AlertDialog(
                     onDismissRequest = onDismissError,
-                    title = { Text("Something went wrong") },
+                    title = { Text(stringResource(R.string.generic_error_title)) },
                     text = { Text(errorMessage) },
                     confirmButton = {
                         TextButton(onClick = onDismissError) {
-                            Text("OK")
+                            Text(stringResource(R.string.ok))
                         }
                     }
                 )
@@ -123,6 +128,7 @@ private fun SmartFeedContent(
                             deletingArticleUrl = uiState.deletingArticleUrl,
                             articlesErrorMessage = uiState.articlesErrorMessage,
                             onBack = onCloseArticleManager,
+                            onOpenArticleChat = onOpenArticleChat,
                             onDeleteArticle = onDeleteArticle,
                             modifier = Modifier.padding(innerPadding)
                         )
@@ -130,9 +136,10 @@ private fun SmartFeedContent(
                         AnalysisScreen(
                             conversations = uiState.conversations,
                             stats = uiState.statsResponse,
+                            insights = uiState.insightsResponse,
                             articles = uiState.articlesResponse?.articles.orEmpty(),
                             isLoading = uiState.isLoadingStats,
-                            errorMessage = uiState.statsErrorMessage,
+                            errorMessage = uiState.statsErrorMessage ?: uiState.insightsErrorMessage,
                             onOpenArticleManager = onOpenArticleManager,
                             modifier = Modifier.padding(innerPadding)
                         )
@@ -141,8 +148,8 @@ private fun SmartFeedContent(
 
                 AppTab.Profile -> {
                     PlaceholderScreen(
-                        title = "Profile",
-                        description = "Account and settings will appear here.",
+                        title = stringResource(R.string.profile_title),
+                        description = stringResource(R.string.profile_placeholder),
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

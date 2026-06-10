@@ -250,6 +250,42 @@ def test_articles_list_returns_saved_articles(monkeypatch):
     assert data["articles"][0]["topic"] == "科技"
 
 
+def test_insights_returns_smart_summary(monkeypatch):
+    class FakeVectorStoreService:
+        def list_articles(self):
+            return [
+                {
+                    "url": "https://example.com/a",
+                    "title": "A",
+                    "domain": "example.com",
+                    "chunk_count": 3,
+                    "topic": "科技",
+                }
+            ]
+
+    class FakeLLMService:
+        def summarize_knowledge_base(self, articles):
+            assert articles[0]["topic"] == "科技"
+            return {
+                "summary": "你的知识库主要关注科技内容。",
+                "highlights": ["科技内容占比较高"],
+                "suggestions": ["可以继续围绕重点文章提问"],
+                "source": "llm",
+            }
+
+    monkeypatch.setattr("app.routes.insights.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.insights.LLMService", FakeLLMService)
+
+    response = client.get("/insights")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "ok"
+    assert data["total_articles"] == 1
+    assert data["summary"] == "你的知识库主要关注科技内容。"
+    assert data["source"] == "llm"
+
+
 def test_upload_stores_llm_topic_metadata(monkeypatch):
     captured = {}
 

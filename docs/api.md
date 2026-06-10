@@ -284,6 +284,45 @@ curl http://127.0.0.1:8000/articles
 - No uploaded content returns an empty list.
 - ChromaDB dependencies or local database files are unavailable.
 
+## GET /insights
+
+Returns an AI-assisted knowledge base summary for the Android Analysis page.
+
+### Request JSON
+
+No request body.
+
+### Response JSON
+
+```json
+{
+  "status": "ok",
+  "total_articles": 3,
+  "summary": "你的知识库主要关注科技和学习内容，近期保存的文章适合围绕算法、开发和学习方法继续追问。",
+  "highlights": [
+    "科技类内容占比较高",
+    "主要来源集中在少数网站"
+  ],
+  "suggestions": [
+    "可以从文章管理页打开重点文章继续提问",
+    "可以补充不同来源的文章做对比"
+  ],
+  "source": "llm"
+}
+```
+
+### curl
+
+```bash
+curl http://127.0.0.1:8000/insights
+```
+
+### Typical Failures
+
+- No uploaded content returns a fallback summary and empty highlights.
+- If `DEEPSEEK_API_KEY` is not configured or the LLM request fails, the API returns a rule-based fallback summary with `source: "fallback"`.
+- ChromaDB dependencies or local database files are unavailable.
+
 ## DELETE /articles
 
 Deletes all chunks for a saved article URL.

@@ -28,6 +28,22 @@ class ConversationManager {
         }
     }
 
+    fun createArticleConversation(
+        url: String,
+        title: String,
+        storedChunks: Int
+    ): Conversation {
+        val cleanUrl = url.trim()
+        return Conversation(
+            id = createConversationId(),
+            title = title.ifBlank { cleanUrl.ifBlank { "新聊天" } },
+            url = cleanUrl,
+            status = "saved",
+            storedChunks = storedChunks,
+            updatedAtMillis = System.currentTimeMillis()
+        )
+    }
+
     fun appendMessage(
         conversations: List<Conversation>,
         conversationId: String,

@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -118,7 +119,7 @@ private fun ChatHeader(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.back),
                 tint = Color.Black,
                 modifier = Modifier.size(28.dp)
             )
@@ -129,7 +130,7 @@ private fun ChatHeader(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = activeTitle.ifBlank { "新聊天" },
+                text = activeTitle.ifBlank { stringResource(R.string.new_chat) },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -141,7 +142,7 @@ private fun ChatHeader(
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More options",
+                    contentDescription = stringResource(R.string.more_options),
                     tint = Color.Black
                 )
             }
@@ -151,7 +152,7 @@ private fun ChatHeader(
                 onDismissRequest = { menuExpanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Open original page") },
+                    text = { Text(stringResource(R.string.open_original_page)) },
                     enabled = activeUrl.isNotBlank(),
                     onClick = {
                         menuExpanded = false
@@ -190,7 +191,7 @@ private fun MessageList(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Ask a question to start.",
+                        text = stringResource(R.string.ask_question_to_start),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -229,7 +230,7 @@ private fun ChatInputBar(
                 value = query,
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask anything") },
+                placeholder = { Text(stringResource(R.string.ask_anything)) },
                 shape = RoundedCornerShape(18.dp),
                 minLines = 1,
                 maxLines = 3,
@@ -259,7 +260,7 @@ private fun ChatInputBar(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_send_message),
-                    contentDescription = "Send",
+                    contentDescription = stringResource(R.string.send),
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
@@ -272,10 +273,10 @@ private fun ChatInputBar(
 private fun ChatBubble(message: ChatMessage) {
     when (message) {
         is ChatMessage.User -> UserBubble(text = message.text)
-        is ChatMessage.Summary -> AssistantBubble(title = "Summary", text = message.text)
+        is ChatMessage.Summary -> AssistantBubble(title = stringResource(R.string.summary), text = message.text)
         is ChatMessage.Assistant -> AssistantMessage(response = message.response)
         is ChatMessage.Error -> {
-            ResultCard(title = "Chat Error") {
+            ResultCard(title = stringResource(R.string.chat_error)) {
                 Text(text = message.text, color = MaterialTheme.colorScheme.error)
             }
         }
@@ -289,16 +290,16 @@ private fun AssistantMessage(response: ChatResponse) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         AssistantBubble(
-            title = "SmartFeed",
+            title = stringResource(R.string.app_name),
             text = response.answer.ifBlank {
-                response.message.ifBlank { "No answer returned." }
+                response.message.ifBlank { stringResource(R.string.no_answer_returned) }
             },
             footer = response.sourceType.ifBlank { response.status.ifBlank { "N/A" } }
         )
 
         if (response.sources.isNotEmpty()) {
             Text(
-                text = "Sources",
+                text = stringResource(R.string.sources),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -312,8 +313,8 @@ private fun AssistantMessage(response: ChatResponse) {
 @Composable
 private fun ThinkingBubble() {
     AssistantBubble(
-        title = "SmartFeed",
-        text = "正在思考中..."
+        title = stringResource(R.string.app_name),
+        text = stringResource(R.string.thinking)
     )
 }
 
@@ -430,7 +431,7 @@ private fun SourceCard(source: ChatSource) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = source.displayTitle.ifBlank { source.title.ifBlank { "Untitled source" } },
+                text = source.displayTitle.ifBlank { source.title.ifBlank { stringResource(R.string.untitled_source) } },
                 fontWeight = FontWeight.SemiBold
             )
             if (source.sectionTitle.isNotBlank()) {

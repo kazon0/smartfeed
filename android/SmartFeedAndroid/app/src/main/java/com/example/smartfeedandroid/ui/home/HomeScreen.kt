@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -83,7 +84,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SmartFeed",
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -95,7 +96,7 @@ fun HomeScreen(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_new_chat),
-                        contentDescription = "新聊天",
+                        contentDescription = stringResource(R.string.new_chat),
                         tint = Color.Black,
                         modifier = Modifier.size(28.dp)
                     )
@@ -112,7 +113,7 @@ fun HomeScreen(
                 value = uiState.url,
                 onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("粘贴或分享文章链接") },
+                placeholder = { Text(stringResource(R.string.paste_or_share_article_link)) },
                 shape = RoundedCornerShape(24.dp), // 调大圆角，更有搜索框的胶囊感
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -177,7 +178,7 @@ private fun ConversationList(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = "最近对话",
+            text = stringResource(R.string.recent_conversations),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -188,7 +189,7 @@ private fun ConversationList(
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Text(
-                    text = "保存一篇文章后，这里会出现对话记录。",
+                    text = stringResource(R.string.first_conversation_hint),
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -237,7 +238,7 @@ private fun SwipeDeleteConversationRow(
                 onClick = { onDeleteConversation(conversation.id) }
             ) {
                 Text(
-                    text = "删除",
+                    text = stringResource(R.string.delete),
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
@@ -320,7 +321,7 @@ private fun ConversationItem(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = conversation.title.ifBlank { "新聊天" },
+                    text = conversation.title.ifBlank { stringResource(R.string.new_chat) },
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -328,9 +329,9 @@ private fun ConversationItem(
                 Text(
                     text = conversation.summary.ifBlank {
                         if (conversation.url.isBlank()) {
-                            "向知识库提问"
+                            stringResource(R.string.ask_knowledge_base)
                         } else {
-                            "网页对话"
+                            stringResource(R.string.page_conversation)
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -411,18 +412,18 @@ private fun conversationTopic(conversation: Conversation): String {
 
 @Composable
 private fun UploadResult(response: UploadResponse) {
-    ResultCard(title = "保存结果") {
-        ResultRow(label = "状态", value = response.status)
-        ResultRow(label = "片段数", value = response.storedChunks.toString())
-        ResultRow(label = "标题", value = response.data?.title.orEmpty().ifBlank { "N/A" })
-        ResultRow(label = "解析方式", value = response.data?.metadata?.parser ?: "N/A")
+    ResultCard(title = stringResource(R.string.save_result)) {
+        ResultRow(label = stringResource(R.string.status), value = response.status)
+        ResultRow(label = stringResource(R.string.chunk_count), value = response.storedChunks.toString())
+        ResultRow(label = stringResource(R.string.title), value = response.data?.title.orEmpty().ifBlank { "N/A" })
+        ResultRow(label = stringResource(R.string.parser), value = response.data?.metadata?.parser ?: "N/A")
 
         Spacer(modifier = Modifier.height(12.dp))
-        Text(text = "总结", fontWeight = FontWeight.SemiBold)
+        Text(text = stringResource(R.string.summary), fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = response.summary.ifBlank {
-                response.error ?: "暂无总结。"
+                response.error ?: stringResource(R.string.no_summary)
             },
             style = MaterialTheme.typography.bodyMedium
         )

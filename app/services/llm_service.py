@@ -282,6 +282,106 @@ class LLMService:
 
         return [item for item in data if isinstance(item, str)]
 
+    def summarize_knowledge_base(self, articles: list[dict]) -> dict:
+        clean_articles = [
+            {
+                "title": str(article.get("title", "")).strip(),
+                "url": str(article.get("url", "")).strip(),
+                "domain": str(article.get("domain", "")).strip(),
+                "topic": str(article.get("topic", "")).strip() or "其他",
+                "chunk_count": int(article.get("chunk_count", 0) or 0),
+            }
+            for article in articles
+            if str(article.get("url", "")).strip()
+        ]
+        if not clean_articles:
+            return {
+                "summary": "当前知识库还没有已保存文章。可以先分享几篇文章，系统会在这里总结你的关注方向。",
+                "highlights": [],
+                "suggestions": ["先保存几篇同一主题的文章，方便形成更稳定的知识画像。"],
+                "source": "fallback",
+            }
+
+        article_lines = "\n".join(
+            (
+                f"- title: {article['title'][:120]}\n"
+                f"  topic: {article['topic']}\n"
+                f"  domain: {article['domain']}\n"
+                f"  chunk_count: {article['chunk_count']}"
+            )
+            for article in clean_articles[:80]
+        )
+        prompt = (
+            "请基于用户个人知识库的文章清单，生成一份中文智能分析。"
+            "你只能基于给定清单分析，不要编造未出现的文章内容。"
+            "输出必须是 JSON，不要 Markdown。"
+            "字段："
+            "{"
+            '"summary":"80到140字，总结用户当前知识库主要关注什么",'
+            '"highlights":["3条以内，指出明显的内容结构、主题倾向或来源特征"],'
+            '"suggestions":["3条以内，给出下一步保存或提问建议"]'
+            "}"
+            "\n\n"
+            f"articles:\n{article_lines}"
+        )
+        response = self._chat(prompt)
+        if response.startswith("LLM unavailable"):
+            fallback = self._fallback_knowledge_summary(clean_articles)
+            fallback["source"] = "fallback"
+            return fallback
+
+        data = self._parse_json_object(response)
+        summary = data.get("summary", "")
+        highlights = data.get("highlights", [])
+        suggestions = data.get("suggestions", [])
+
+        if not isinstance(summary, str) or not summary.strip():
+            fallback = self._fallback_knowledge_summary(clean_articles)
+            fallback["source"] = "fallback"
+            return fallback
+
+        return {
+            "summary": summary.strip(),
+            "highlights": [
+                item.strip()
+                for item in highlights
+                if isinstance(item, str) and item.strip()
+            ][:3],
+            "suggestions": [
+                item.strip()
+                for item in suggestions
+                if isinstance(item, str) and item.strip()
+            ][:3],
+            "source": "llm",
+        }
+
+    def _fallback_knowledge_summary(self, articles: list[dict]) -> dict:
+        topic_counts: dict[str, int] = {}
+        domain_counts: dict[str, int] = {}
+        for article in articles:
+            topic = article.get("topic", "其他") or "其他"
+            domain = article.get("domain", "unknown") or "unknown"
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+            domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+        top_topic = max(topic_counts.items(), key=lambda item: item[1])[0]
+        top_domain = max(domain_counts.items(), key=lambda item: item[1])[0]
+        summary = (
+            f"当前知识库共保存 {len(articles)} 篇文章，主要集中在“{top_topic}”方向，"
+            f"常见来源包括 {top_domain}。可以继续围绕高频主题追问，也可以补充不同来源的文章。"
+        )
+        return {
+            "summary": summary,
+            "highlights": [
+                f"最主要主题是“{top_topic}”。",
+                f"主要内容来源是 {top_domain}。",
+            ],
+            "suggestions": [
+                "可以从文章管理页打开一篇文章继续追问。",
+                "如果主题过于集中，可以补充不同领域的文章做对比。",
+            ],
+        }
+
     def _parse_json_object(self, text: str) -> dict:
         try:
             data = json.loads(text)

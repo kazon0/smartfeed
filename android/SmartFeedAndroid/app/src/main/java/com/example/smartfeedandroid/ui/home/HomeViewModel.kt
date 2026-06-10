@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.local.ConversationStore
+import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.data.repository.StatsRepository
@@ -75,6 +76,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (tab == AppTab.Analysis) {
             refreshStats()
             refreshArticles()
+            refreshInsights()
         }
     }
 
@@ -148,11 +150,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         persistConversations(uiState.conversations)
     }
 
+    fun startArticleConversation(article: SavedArticle) {
+        val conversation = conversationManager.createArticleConversation(
+            url = article.url,
+            title = article.title,
+            storedChunks = article.chunkCount
+        )
+
+        uiState = uiState.copy(
+            activeConversationId = conversation.id,
+            selectedTab = AppTab.Home,
+            isChatOpen = true,
+            isArticleManagerOpen = false,
+            activeUrl = conversation.url,
+            uploadResponse = null,
+            errorMessage = null,
+            conversations = listOf(conversation) + uiState.conversations,
+            messages = emptyList()
+        )
+        persistConversations(uiState.conversations)
+    }
+
     fun upload() {
         val cleanUrl = uiState.url.trim()
         if (cleanUrl.isEmpty()) {
             uiState = uiState.copy(
-                errorMessage = "Please enter a URL.",
+                errorMessage = "请输入文章链接。",
                 uploadResponse = null
             )
             return
@@ -193,7 +216,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
-                        errorMessage = error.message ?: "Upload failed."
+                        errorMessage = error.message ?: "保存失败。"
                     )
                 }
 
@@ -204,7 +227,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun ask() {
         val cleanQuery = uiState.query.trim()
         if (cleanQuery.isEmpty()) {
-            uiState = uiState.copy(errorMessage = "Please enter a question.")
+            uiState = uiState.copy(errorMessage = "请输入问题。")
             return
         }
 
@@ -276,11 +299,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
-                        statsErrorMessage = error.message ?: "Failed to load stats."
+                        statsErrorMessage = error.message ?: "加载分析数据失败。"
                     )
                 }
 
             uiState = uiState.copy(isLoadingStats = false)
+        }
+    }
+
+    fun refreshInsights() {
+        uiState = uiState.copy(insightsErrorMessage = null)
+
+        viewModelScope.launch {
+            statsRepository.getInsights()
+                .onSuccess { insights ->
+                    uiState = uiState.copy(insightsResponse = insights)
+                }
+                .onFailure { error ->
+                    uiState = uiState.copy(
+                        insightsErrorMessage = error.message ?: "加载智能总结失败。"
+                    )
+                }
         }
     }
 
@@ -297,7 +336,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
-                        articlesErrorMessage = error.message ?: "Failed to load articles."
+                        articlesErrorMessage = error.message ?: "加载文章列表失败。"
                     )
                 }
 
@@ -321,10 +360,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess {
                     refreshArticles()
                     refreshStats()
+                    refreshInsights()
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
-                        articlesErrorMessage = error.message ?: "Failed to delete article."
+                        articlesErrorMessage = error.message ?: "删除文章失败。"
                     )
                 }
 
