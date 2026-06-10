@@ -440,6 +440,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现 Home / Analysis / Profile 底部 tab 结构。
 - Android 端已将历史对话列表和聊天详情页拆开。
 - Android 端 Home 最近对话已支持按全部、新聊天、文章对话和 topic 过滤。
+- Android 端 Home 最近对话已支持本地搜索标题、摘要、URL、topic 和最近消息。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
 - Android 端已实现重复分享同 URL 时打开已有对话。

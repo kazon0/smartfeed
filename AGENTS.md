@@ -77,6 +77,7 @@ Backend 已实现：
 * Android 主要用户可见文案开始抽离到 `strings.xml`
 * Android 文章列表左滑显示删除按钮
 * Android Home 最近对话支持分类过滤
+* Android Home 最近对话支持本地搜索
 * Android Chat sources 以“回答依据”短卡片展示并支持展开
 * Android UI feature folders:
   * `ui/home`

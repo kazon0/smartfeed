@@ -182,8 +182,9 @@ private fun ConversationList(
     onDeleteConversation: (String) -> Unit
 ) {
     var selectedFilter by remember { mutableStateOf<ConversationFilter>(ConversationFilter.All) }
+    var searchQuery by remember { mutableStateOf("") }
     val visibleConversations = conversations.filter { conversation ->
-        selectedFilter.matches(conversation)
+        selectedFilter.matches(conversation) && conversation.matchesSearch(searchQuery)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -191,6 +192,20 @@ private fun ConversationList(
             selectedFilter = selectedFilter,
             conversations = conversations,
             onSelectFilter = { selectedFilter = it }
+        )
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(R.string.search_conversations)) },
+            shape = RoundedCornerShape(18.dp),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = SoftBlue,
+                unfocusedBorderColor = Color.LightGray
+            )
         )
         if (conversations.isEmpty()) {
             Card(
@@ -204,6 +219,12 @@ private fun ConversationList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        } else if (visibleConversations.isEmpty()) {
+            Text(
+                text = stringResource(R.string.no_matching_conversations),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp)
+            )
         } else {
             visibleConversations.forEach { conversation ->
                 SwipeDeleteConversationRow(
@@ -477,6 +498,37 @@ private fun conversationFilters(conversations: List<Conversation>): List<Convers
         ConversationFilter.NewChat,
         ConversationFilter.Page,
     ) + topicFilters
+}
+
+private fun Conversation.matchesSearch(query: String): Boolean {
+    val cleanQuery = query.trim().lowercase()
+    if (cleanQuery.isBlank()) {
+        return true
+    }
+
+    val messageText = messages
+        .takeLast(6)
+        .joinToString(" ") { message ->
+            when (message) {
+                is ChatMessage.User -> message.text
+                is ChatMessage.Summary -> message.text
+                is ChatMessage.Assistant -> message.response.answer.ifBlank {
+                    message.response.message
+                }
+                is ChatMessage.Error -> message.text
+            }
+        }
+
+    val searchable = listOf(
+        title,
+        summary,
+        url,
+        status,
+        conversationTopic(this),
+        messageText,
+    ).joinToString(" ").lowercase()
+
+    return cleanQuery in searchable
 }
 
 private fun conversationTopic(conversation: Conversation): String {
