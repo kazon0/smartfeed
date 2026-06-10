@@ -1,2 +1,150 @@
-# smartfeed
+# SmartFeed
 
+SmartFeed is a personal AI knowledge base for saving web articles, turning them into searchable knowledge, and asking questions about saved content.
+
+The project currently includes a FastAPI backend and an Android Jetpack Compose client. The backend ingests web pages, extracts readable article content, chunks and embeds the text, stores it in ChromaDB, and uses DeepSeek to generate summaries and answers. The Android app provides article saving, article-based chat, global knowledge chat, local conversation history, and knowledge analysis.
+
+## Features
+
+- Save web articles by URL.
+- Parse article content with Jina Reader first, then HTML fallback.
+- Extract structured sections and chunks for RAG ingestion.
+- Store embeddings in ChromaDB.
+- Ask questions against the current article or the global knowledge base.
+- Generate article summaries and knowledge base insights with DeepSeek.
+- Support lightweight chat history context for follow-up questions.
+- Show saved articles grouped by topic.
+- Display Android knowledge analysis, including topic distribution, content depth, source domains, and AI-generated insights.
+- Persist Android conversation history locally with Room.
+
+## Tech Stack
+
+### Backend
+
+- Python
+- FastAPI
+- ChromaDB
+- sentence-transformers
+- requests
+- BeautifulSoup
+- python-dotenv
+- pytest
+- DeepSeek API
+
+### Android
+
+- Kotlin
+- Jetpack Compose
+- Material 3
+- Retrofit
+- OkHttp
+- kotlinx.serialization
+- Room
+
+## Backend Setup
+
+Create a Python environment and install dependencies:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Create a `.env` file:
+
+```env
+DEEPSEEK_API_KEY=your_api_key_here
+```
+
+Start the backend:
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8000/
+```
+
+## Main API Endpoints
+
+- `GET /` health check
+- `GET /debug` browser-based debug page
+- `POST /upload` upload and parse a web article
+- `POST /search` semantic search over saved chunks
+- `POST /chat` ask questions with optional `url` and chat `history`
+- `GET /stats` knowledge base statistics
+- `GET /insights` AI-generated knowledge base summary
+- `GET /articles` saved articles
+- `DELETE /articles` delete an article from the knowledge base by URL
+
+Example upload:
+
+```bash
+curl -X POST http://127.0.0.1:8000/upload \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+```
+
+Example chat:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"What is this article about?","url":"https://example.com"}'
+```
+
+## Android App
+
+Android project path:
+
+```text
+android/SmartFeedAndroid
+```
+
+The Android client currently uses:
+
+```text
+http://10.0.2.2:8000
+```
+
+as the backend base URL for the emulator.
+
+Build check:
+
+```bash
+cd android/SmartFeedAndroid
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:compileDebugKotlin --offline
+```
+
+## Tests
+
+Run backend tests:
+
+```bash
+venv/bin/python -m compileall app tests
+venv/bin/python -m pytest tests/test_mvp.py -q
+```
+
+## Project Status
+
+SmartFeed is beyond a minimal MVP and now has a working RAG loop:
+
+```text
+URL -> article parsing -> sections/chunks -> embeddings -> ChromaDB -> retrieval -> DeepSeek answer
+```
+
+The next major backend direction is to introduce a more formal RAG pipeline layer, with LangChain considered as an optional orchestration layer after the current retrieval, reranking, context compression, and chat history behavior is stable.
+
+## Notes
+
+Runtime data and secrets should not be committed:
+
+- `.env`
+- `venv/`
+- `chroma_db/`
+- `__pycache__/`
+- `*.pyc`
