@@ -1177,7 +1177,10 @@ class ChatService:
         return url or "Untitled source"
 
     def _attach_source_notes(self, query: str, sources: list[dict]) -> None:
-        source_texts = [source["content_preview"] for source in sources]
+        source_texts = [
+            self._source_note_input(source)
+            for source in sources
+        ]
 
         try:
             describe_sources = getattr(self.llm_service_factory(), "describe_sources")
@@ -1188,13 +1191,27 @@ class ChatService:
         for index, source in enumerate(sources):
             note = notes[index].strip() if index < len(notes) and notes[index] else ""
             if note and not note.startswith("LLM unavailable"):
-                note = self._clean_source_note(note)
+                note = self._clean_source_note(note, source)
                 source["source_note"] = note
                 source["source_summary"] = note
 
-    def _clean_source_note(self, note: str) -> str:
-        cleaned = re.sub(r"(来源|片段|source)\s*\[\s*\d+\s*\]", "这段内容", note, flags=re.IGNORECASE)
+    def _source_note_input(self, source: dict) -> str:
+        return (
+            f"title: {source.get('display_title') or source.get('title') or ''}\n"
+            f"section_title: {source.get('section_title') or ''}\n"
+            f"content:\n{source.get('content_preview', '')}"
+        ).strip()
+
+    def _clean_source_note(self, note: str, source: dict | None = None) -> str:
+        cleaned = re.sub(r"(来源|片段|source)\s*\[\s*\d+\s*\]", "该依据", note, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        cleaned = re.sub(r"^(这段内容|该段内容|这部分内容|这部分|该内容)", "该依据", cleaned)
+        cleaned = re.sub(r"^该依据(介绍了|说明了|列出了|提到|包含)", r"依据\1", cleaned)
+
+        if source:
+            display_title = source.get("display_title", "") or source.get("title", "")
+            if display_title and cleaned.startswith(("该依据", "依据")):
+                cleaned = f"《{display_title}》{cleaned}"
         return cleaned
 
     def _debug_chunk_refs(self, chunks: list[dict], limit: int = 10) -> list[dict]:

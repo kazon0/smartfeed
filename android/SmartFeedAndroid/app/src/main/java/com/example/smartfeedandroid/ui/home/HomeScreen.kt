@@ -24,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -31,11 +33,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -176,11 +181,16 @@ private fun ConversationList(
     onSelectConversation: (String) -> Unit,
     onDeleteConversation: (String) -> Unit
 ) {
+    var selectedFilter by remember { mutableStateOf<ConversationFilter>(ConversationFilter.All) }
+    val visibleConversations = conversations.filter { conversation ->
+        selectedFilter.matches(conversation)
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = stringResource(R.string.recent_conversations),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+        ConversationListHeader(
+            selectedFilter = selectedFilter,
+            conversations = conversations,
+            onSelectFilter = { selectedFilter = it }
         )
         if (conversations.isEmpty()) {
             Card(
@@ -195,13 +205,54 @@ private fun ConversationList(
                 )
             }
         } else {
-            conversations.forEach { conversation ->
+            visibleConversations.forEach { conversation ->
                 SwipeDeleteConversationRow(
                     conversation = conversation,
                     isActive = conversation.id == activeConversationId,
                     onClick = { onSelectConversation(conversation.id) },
                     onDeleteConversation = onDeleteConversation
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationListHeader(
+    selectedFilter: ConversationFilter,
+    conversations: List<Conversation>,
+    onSelectFilter: (ConversationFilter) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val filters = conversationFilters(conversations)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.recent_conversations),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Box {
+            TextButton(onClick = { expanded = true }) {
+                Text(text = selectedFilter.label())
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                filters.forEach { filter ->
+                    DropdownMenuItem(
+                        text = { Text(filter.label()) },
+                        onClick = {
+                            onSelectFilter(filter)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -382,6 +433,51 @@ private fun TopicBookmark(
 }
 
 private val topicOrder = listOf("科技", "学习", "健康", "职业", "财经", "生活", "新闻", "新聊天", "其他")
+
+private sealed interface ConversationFilter {
+    data object All : ConversationFilter
+    data object NewChat : ConversationFilter
+    data object Page : ConversationFilter
+    data class Topic(val topic: String) : ConversationFilter
+
+    fun matches(conversation: Conversation): Boolean {
+        return when (this) {
+            All -> true
+            NewChat -> conversation.url.isBlank()
+            Page -> conversation.url.isNotBlank()
+            is Topic -> conversationTopic(conversation) == topic
+        }
+    }
+}
+
+@Composable
+private fun ConversationFilter.label(): String {
+    return when (this) {
+        ConversationFilter.All -> stringResource(R.string.conversation_filter_all)
+        ConversationFilter.NewChat -> stringResource(R.string.new_chat)
+        ConversationFilter.Page -> stringResource(R.string.conversation_filter_page)
+        is ConversationFilter.Topic -> topic
+    }
+}
+
+private fun conversationFilters(conversations: List<Conversation>): List<ConversationFilter> {
+    val topicFilters = conversations
+        .map { conversationTopic(it) }
+        .distinct()
+        .filterNot { it == "新聊天" }
+        .sortedWith(
+            compareBy<String> { topic ->
+                topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.size
+            }.thenBy { it }
+        )
+        .map { ConversationFilter.Topic(it) }
+
+    return listOf(
+        ConversationFilter.All,
+        ConversationFilter.NewChat,
+        ConversationFilter.Page,
+    ) + topicFilters
+}
 
 private fun conversationTopic(conversation: Conversation): String {
     if (conversation.url.isBlank()) {

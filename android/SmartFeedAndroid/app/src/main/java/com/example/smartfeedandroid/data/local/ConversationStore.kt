@@ -10,7 +10,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.room.withTransaction
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.smartfeedandroid.data.remote.ChatResponse
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -28,7 +30,23 @@ class ConversationStore(context: Context) {
     suspend fun load(): List<StoredConversation> {
         val roomConversations = database.conversationDao()
             .getAll()
-            .map { it.toStoredConversation() }
+            .map { conversation ->
+                val messages = database.messageDao()
+                    .getByConversationId(conversation.id)
+                    .map { it.toStoredChatMessage() }
+                    .ifEmpty {
+                        val legacyMessages = conversation.decodeLegacyMessages()
+                        if (legacyMessages.isNotEmpty()) {
+                            database.messageDao().insertAll(
+                                legacyMessages.mapIndexed { index, message ->
+                                    message.toEntity(conversation.id, index)
+                                }
+                            )
+                        }
+                        legacyMessages
+                    }
+                conversation.toStoredConversation(messages)
+            }
         if (roomConversations.isNotEmpty()) {
             return roomConversations
         }
@@ -41,9 +59,21 @@ class ConversationStore(context: Context) {
     }
 
     suspend fun save(conversations: List<StoredConversation>) {
-        database.conversationDao().replaceAll(
-            conversations.map { it.toEntity() }
-        )
+        val conversationEntities = conversations.map { it.toEntity() }
+        val messageEntities = conversations.flatMap { conversation ->
+                conversation.messages.mapIndexed { index, message ->
+                    message.toEntity(conversation.id, index)
+                }
+            }
+
+        database.withTransaction {
+            database.messageDao().deleteAll()
+            database.conversationDao().deleteAll()
+            database.conversationDao().insertAll(conversationEntities)
+            if (messageEntities.isNotEmpty()) {
+                database.messageDao().insertAll(messageEntities)
+            }
+        }
         preferences.edit()
             .remove(KEY_CONVERSATIONS)
             .apply()
@@ -70,10 +100,12 @@ class ConversationStore(context: Context) {
     }
 
     private fun ConversationEntity.toStoredConversation(): StoredConversation {
-        val messages = runCatching {
-            json.decodeFromString<List<StoredChatMessage>>(messagesJson)
-        }.getOrDefault(emptyList())
+        return toStoredConversation(decodeLegacyMessages())
+    }
 
+    private fun ConversationEntity.toStoredConversation(
+        messages: List<StoredChatMessage>
+    ): StoredConversation {
         return StoredConversation(
             id = id,
             title = title,
@@ -83,6 +115,41 @@ class ConversationStore(context: Context) {
             storedChunks = storedChunks,
             updatedAtMillis = updatedAtMillis,
             messages = messages
+        )
+    }
+
+    private fun ConversationEntity.decodeLegacyMessages(): List<StoredChatMessage> {
+        return runCatching {
+            json.decodeFromString<List<StoredChatMessage>>(messagesJson)
+        }.getOrDefault(emptyList())
+    }
+
+    private fun StoredChatMessage.toEntity(
+        conversationId: String,
+        index: Int
+    ): MessageEntity {
+        return MessageEntity(
+            id = "$conversationId:$index",
+            conversationId = conversationId,
+            messageIndex = index,
+            type = type,
+            text = text,
+            responseJson = response?.let { json.encodeToString(it) }.orEmpty()
+        )
+    }
+
+    private fun MessageEntity.toStoredChatMessage(): StoredChatMessage {
+        val response = responseJson
+            .takeIf { it.isNotBlank() }
+            ?.let { raw ->
+                runCatching {
+                    json.decodeFromString<ChatResponse>(raw)
+                }.getOrNull()
+            }
+        return StoredChatMessage(
+            type = type,
+            text = text,
+            response = response
         )
     }
 
@@ -123,6 +190,16 @@ data class ConversationEntity(
     val messagesJson: String
 )
 
+@Entity(tableName = "messages")
+data class MessageEntity(
+    @PrimaryKey val id: String,
+    val conversationId: String,
+    val messageIndex: Int,
+    val type: String,
+    val text: String,
+    val responseJson: String
+)
+
 @Dao
 interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY updatedAtMillis DESC")
@@ -134,20 +211,28 @@ interface ConversationDao {
     @Query("DELETE FROM conversations")
     suspend fun deleteAll()
 
-    @Transaction
-    suspend fun replaceAll(conversations: List<ConversationEntity>) {
-        deleteAll()
-        insertAll(conversations)
-    }
+}
+
+@Dao
+interface MessageDao {
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY messageIndex ASC")
+    suspend fun getByConversationId(conversationId: String): List<MessageEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(messages: List<MessageEntity>)
+
+    @Query("DELETE FROM messages")
+    suspend fun deleteAll()
 }
 
 @Database(
-    entities = [ConversationEntity::class],
-    version = 1,
+    entities = [ConversationEntity::class, MessageEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class SmartFeedDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
+    abstract fun messageDao(): MessageDao
 
     companion object {
         @Volatile
@@ -159,7 +244,27 @@ abstract class SmartFeedDatabase : RoomDatabase() {
                     context.applicationContext,
                     SmartFeedDatabase::class.java,
                     "smartfeed.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
+            }
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        conversationId TEXT NOT NULL,
+                        messageIndex INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        text TEXT NOT NULL,
+                        responseJson TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

@@ -2,6 +2,7 @@ package com.example.smartfeedandroid.ui.chat
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -299,11 +301,11 @@ private fun AssistantMessage(response: ChatResponse) {
 
         if (response.sources.isNotEmpty()) {
             Text(
-                text = stringResource(R.string.sources),
+                text = stringResource(R.string.evidence),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            response.sources.forEach { source ->
+            response.sources.take(3).forEach { source ->
                 SourceCard(source = source)
             }
         }
@@ -397,31 +399,42 @@ private fun Avatar(label: String, color: Color) {
 
 @Composable
 private fun BubbleTriangle(color: Color, pointsRight: Boolean) {
+    val path = remember(pointsRight) { Path() }
     Canvas(
         modifier = Modifier
             .padding(top = 12.dp)
             .size(width = 8.dp, height = 12.dp)
     ) {
-        val path = Path().apply {
-            if (pointsRight) {
-                moveTo(0f, 0f)
-                lineTo(size.width, size.height / 2f)
-                lineTo(0f, size.height)
-            } else {
-                moveTo(size.width, 0f)
-                lineTo(0f, size.height / 2f)
-                lineTo(size.width, size.height)
-            }
-            close()
+        path.reset()
+        if (pointsRight) {
+            path.moveTo(0f, 0f)
+            path.lineTo(size.width, size.height / 2f)
+            path.lineTo(0f, size.height)
+        } else {
+            path.moveTo(size.width, 0f)
+            path.lineTo(0f, size.height / 2f)
+            path.lineTo(size.width, size.height)
         }
+        path.close()
         drawPath(path = path, color = color)
     }
 }
 
 @Composable
 private fun SourceCard(source: ChatSource) {
+    var expanded by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    val title = source.displayTitle.ifBlank {
+        source.title.ifBlank { stringResource(R.string.untitled_source) }
+    }
+    val explanation = source.sourceSummary.ifBlank {
+        source.sectionTitle.ifBlank { source.url }
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -431,25 +444,55 @@ private fun SourceCard(source: ChatSource) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = source.displayTitle.ifBlank { source.title.ifBlank { stringResource(R.string.untitled_source) } },
-                fontWeight = FontWeight.SemiBold
+                text = title,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            if (source.sectionTitle.isNotBlank()) {
+            if (explanation.isNotBlank()) {
                 Text(
-                    text = source.sectionTitle,
+                    text = stringResource(R.string.source_relation),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = explanation,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (expanded && source.sectionTitle.isNotBlank() && source.sourceSummary.isNotBlank()) {
+                Text(
+                    text = stringResource(R.string.source_section, source.sectionTitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (source.sourceSummary.isNotBlank()) {
-                Text(text = source.sourceSummary)
-            }
-            if (source.url.isNotBlank()) {
+            if (expanded && source.url.isNotBlank()) {
                 Text(
                     text = source.url,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(
+                        text = if (expanded) {
+                            stringResource(R.string.hide_source_detail)
+                        } else {
+                            stringResource(R.string.view_source_detail)
+                        }
+                    )
+                }
+                if (source.url.isNotBlank()) {
+                    TextButton(onClick = { uriHandler.openUri(source.url) }) {
+                        Text(text = stringResource(R.string.open_original_page))
+                    }
+                }
             }
         }
     }

@@ -5,6 +5,8 @@
     <string name="tab_profile">我的</string>
     <string name="new_chat">新聊天</string>
     <string name="recent_conversations">最近对话</string>
+    <string name="conversation_filter_all">全部</string>
+    <string name="conversation_filter_page">文章对话</string>
     <string name="paste_or_share_article_link">粘贴或分享文章链接</string>
     <string name="first_conversation_hint">保存一篇文章后，这里会出现对话记录。</string>
     <string name="ask_knowledge_base">向知识库提问</string>
@@ -65,6 +67,12 @@
     <string name="chat_error">聊天错误</string>
     <string name="no_answer_returned">暂无回答。</string>
     <string name="sources">来源</string>
+    <string name="evidence">回答依据</string>
+    <string name="source_from">来自</string>
+    <string name="source_relation">关联说明</string>
+    <string name="view_source_detail">查看依据详情</string>
+    <string name="hide_source_detail">收起依据详情</string>
+    <string name="source_section">章节：%1$s</string>
     <string name="thinking">正在思考中...</string>
     <string name="untitled_source">未命名来源</string>
     <string name="profile_title">我的</string>

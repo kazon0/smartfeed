@@ -276,6 +276,7 @@
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
   - Chat 页面实现位置：`ui/chat/ChatDetailScreen.kt`。
+  - Chat 页 sources 当前以“回答依据”短卡片展示，默认只显示标题和说明，点击后展开来源详情。
   - Analysis tab 当前调用后端 `/stats`、`/articles` 和 `/insights` 展示智能总结、知识库画像、主题占比、内容厚度和来源域名。
   - Analysis tab 的 Topic share 当前基于 `/articles` 返回的文章 `topic` 按文章数量统计。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
@@ -294,8 +295,9 @@
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
-  - Room 当前表：`conversations`。
-  - conversations 的 messages 当前仍通过 kotlinx serialization 序列化为 `messagesJson` 字段。
+  - Room 当前表：`conversations` 和 `messages`。
+  - messages 已从 conversation 的 `messagesJson` 拆到独立 Room 表。
+  - 旧 `messagesJson` 字段当前保留为本地迁移来源，首次加载旧数据时会迁移到 `messages` 表。
   - 旧 SharedPreferences conversations 会在首次 Room 加载为空时自动迁移到 Room。
   - App 启动时会从 Room 加载本地保存的 conversations。
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
@@ -433,11 +435,13 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现当前进程内 conversation 切换。
 - Android 端已实现 Home / Analysis / Profile 底部 tab 结构。
 - Android 端已将历史对话列表和聊天详情页拆开。
+- Android 端 Home 最近对话已支持按全部、新聊天、文章对话和 topic 过滤。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
 - Android 端已实现重复分享同 URL 时打开已有对话。
 - Android 端重复上传同 URL 时会更新已有对话并保留原聊天消息。
 - Android 端已实现 Room 级本地历史对话保存。
+- Android 端已将本地 messages 拆到独立 Room 表保存。
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
 - Android 端已实现知识库主题占比饼图。

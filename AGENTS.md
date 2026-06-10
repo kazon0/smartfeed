@@ -60,6 +60,7 @@ Backend 已实现：
 * Android 分享 URL 自动上传并创建新对话
 * Android 重复分享同 URL 打开已有对话
 * Android Room 本地历史对话保存
+* Android Room messages 独立表保存
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
 * `GET /articles`
@@ -73,6 +74,8 @@ Backend 已实现：
 * Android 文章列表点击新建文章聊天
 * Android 主要用户可见文案开始抽离到 `strings.xml`
 * Android 文章列表左滑显示删除按钮
+* Android Home 最近对话支持分类过滤
+* Android Chat sources 以“回答依据”短卡片展示并支持展开
 * Android UI feature folders:
   * `ui/home`
   * `ui/chat`
