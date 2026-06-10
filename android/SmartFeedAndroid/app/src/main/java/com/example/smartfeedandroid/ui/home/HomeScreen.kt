@@ -1,7 +1,10 @@
 package com.example.smartfeedandroid.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,8 +13,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,21 +29,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.smartfeedandroid.data.remote.UploadResponse
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.ResultRow
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
+import com.example.smartfeedandroid.ui.common.SoftRed
+import com.example.smartfeedandroid.ui.common.topicColor
 import androidx.compose.ui.res.painterResource
 import com.example.smartfeedandroid.R
 import androidx.compose.material3.Icon
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun HomeScreen(
@@ -46,6 +62,7 @@ fun HomeScreen(
     onUrlChange: (String) -> Unit,
     onUpload: () -> Unit,
     onSelectConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onStartGlobalConversation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -78,24 +95,24 @@ fun HomeScreen(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_new_chat),
-                        contentDescription = "Start New Chat",
+                        contentDescription = "新聊天",
                         tint = Color.Black,
                         modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
-            Text(
-                text = "Save articles and continue reading through conversation.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+//            Text(
+//                text = "Save articles and continue reading through conversation.",
+//                style = MaterialTheme.typography.bodyMedium,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant
+//            )
 
             OutlinedTextField(
                 value = uiState.url,
                 onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Paste article link...") },
+                placeholder = { Text("粘贴或分享文章链接") },
                 shape = RoundedCornerShape(24.dp), // 调大圆角，更有搜索框的胶囊感
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -144,7 +161,8 @@ fun HomeScreen(
             ConversationList(
                 conversations = uiState.conversations,
                 activeConversationId = uiState.activeConversationId,
-                onSelectConversation = onSelectConversation
+                onSelectConversation = onSelectConversation,
+                onDeleteConversation = onDeleteConversation
             )
         }
     }
@@ -154,11 +172,12 @@ fun HomeScreen(
 private fun ConversationList(
     conversations: List<Conversation>,
     activeConversationId: String?,
-    onSelectConversation: (String) -> Unit
+    onSelectConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = "History",
+            text = "最近对话",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -169,19 +188,99 @@ private fun ConversationList(
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Text(
-                    text = "Upload a page to create your first conversation.",
+                    text = "保存一篇文章后，这里会出现对话记录。",
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
             conversations.forEach { conversation ->
-                ConversationItem(
+                SwipeDeleteConversationRow(
                     conversation = conversation,
                     isActive = conversation.id == activeConversationId,
-                    onClick = { onSelectConversation(conversation.id) }
+                    onClick = { onSelectConversation(conversation.id) },
+                    onDeleteConversation = onDeleteConversation
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SwipeDeleteConversationRow(
+    conversation: Conversation,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    onDeleteConversation: (String) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val actionWidth = 96.dp
+    val actionWidthPx = with(density) { actionWidth.toPx() }
+    val offsetX = remember(conversation.id) { Animatable(0f) }
+    val rowHeight = 96.dp
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(rowHeight)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(actionWidth)
+                .height(rowHeight)
+                .background(SoftRed),
+            contentAlignment = Alignment.Center
+        ) {
+            TextButton(
+                onClick = { onDeleteConversation(conversation.id) }
+            ) {
+                Text(
+                    text = "删除",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .pointerInput(conversation.id) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val newOffset = (offsetX.value + dragAmount)
+                                .coerceIn(-actionWidthPx, 0f)
+                            scope.launch {
+                                offsetX.snapTo(newOffset)
+                            }
+                        },
+                        onDragEnd = {
+                            scope.launch {
+                                val target = if (offsetX.value < -actionWidthPx / 2) {
+                                    -actionWidthPx
+                                } else {
+                                    0f
+                                }
+                                offsetX.animateTo(target, tween(180))
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                offsetX.animateTo(0f, tween(180))
+                            }
+                        }
+                    )
+                }
+        ) {
+            ConversationItem(
+                conversation = conversation,
+                isActive = isActive,
+                onClick = onClick,
+                modifier = Modifier.height(rowHeight)
+            )
         }
     }
 }
@@ -190,13 +289,17 @@ private fun ConversationList(
 private fun ConversationItem(
     conversation: Conversation,
     isActive: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val topic = conversationTopic(conversation)
+    val topicIndex = topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.lastIndex
+
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) {
                 SoftBlueLight
@@ -205,51 +308,121 @@ private fun ConversationItem(
             }
         )
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
         ) {
-            Text(
-                text = conversation.title,
-                fontWeight = FontWeight.SemiBold
-            )
-            if (conversation.url.isNotBlank()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 74.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
-                    text = conversation.url,
+                    text = conversation.title.ifBlank { "新聊天" },
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = conversation.summary.ifBlank {
+                        if (conversation.url.isBlank()) {
+                            "向知识库提问"
+                        } else {
+                            "网页对话"
+                        }
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${conversation.messages.size} 条消息 · ${conversation.storedChunks} 个片段",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = "${conversation.messages.size} messages",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            TopicBookmark(
+                topic = topic,
+                color = topicColor(topicIndex),
+                modifier = Modifier.align(Alignment.TopEnd)
             )
-            if (conversation.status.isNotBlank() || conversation.storedChunks > 0) {
-                Text(
-                    text = "status: ${conversation.status.ifBlank { "N/A" }} · chunks: ${conversation.storedChunks}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
 
 @Composable
+private fun TopicBookmark(
+    topic: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(
+                color = color,
+                shape = RoundedCornerShape(bottomStart = 12.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = topic,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
+    }
+}
+
+private val topicOrder = listOf("科技", "学习", "健康", "职业", "财经", "生活", "新闻", "新聊天", "其他")
+
+private fun conversationTopic(conversation: Conversation): String {
+    if (conversation.url.isBlank()) {
+        return "新聊天"
+    }
+
+    val text = listOf(conversation.title, conversation.summary, conversation.url)
+        .joinToString(" ")
+        .lowercase()
+
+    val scores = mapOf(
+        "科技" to listOf("ai", "人工智能", "算法", "编程", "代码", "软件", "数据", "模型", "rag", "android", "kotlin", "python", "开发", "技术"),
+        "学习" to listOf("学习", "课程", "考试", "高考", "教育", "笔记", "教程", "方法", "总结", "复习"),
+        "健康" to listOf("健康", "医生", "疾病", "中毒", "症状", "治疗", "医院", "睡眠", "心理", "饮食"),
+        "职业" to listOf("职业", "实习", "面试", "招聘", "简历", "工作", "岗位", "职场", "薪资"),
+        "财经" to listOf("财经", "股票", "基金", "投资", "价格", "汇率", "美元", "经济", "市场", "公司"),
+        "生活" to listOf("生活", "旅行", "美食", "家庭", "情感", "娱乐", "消费", "家长", "孩子"),
+        "新闻" to listOf("新闻", "央视新闻", "新华社", "人民日报", "中新网", "通报", "政策", "社会", "近日", "报道称")
+    )
+
+    return scores
+        .mapValues { (_, keywords) -> keywords.count { keyword -> keyword.lowercase() in text } }
+        .maxByOrNull { it.value }
+        ?.takeIf { it.value > 0 }
+        ?.key
+        ?: "其他"
+}
+
+@Composable
 private fun UploadResult(response: UploadResponse) {
-    ResultCard(title = "Upload Result") {
-        ResultRow(label = "Status", value = response.status)
-        ResultRow(label = "Stored chunks", value = response.storedChunks.toString())
-        ResultRow(label = "Title", value = response.data?.title.orEmpty().ifBlank { "N/A" })
-        ResultRow(label = "Parser", value = response.data?.metadata?.parser ?: "N/A")
+    ResultCard(title = "保存结果") {
+        ResultRow(label = "状态", value = response.status)
+        ResultRow(label = "片段数", value = response.storedChunks.toString())
+        ResultRow(label = "标题", value = response.data?.title.orEmpty().ifBlank { "N/A" })
+        ResultRow(label = "解析方式", value = response.data?.metadata?.parser ?: "N/A")
 
         Spacer(modifier = Modifier.height(12.dp))
-        Text(text = "Summary", fontWeight = FontWeight.SemiBold)
+        Text(text = "总结", fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = response.summary.ifBlank {
-                response.error ?: "No summary returned."
+                response.error ?: "暂无总结。"
             },
             style = MaterialTheme.typography.bodyMedium
         )
@@ -277,6 +450,7 @@ private fun HomeScreenPreview() {
         onUrlChange = {},
         onUpload = {},
         onSelectConversation = {},
+        onDeleteConversation = {},
         onStartGlobalConversation = {}
     )
 }

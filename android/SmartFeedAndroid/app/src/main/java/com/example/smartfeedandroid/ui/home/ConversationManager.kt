@@ -6,7 +6,7 @@ class ConversationManager {
     fun createGlobalConversation(): Conversation {
         return Conversation(
             id = createConversationId(),
-            title = "Global knowledge chat",
+            title = "新聊天",
             updatedAtMillis = System.currentTimeMillis()
         )
     }

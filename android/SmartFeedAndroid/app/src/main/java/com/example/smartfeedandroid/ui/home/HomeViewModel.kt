@@ -117,6 +117,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun deleteConversation(conversationId: String) {
+        val conversations = uiState.conversations.filterNot { it.id == conversationId }
+        val deletingActiveConversation = uiState.activeConversationId == conversationId
+        uiState = uiState.copy(
+            conversations = conversations,
+            activeConversationId = if (deletingActiveConversation) null else uiState.activeConversationId,
+            activeUrl = if (deletingActiveConversation) "" else uiState.activeUrl,
+            messages = if (deletingActiveConversation) emptyList() else uiState.messages,
+            isChatOpen = if (deletingActiveConversation) false else uiState.isChatOpen,
+            errorMessage = null
+        )
+        persistConversations(conversations)
+    }
+
     fun startGlobalConversation() {
         val conversation = conversationManager.createGlobalConversation()
 

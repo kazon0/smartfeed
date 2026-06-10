@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,17 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,7 +52,6 @@ import com.example.smartfeedandroid.data.remote.ChatSource
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
-import com.example.smartfeedandroid.ui.common.SoftGreen
 import com.example.smartfeedandroid.ui.home.ChatMessage
 
 @Composable
@@ -108,16 +106,21 @@ private fun ChatHeader(
         modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
+            .background(Color.LightGray.copy(0.1f))
             .padding(horizontal = 0.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+
+
     ) {
         IconButton(
             onClick = onBack,
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = "Back",
                 tint = Color.Black,
+                modifier = Modifier.size(28.dp)
             )
         }
 
@@ -126,7 +129,7 @@ private fun ChatHeader(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = activeTitle.ifBlank { "Global chat" },
+                text = activeTitle.ifBlank { "新聊天" },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -166,36 +169,40 @@ private fun ChatHeader(
         color = Color.LightGray.copy(alpha = 0.6f)
     )
 }
+
 @Composable
 private fun MessageList(
     messages: List<ChatMessage>,
     isAsking: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
     ) {
         if (messages.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Ask a question to start.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Ask a question to start.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         } else {
-            messages.forEach { message ->
+            items(messages) { message ->
                 ChatBubble(message = message)
             }
             if (isAsking) {
-                ThinkingBubble()
+                item {
+                    ThinkingBubble()
+                }
             }
         }
     }
@@ -329,7 +336,7 @@ private fun UserBubble(text: String) {
                 )
             }
             BubbleTriangle(color = SoftBlueLight, pointsRight = true)
-            Avatar(label = "我", color = SoftBlue)
+//            Avatar(label = "我", color = SoftBlue)
         }
     }
 }
@@ -345,7 +352,7 @@ private fun AssistantBubble(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        Avatar(label = "S", color = SoftGreen)
+//        Avatar(label = "S", color = SoftGreen)
         BubbleTriangle(color = Color.White, pointsRight = false)
         Card(
             modifier = Modifier.widthIn(max = 330.dp),

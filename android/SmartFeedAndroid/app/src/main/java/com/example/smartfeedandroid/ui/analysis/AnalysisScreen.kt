@@ -12,17 +12,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.smartfeedandroid.R
 import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.remote.StatsResponse
 import com.example.smartfeedandroid.data.remote.TopicDistribution
@@ -64,8 +68,17 @@ fun AnalysisScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            TextButton(onClick = onOpenArticleManager) {
-                Text("Articles")
+            IconButton(
+                onClick = onOpenArticleManager,
+                modifier = Modifier
+                    .size(48.dp) // 控制整个按钮的点击热区大小
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_summary),
+                    contentDescription = "Open article manager",
+                    tint = Color.Black,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 

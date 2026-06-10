@@ -8,22 +8,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +42,21 @@ import com.example.smartfeedandroid.ui.common.AppBackground
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftRed
-import com.example.smartfeedandroid.ui.common.SoftRedLight
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @Composable
 fun ArticleManagerScreen(
@@ -61,8 +75,13 @@ fun ArticleManagerScreen(
             topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.size
         }.thenBy { it }
     )
+
     val tabs = listOf("全部") + orderedTopics
-    var selectedTopic by remember(tabs) { mutableStateOf(tabs.first()) }
+
+    var selectedTopic by remember(tabs) {
+        mutableStateOf(tabs.first())
+    }
+
     val visibleArticles = if (selectedTopic == "全部") {
         articles
     } else {
@@ -73,66 +92,94 @@ fun ArticleManagerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(AppBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .background(Color.LightGray.copy(0.1f)),
+            contentAlignment = Alignment.Center
         ) {
-            TextButton(onClick = onBack) {
-                Text("‹", style = MaterialTheme.typography.headlineMedium)
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(48.dp)
+                    .align(Alignment.CenterStart)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "Back",
+                    tint = Color.Black,
+                    modifier = Modifier.size(28.dp)
+                )
             }
+
             Text(
                 text = "Saved articles",
-                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 56.dp)
             )
         }
 
-        Text(
-            text = "Tap an article to open it. Swipe left to reveal Delete.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        articlesErrorMessage?.let {
+        articlesErrorMessage?.let { errorMessage ->
             ResultCard(title = "Articles Error") {
-                Text(text = it, color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
 
-        if (isLoadingArticles) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (articles.isEmpty()) {
-            ResultCard(title = "No saved articles") {
-                Text(
-                    text = "Upload or share articles first.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
+        if (!isLoadingArticles && articles.isNotEmpty()) {
             TopicTabs(
                 topics = tabs,
                 selectedTopic = selectedTopic,
                 onSelectTopic = { selectedTopic = it }
             )
+        }
 
-            visibleArticles.forEach { article ->
-                SwipeDeleteArticleRow(
-                    article = article,
-                    isDeleting = deletingArticleUrl == article.url,
-                    onDeleteArticle = onDeleteArticle
-                )
+        when {
+            isLoadingArticles -> {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            articles.isEmpty() -> {
+                ResultCard(title = "No saved articles") {
+                    Text(
+                        text = "Upload or share articles first.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    items(
+                        items = visibleArticles,
+                        key = { article -> article.url }
+                    ) { article ->
+                        SwipeDeleteArticleRow(
+                            article = article,
+                            isDeleting = deletingArticleUrl == article.url,
+                            onDeleteArticle = onDeleteArticle
+                        )
+                    }
+                }
             }
         }
     }
@@ -168,50 +215,121 @@ private fun TopicTabs(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeDeleteArticleRow(
     article: SavedArticle,
     isDeleting: Boolean,
     onDeleteArticle: (String) -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            value == SwipeToDismissBoxValue.EndToStart
-        }
-    )
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = true,
-        backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(SoftRedLight, RoundedCornerShape(18.dp))
-                    .padding(horizontal = 18.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                TextButton(
-                    onClick = { onDeleteArticle(article.url) },
-                    enabled = !isDeleting
-                ) {
-                    Text(
-                        text = if (isDeleting) "Deleting..." else "Delete",
-                        color = SoftRed,
-                        fontWeight = FontWeight.Bold
+    val actionWidth = 96.dp
+    val actionWidthPx = with(density) {
+        actionWidth.toPx()
+    }
+
+    val offsetX = remember(article.url) { Animatable(0f) }
+
+    var cardHeightPx by remember(article.url) {
+        mutableStateOf(0)
+    }
+
+    val cardHeightDp = with(density) {
+        if (cardHeightPx > 0) cardHeightPx.toDp() else 88.dp
+    }
+
+    LaunchedEffect(isDeleting) {
+        if (isDeleting) {
+            offsetX.animateTo(-actionWidthPx, tween(180))
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        // 右侧 Delete，跟卡片同高
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(actionWidth)
+                .height(cardHeightDp)
+                .background(
+                    color = SoftRed,
+                    shape = RoundedCornerShape(
+                        topStart = 0.dp,
+                        bottomStart = 0.dp,
+                        topEnd = 0.dp,
+                        bottomEnd = 0.dp
                     )
-                }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            TextButton(
+                onClick = {
+                    onDeleteArticle(article.url)
+                },
+                enabled = !isDeleting
+            ) {
+                Text(
+                    text = if (isDeleting) "Deleting..." else "Delete",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
-    ) {
-        SavedArticleCard(article = article, isDeleting = isDeleting)
+
+        // 前面的文章卡片
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(offsetX.value.roundToInt(), 0)
+                }
+                .onGloballyPositioned { coordinates ->
+                    cardHeightPx = coordinates.size.height
+                }
+                .pointerInput(article.url, isDeleting) {
+                    if (!isDeleting) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+
+                                val newOffset = (offsetX.value + dragAmount)
+                                    .coerceIn(-actionWidthPx, 0f)
+
+                                scope.launch {
+                                    offsetX.snapTo(newOffset)
+                                }
+                            },
+                            onDragEnd = {
+                                scope.launch {
+                                    val target = if (offsetX.value < -actionWidthPx / 2) {
+                                        -actionWidthPx
+                                    } else {
+                                        0f
+                                    }
+
+                                    offsetX.animateTo(target, tween(180))
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch {
+                                    offsetX.animateTo(0f, tween(180))
+                                }
+                            }
+                        )
+                    }
+                }
+        ) {
+            PureSavedArticleCard(article = article, isDeleting = isDeleting)
+        }
     }
 }
 
 @Composable
-private fun SavedArticleCard(
+private fun PureSavedArticleCard(
     article: SavedArticle,
     isDeleting: Boolean
 ) {
@@ -223,8 +341,10 @@ private fun SavedArticleCard(
             .clickable(enabled = article.url.isNotBlank() && !isDeleting) {
                 uriHandler.openUri(article.url)
             },
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDeleting) Color(0xFFF5F5F5) else Color.White
+        )
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -234,7 +354,8 @@ private fun SavedArticleCard(
                 text = article.title.ifBlank { article.url.ifBlank { "Untitled article" } },
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                color = if (isDeleting) Color.Gray else Color.Unspecified
             )
             if (article.domain.isNotBlank()) {
                 Text(

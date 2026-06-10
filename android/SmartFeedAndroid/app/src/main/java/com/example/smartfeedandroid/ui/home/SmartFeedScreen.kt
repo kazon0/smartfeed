@@ -29,6 +29,7 @@ fun SmartFeedScreen(
         onAsk = viewModel::ask,
         onSelectTab = viewModel::selectTab,
         onSelectConversation = viewModel::selectConversation,
+        onDeleteConversation = viewModel::deleteConversation,
         onStartGlobalConversation = viewModel::startGlobalConversation,
         onBackToConversations = viewModel::showConversationList,
         onOpenArticleManager = viewModel::openArticleManager,
@@ -48,6 +49,7 @@ private fun SmartFeedContent(
     onAsk: () -> Unit,
     onSelectTab: (AppTab) -> Unit,
     onSelectConversation: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onStartGlobalConversation: () -> Unit,
     onBackToConversations: () -> Unit,
     onOpenArticleManager: () -> Unit,
@@ -106,6 +108,7 @@ private fun SmartFeedContent(
                             onUrlChange = onUrlChange,
                             onUpload = onUpload,
                             onSelectConversation = onSelectConversation,
+                            onDeleteConversation = onDeleteConversation,
                             onStartGlobalConversation = onStartGlobalConversation,
                             modifier = Modifier.padding(innerPadding)
                         )
