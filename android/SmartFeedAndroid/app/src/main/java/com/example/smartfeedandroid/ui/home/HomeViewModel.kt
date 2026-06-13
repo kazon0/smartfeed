@@ -184,11 +184,41 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         uiState = uiState.copy(
             isUploading = true,
+            uploadProgress = UploadProgress.CheckingStatus,
             errorMessage = null,
             uploadResponse = null
         )
 
         viewModelScope.launch {
+            val existingArticle = articleRepository.getArticleStatus(cleanUrl)
+                .getOrNull()
+                ?.takeIf { it.exists && it.chunkCount > 0 }
+
+            if (existingArticle != null) {
+                val conversation = conversationManager.createArticleConversation(
+                    url = existingArticle.url.ifBlank { cleanUrl },
+                    title = existingArticle.title.ifBlank { cleanUrl },
+                    storedChunks = existingArticle.chunkCount
+                )
+
+                uiState = uiState.copy(
+                    uploadResponse = null,
+                    uploadProgress = null,
+                    activeConversationId = conversation.id,
+                    selectedTab = AppTab.Home,
+                    isChatOpen = true,
+                    isArticleManagerOpen = false,
+                    activeUrl = conversation.url,
+                    conversations = listOf(conversation) + uiState.conversations,
+                    messages = emptyList(),
+                    isUploading = false
+                )
+                persistConversations(uiState.conversations)
+                return@launch
+            }
+
+            uiState = uiState.copy(uploadProgress = UploadProgress.UploadingNewArticle)
+
             uploadRepository.upload(cleanUrl)
                 .onSuccess { response ->
                     val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
@@ -217,11 +247,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { error ->
                     uiState = uiState.copy(
-                        errorMessage = error.message ?: "保存失败。"
+                        errorMessage = error.message ?: "保存失败。",
+                        uploadProgress = null
                     )
                 }
 
-            uiState = uiState.copy(isUploading = false)
+            uiState = uiState.copy(
+                isUploading = false,
+                uploadProgress = null
+            )
         }
     }
 

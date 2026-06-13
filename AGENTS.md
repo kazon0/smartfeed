@@ -62,13 +62,14 @@ Backend 已实现：
 * Android 历史对话列表和聊天详情页分层
 * Android 系统分享入口
 * Android 分享 URL 自动上传并创建新对话
-* Android 重复分享同 URL 打开已有对话
+* Android 已入库 URL 跳过重复上传并新建文章聊天
 * Android Room 本地历史对话保存
 * Android Room messages 独立表保存
 * Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
 * `GET /articles`
+* `GET /articles/status`
 * `GET /insights`
 * `DELETE /articles`
 * Android Analysis 主题占比饼图
@@ -308,7 +309,9 @@ Android MVP 阶段：
 5. Share Intent
    * 接收系统分享网页链接
    * 自动填入 URL
-   * 调用 `/upload`
+   * 先调用 `/articles/status`
+   * 如果已入库，直接新建文章聊天
+   * 如果未入库，再调用 `/upload`
 
 ## Current Next Step
 

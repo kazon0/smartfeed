@@ -6,10 +6,14 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.HTTP
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface SmartFeedApi {
     @GET("articles")
     suspend fun articles(): ArticlesResponse
+
+    @GET("articles/status")
+    suspend fun articleStatus(@Query("url") url: String): ArticleStatusResponse
 
     @HTTP(method = "DELETE", path = "articles", hasBody = true)
     suspend fun deleteArticle(@Body request: DeleteArticleRequest): DeleteArticleResponse
@@ -46,6 +50,17 @@ data class SavedArticle(
     @SerialName("chunk_count")
     val chunkCount: Int = 0,
     val topic: String = "其他"
+)
+
+@Serializable
+data class ArticleStatusResponse(
+    val exists: Boolean = false,
+    val url: String = "",
+    val title: String = "",
+    val domain: String = "",
+    val topic: String = "",
+    @SerialName("chunk_count")
+    val chunkCount: Int = 0
 )
 
 @Serializable

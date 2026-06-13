@@ -284,6 +284,57 @@ curl http://127.0.0.1:8000/articles
 - No uploaded content returns an empty list.
 - ChromaDB dependencies or local database files are unavailable.
 
+## GET /articles/status
+
+Returns whether a single URL already exists in the local ChromaDB knowledge base.
+
+This is intended for Android share/open flows that need to decide whether a URL
+has already been ingested before uploading again.
+
+### Request JSON
+
+No request body. Pass `url` as a query parameter.
+
+### Response JSON
+
+When the URL exists:
+
+```json
+{
+  "exists": true,
+  "url": "https://example.com/article",
+  "title": "Example Article",
+  "domain": "example.com",
+  "topic": "科技",
+  "chunk_count": 4
+}
+```
+
+When the URL is not found:
+
+```json
+{
+  "exists": false,
+  "url": "https://example.com/missing",
+  "title": "",
+  "domain": "example.com",
+  "topic": "",
+  "chunk_count": 0
+}
+```
+
+### curl
+
+```bash
+curl "http://127.0.0.1:8000/articles/status?url=https%3A%2F%2Fexample.com%2Farticle"
+```
+
+### Typical Failures
+
+- Missing `url` query parameter returns FastAPI validation error.
+- URL has never been uploaded or has been deleted: `exists` is `false`.
+- ChromaDB dependencies or local database files are unavailable.
+
 ## GET /insights
 
 Returns an AI-assisted knowledge base summary for the Android Analysis page.

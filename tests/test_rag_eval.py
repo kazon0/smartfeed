@@ -5,6 +5,7 @@ from app.services.query_intent import QueryIntentService
 ALG_URL = "https://cloud.tencent.com/developer/article/2352039"
 NEWS_URL = "https://news.99.com.cn/minsheng/20260605/2386221.htm"
 KOTLIN_URL = "https://example.com/kotlin"
+CHEATING_URL = "https://c.m.163.com/news/a/KJVOP9P80536N8SL.html"
 UNKNOWN_URL = "https://example.com/not-uploaded"
 
 
@@ -81,6 +82,14 @@ CORPUS = [
         "协程学习路径",
         0,
     ),
+    chunk(
+        CHEATING_URL,
+        "2026高考时间官宣！考生家长必看！",
+        "教育部提醒，组织考试作弊、向考生提供试题答案、替考等行为都属于违法行为。案例2中，陈某、谢某共谋组织高考考试作弊，联系考生及家长、收取费用、提供试题答案，最终被公安机关查获。",
+        0,
+        "高考作弊案例",
+        0,
+    ),
 ]
 
 
@@ -152,6 +161,10 @@ class EvalVectorStore:
             "症状",
             "kotlin",
             "协程",
+            "作弊",
+            "案例",
+            "高考",
+            "考试",
         ]
         hits = sum(1 for term in terms if term.lower() in text.lower() and term.lower() in searchable.lower())
         if hits <= 0:
@@ -169,6 +182,8 @@ class EvalLLMService:
             return {"query": "野生菌中毒 症状", "source": "fake", "reason": ""}
         if "Kotlin" in question or "kotlin" in question:
             return {"query": "Kotlin 协程 学习", "source": "fake", "reason": ""}
+        if "作弊" in question or "案例" in question:
+            return {"query": "高考 作弊 案例 违法", "source": "fake", "reason": ""}
         return {"query": question, "source": "fake", "reason": ""}
 
     def generate_search_queries(self, question, rewritten_query, *, url=None):
@@ -191,6 +206,8 @@ class EvalLLMService:
             return "根据野生菌中毒文章，可能出现胃肠道症状、幻觉、意识障碍和肝肾损伤。"
         if "Kotlin" in question or "kotlin" in question:
             return "根据 Kotlin 学习笔记，可以从 suspend、CoroutineScope、Dispatcher 和 Flow 开始。"
+        if "作弊" in question or "案例" in question:
+            return "根据高考提醒文章，组织考试作弊、提供试题答案和替考都属于违法行为，陈某、谢某组织高考作弊的案例最终被公安机关查获。"
         return "根据知识库内容回答。"
 
     def answer_without_context(self, question, reason):
@@ -257,6 +274,16 @@ def test_rag_eval_global_learning_query_can_use_saved_kotlin_article():
     assert "CoroutineScope" in response["answer"]
 
 
+def test_rag_eval_global_case_query_finds_saved_cheating_article():
+    response = make_service().chat("有没有什么作弊案例")
+
+    assert response["status"] == "ok"
+    assert response["source_type"] == "knowledge_base"
+    assert_source_url(response, CHEATING_URL)
+    assert "组织考试作弊" in response["answer"]
+    assert "陈某" in response["answer"]
+
+
 def test_rag_eval_article_reference_without_url_does_not_randomly_search():
     response = make_service().chat("这篇文章讲了什么")
 
@@ -274,6 +301,16 @@ def test_rag_eval_unknown_current_page_returns_saved_article_suggestions():
     assert response["sources"]
     assert UNKNOWN_URL not in [source.get("url") for source in response["sources"]]
     assert "当前网页没有找到" in response["answer"]
+
+
+def test_rag_eval_unknown_current_page_suggestions_are_article_links_not_answer_sources():
+    response = make_service().chat("这篇文章讲了什么", url=UNKNOWN_URL)
+
+    assert response["status"] == "failed"
+    assert response["source_type"] == "page_not_found_with_suggestions"
+    assert response["sources"]
+    assert all(source.get("chunk_index") is None for source in response["sources"])
+    assert all(not source.get("content_preview") for source in response["sources"])
 
 
 def test_rag_eval_realtime_query_without_knowledge_does_not_guess():

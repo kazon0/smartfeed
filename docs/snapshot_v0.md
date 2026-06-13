@@ -19,6 +19,23 @@
     - `chunk_count`
     - `topic`
 
+- `GET /articles/status`
+  - 定义位置：`app/routes/articles.py`
+  - 输入：query parameter `url`
+  - 当前流程：
+    - 调用 `VectorStoreService.article_status(url)`。
+    - 查询该 URL 是否已有入库 chunks。
+    - 聚合返回 title、domain、topic 和 chunk_count。
+  - 返回字段：
+    - `exists`
+    - `url`
+    - `title`
+    - `domain`
+    - `topic`
+    - `chunk_count`
+  - 当前用途：
+    - 为 Android 分享入口或文章打开流程提供“是否已入库”的稳定判断。
+
 - `DELETE /articles`
   - 定义位置：`app/routes/articles.py`
   - 输入：`{"url": "..."}`
@@ -239,6 +256,7 @@
     - `delete_by_url(url)` 删除 `metadata.url == url` 的旧 chunks。
     - `delete_by_url(url)` 返回删除的 chunk 数。
     - `list_articles(limit=1000)` 按 URL 聚合返回已保存文章列表。
+    - `article_status(url)` 返回单个 URL 是否已入库以及对应的文章元信息。
     - `list_articles()` 优先使用 chunks metadata 中保存的 `topic`，旧数据没有 topic 时使用规则分类 fallback。
     - `get_chunks_by_url(url)` 返回指定 URL 的全部 chunks，并按 `chunk_index` 排序。
     - `get_all_chunks(limit=1000)` 返回本地知识库中的 chunks，用于轻量关键词召回。
@@ -319,8 +337,8 @@
   - 删除文章后会刷新文章列表和知识库统计。
   - Profile tab 当前为占位页。
   - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
-  - `HomeViewModel` 负责上传、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
-  - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、追加消息、更新消息、上传 URL 后创建或更新已有对话。
+  - `HomeViewModel` 负责上传、文章状态查询、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
+  - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
   - 已定义内存级 `Conversation` 和 `ChatMessage`。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
@@ -332,8 +350,11 @@
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
   - App 会从分享文本中提取第一个 `http` / `https` URL。
   - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
-  - 上传新 URL 成功后会创建一个新的 conversation。
-  - 上传或分享已存在 URL 时，会打开已有 conversation 并更新 title、summary、status 和 stored chunks，不创建重复历史项。
+  - 上传流程会先调用后端 `GET /articles/status` 查询该 URL 是否已入库。
+  - 如果后端已存在该 URL 且 `chunk_count > 0`，Android 会跳过重复 `/upload`，直接新建一条文章聊天。
+  - 如果后端没有该 URL，Android 会调用 `/upload` 解析并入库，上传成功后进入文章聊天。
+  - Android Home URL 输入框下方会显示上传流程状态，包括检查已保存状态和解析保存状态。
+  - 文章管理页点击已保存文章也会新建一条文章聊天。
   - URL 去重比较会忽略首尾空格、fragment、`www.` 和末尾 `/` 差异。
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
@@ -470,8 +491,9 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端 Home 最近对话已支持本地搜索标题、摘要、URL、topic 和最近消息。
 - Android 端已实现系统分享入口。
 - Android 端已实现从分享文本提取 URL 并自动上传。
-- Android 端已实现重复分享同 URL 时打开已有对话。
-- Android 端重复上传同 URL 时会更新已有对话并保留原聊天消息。
+- Android 端上传/分享 URL 前已接入后端 `GET /articles/status` 状态查询。
+- Android 端已实现已入库 URL 跳过重复上传，并直接新建文章聊天。
+- Android 端已实现上传/分享流程状态提示。
 - Android 端已实现 Room 级本地历史对话保存。
 - Android 端已将本地 messages 拆到独立 Room 表保存。
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。

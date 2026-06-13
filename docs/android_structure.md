@@ -40,6 +40,15 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Local persistence：`data/local/ConversationStore.kt`
 
+## Share And Article Status Flow
+
+- `MainActivity` 接收系统分享文本并提取第一个 `http` / `https` URL。
+- `HomeViewModel.handleSharedUrl(url)` 进入 Home，并调用上传流程。
+- 上传流程会先通过 `ArticleRepository.getArticleStatus(url)` 调用后端 `GET /articles/status`。
+- 如果后端已有该 URL 且 `chunk_count > 0`，Android 会跳过重复 `/upload`，直接新建一条文章聊天。
+- 如果后端没有该 URL，Android 才调用 `/upload` 解析并入库。
+- 文章管理页点击已保存文章也会新建一条文章聊天，不复用旧会话。
+
 ## Preview
 
 当前主要页面已添加 Compose Preview：

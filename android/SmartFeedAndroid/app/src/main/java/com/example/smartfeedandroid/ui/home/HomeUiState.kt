@@ -14,6 +14,7 @@ data class HomeUiState(
     val isArticleManagerOpen: Boolean = false,
     val query: String = "",
     val isUploading: Boolean = false,
+    val uploadProgress: UploadProgress? = null,
     val isAsking: Boolean = false,
     val isLoadingStats: Boolean = false,
     val isLoadingArticles: Boolean = false,
@@ -30,3 +31,9 @@ data class HomeUiState(
     val conversations: List<Conversation> = emptyList(),
     val messages: List<ChatMessage> = emptyList()
 )
+
+enum class UploadProgress {
+    CheckingStatus,
+    OpeningSavedArticle,
+    UploadingNewArticle
+}

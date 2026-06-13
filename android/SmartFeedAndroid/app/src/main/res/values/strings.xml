@@ -10,6 +10,9 @@
     <string name="conversation_filter_all">全部</string>
     <string name="conversation_filter_page">文章对话</string>
     <string name="paste_or_share_article_link">粘贴或分享文章链接...</string>
+    <string name="upload_progress_checking">正在检查这篇文章是否已保存...</string>
+    <string name="upload_progress_opening_saved">文章已保存，正在打开新聊天...</string>
+    <string name="upload_progress_uploading_new">正在解析并保存文章...</string>
     <string name="first_conversation_hint">保存一篇文章后，这里会出现对话记录。</string>
     <string name="ask_knowledge_base">向知识库提问</string>
     <string name="page_conversation">网页对话</string>

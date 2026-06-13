@@ -282,6 +282,51 @@ def test_articles_list_returns_saved_articles(monkeypatch):
     assert data["articles"][0]["topic"] == "科技"
 
 
+def test_article_status_returns_existing_article(monkeypatch):
+    class FakeVectorStoreService:
+        def article_status(self, url):
+            assert url == "https://example.com/a"
+            return {
+                "exists": True,
+                "url": url,
+                "title": "A",
+                "domain": "example.com",
+                "topic": "科技",
+                "chunk_count": 3,
+            }
+
+    monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+
+    response = client.get("/articles/status", params={"url": "https://example.com/a"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["exists"] is True
+    assert data["chunk_count"] == 3
+    assert data["topic"] == "科技"
+
+
+def test_vector_store_article_status_returns_missing_for_unknown_url():
+    class FakeCollection:
+        def get(self, where, include):
+            assert where == {"url": "https://example.com/missing"}
+            return {"documents": [], "metadatas": []}
+
+    service = VectorStoreService.__new__(VectorStoreService)
+    service.collection = FakeCollection()
+
+    status = service.article_status("https://example.com/missing")
+
+    assert status == {
+        "exists": False,
+        "url": "https://example.com/missing",
+        "title": "",
+        "domain": "example.com",
+        "topic": "",
+        "chunk_count": 0,
+    }
+
+
 def test_insights_returns_smart_summary(monkeypatch):
     class FakeVectorStoreService:
         def list_articles(self):

@@ -158,6 +158,7 @@ fun HomeScreen(
                     }
                 }
             )
+            UploadProgressText(uploadProgress = uiState.uploadProgress)
             uiState.uploadResponse?.let {
                 UploadResult(response = it)
             }
@@ -575,6 +576,23 @@ private fun UploadResult(response: UploadResponse) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
+}
+
+@Composable
+private fun UploadProgressText(uploadProgress: UploadProgress?) {
+    val text = when (uploadProgress) {
+        UploadProgress.CheckingStatus -> stringResource(R.string.upload_progress_checking)
+        UploadProgress.OpeningSavedArticle -> stringResource(R.string.upload_progress_opening_saved)
+        UploadProgress.UploadingNewArticle -> stringResource(R.string.upload_progress_uploading_new)
+        null -> return
+    }
+
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    )
 }
 
 @Preview(showBackground = true)

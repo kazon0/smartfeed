@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi import Query
 from pydantic import BaseModel
 
 from app.services.vector_store import VectorStoreService
@@ -17,6 +18,11 @@ def list_articles():
         "articles": articles,
         "total": len(articles),
     }
+
+
+@router.get("/articles/status")
+def article_status(url: str = Query(...)):
+    return VectorStoreService().article_status(url)
 
 
 @router.delete("/articles")

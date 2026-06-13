@@ -249,6 +249,44 @@ class VectorStoreService:
             reverse=True,
         )
 
+    def article_status(self, url: str) -> dict[str, Any]:
+        chunks = self.get_chunks_by_url(url)
+        if not chunks:
+            return {
+                "exists": False,
+                "url": url,
+                "title": "",
+                "domain": self._domain_from_url(url),
+                "topic": "",
+                "chunk_count": 0,
+            }
+
+        first_metadata = chunks[0].get("metadata", {}) or {}
+        title = first_metadata.get("title", "") or url
+        topic_counts: dict[str, int] = defaultdict(int)
+        for chunk in chunks:
+            metadata = chunk.get("metadata", {}) or {}
+            content = chunk.get("content", "") or ""
+            topic = metadata.get("topic", "") or self.classify_topic(
+                url=url,
+                title=title,
+                content=content,
+            )
+            topic_counts[topic] += 1
+
+        topic = "其他"
+        if topic_counts:
+            topic = max(topic_counts.items(), key=lambda item: item[1])[0]
+
+        return {
+            "exists": True,
+            "url": url,
+            "title": title,
+            "domain": self._domain_from_url(url),
+            "topic": topic,
+            "chunk_count": len(chunks),
+        }
+
     def get_chunks_by_url(self, url: str) -> list[dict[str, Any]]:
         if not url:
             return []

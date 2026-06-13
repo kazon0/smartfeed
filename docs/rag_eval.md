@@ -27,12 +27,16 @@ venv/bin/python -m pytest tests/test_rag_eval.py -q
   - 应命中已保存健康/新闻文章。
 - 全局学习问题：`如何学习 Kotlin`
   - 应优先使用已保存知识库内容。
+- 全局案例问题：`有没有什么作弊案例`
+  - 应命中已保存的考试/高考作弊案例文章。
+  - 不应被健康、算法或其他无关文章抢走。
 - 无 URL 的文章指代：`这篇文章讲了什么`
   - 不允许随机全局检索。
   - 应返回 `need_page_context`。
 - 未入库 URL 的当前网页问题
   - 不允许假装回答该网页。
   - 应返回 `page_not_found_with_suggestions`。
+  - sources 应作为已保存文章链接建议，不应伪装成回答该网页的依据片段。
 - 实时问题：`今天星期几`
   - 没有相关知识库内容时不允许 LLM 猜。
   - 应返回 `unsupported_realtime`。
