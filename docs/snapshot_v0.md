@@ -181,6 +181,20 @@
     - 使用 configurable threshold 筛选高相关 chunks。
     - 保留检索 debug 信息，包括 retrieval steps、rerank before/after 和 chunk previews。
 
+- `app/services/langchain_rag_pipeline.py`
+  - 服务类：`LangChainRAGPipeline`
+  - 当前能力：
+    - 基于 `langchain-core` 的 `RunnableLambda` 包装当前 RAG pipeline 步骤。
+    - 覆盖 query rewrite、multi-query、retrieval、rank 和 rerank 入口。
+    - 当前不替换 ChromaDB 存储结构、不修改 Android `/chat` 协议、不改变默认行为。
+
+- `app/services/rag_pipeline_factory.py`
+  - 当前能力：
+    - 根据环境变量 `SMARTFEED_RAG_PIPELINE` 创建 RAG pipeline。
+    - 未配置或配置为 `classic` 时使用 `RAGPipeline`。
+    - 配置为 `langchain` 时使用 `LangChainRAGPipeline`。
+    - LangChain pipeline 创建失败时自动回退 `RAGPipeline`。
+
 - `app/services/web_parser.py`
   - 服务类：`WebParserService`
   - 当前能力：
@@ -544,6 +558,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - LLM API：Chat Completions
 - LLM model：deepseek-chat
 - Env loader：python-dotenv
+- Optional RAG orchestration：langchain-core
 - LLM API key env：`DEEPSEEK_API_KEY`
 - Test framework：pytest
 - Persistence path：`chroma_db`

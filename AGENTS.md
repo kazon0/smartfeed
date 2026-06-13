@@ -30,6 +30,7 @@ Backend 已实现：
 * `LLMService`
 * `QueryIntentService`
 * `RAGPipeline`
+* `LangChainRAGPipeline`
 * ChromaDB 持久化存储
 * DeepSeek summary / answer
 * DeepSeek article topic classification
@@ -37,6 +38,7 @@ Backend 已实现：
 * DeepSeek multi-query retrieval for `/chat`
 * DeepSeek rerank for `/chat`
 * DeepSeek context compression for `/chat`
+* Optional LangChain Core pipeline wrapper for `/chat`
 * Rule-based topic fallback
 * Jina Reader 优先网页解析
 * HTML fallback 解析
@@ -99,11 +101,10 @@ Backend 已实现：
 * WebSocket
 * Android Profile 真实个人中心
 * 实时搜索、天气、股价、汇率等外部实时工具
-* LangChain
 
 后续计划加入：
 
-* LangChain：用于更复杂的 RAG pipeline、prompt orchestration、tool/chain 管理。
+* LangChain 深度化：用于更复杂的 prompt orchestration、tool/chain 管理和后续 agent 化。
 * WebSocket：用于流式回答、长任务状态推送、客户端实时交互。
 
 ## Tech Stack
@@ -119,6 +120,7 @@ Backend:
 * ChromaDB
 * sentence-transformers
 * python-dotenv
+* langchain-core
 * pytest
 
 LLM:
@@ -175,6 +177,8 @@ Backend:
 * `app/services/llm_service.py`
 * `app/services/query_intent.py`
 * `app/services/rag_pipeline.py`
+* `app/services/langchain_rag_pipeline.py`
+* `app/services/rag_pipeline_factory.py`
 
 Docs:
 
@@ -204,7 +208,8 @@ Runtime/generated files that should not be committed:
 * 优先保持 API 稳定。
 * 不要一次性做大重构。
 * 每次只做一个小闭环：实现、测试、文档、说明如何验证。
-* 不提前引入 LangChain；只有进入 RAG pipeline/agent/tool orchestration 阶段时再加入。
+* LangChain 当前只作为可选 RAG pipeline 包装层，启用方式是设置 `SMARTFEED_RAG_PIPELINE=langchain`。
+* 未设置 `SMARTFEED_RAG_PIPELINE` 时继续使用 classic pipeline。
 * 不提前引入 WebSocket；只有进入流式回答、长任务进度或实时交互阶段时再加入。
 * 不新增用户系统，除非明确要求。
 * 不修改 DeepSeek API key 管理方式，继续使用 `.env` + `python-dotenv`。

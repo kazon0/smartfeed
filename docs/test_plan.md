@@ -296,7 +296,40 @@ Expected result:
 
 Restore `.env` after the test.
 
-## 8. Run Automated Tests
+## 8. Test Optional LangChain Pipeline
+
+Start backend with LangChain pipeline enabled:
+
+```bash
+SMARTFEED_RAG_PIPELINE=langchain uvicorn app.main:app --reload
+```
+
+Then call `/chat`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query":"如何学习 Kotlin"}'
+```
+
+Expected result:
+
+- Backend should not crash.
+- Response should keep the same `/chat` JSON fields as classic pipeline.
+- `debug.rag_pipeline` should be `LangChainRAGPipeline`.
+- If LangChain pipeline cannot be initialized, system should fall back to `RAGPipeline`.
+
+Run the focused automated test:
+
+```bash
+SMARTFEED_RAG_PIPELINE=langchain venv/bin/python -m pytest tests/test_mvp.py::test_chat_multi_query_retrieves_generated_query -q
+```
+
+Expected result:
+
+- Test should pass.
+
+## 9. Run Automated Tests
 
 ```bash
 pytest

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from app.services.llm_service import LLMService
 from app.services.query_intent import QueryIntentService
 from app.services.rag_pipeline import RAGPipeline
+from app.services.rag_pipeline_factory import create_rag_pipeline
 from app.services.vector_store import VectorStoreService
 
 
@@ -35,7 +36,7 @@ class ChatService:
         self.rag_pipeline = (
             rag_pipeline_factory()
             if rag_pipeline_factory
-            else RAGPipeline(llm_service_factory=llm_service_factory)
+            else create_rag_pipeline(llm_service_factory=llm_service_factory)
         )
 
     def chat(
@@ -52,6 +53,7 @@ class ChatService:
             has_url=bool(url),
         )
         debug = self._new_debug(query, url, mode, intent)
+        debug["rag_pipeline"] = self.rag_pipeline.__class__.__name__
         debug["history_count"] = len(history or [])
         debug["history_used"] = bool(history_context)
 

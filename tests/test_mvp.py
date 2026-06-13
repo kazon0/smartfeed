@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.langchain_rag_pipeline import LangChainRAGPipeline
 from app.services.llm_service import LLMService
 from app.services.rag_pipeline import RAGPipeline
+from app.services.rag_pipeline_factory import create_rag_pipeline
 from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
 
@@ -150,6 +152,14 @@ def test_rag_pipeline_builds_search_queries_from_rewrite_and_multi_query():
         "十个基础算法 清单",
         "排序算法 搜索算法",
     ]
+
+
+def test_rag_pipeline_factory_can_create_langchain_pipeline(monkeypatch):
+    monkeypatch.setenv("SMARTFEED_RAG_PIPELINE", "langchain")
+
+    pipeline = create_rag_pipeline(llm_service_factory=LLMService)
+
+    assert isinstance(pipeline, LangChainRAGPipeline)
 
 
 def test_llm_rerank_chunks_parses_json_array(monkeypatch):

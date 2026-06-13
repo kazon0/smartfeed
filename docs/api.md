@@ -449,6 +449,7 @@ Follow-up chat with optional recent local history:
   "retrieval_scope": "global",
   "fallback_policy": "llm_allowed",
   "debug": {
+    "rag_pipeline": "RAGPipeline",
     "rewritten_query": "吃菌子中毒 症状 风险 处理",
     "search_queries": ["吃菌子中毒 症状 风险 处理", "吃菌子中毒会怎么样"],
     "retrieval_steps": [
@@ -569,7 +570,15 @@ When `url` is not provided, SmartFeed searches the global knowledge base with li
 
 Diagnostics:
 
-- `/chat` returns a `debug` object with rewritten query, multi-query search variants, retrieval hit counts, selected chunk previews, and context compression status.
+- `/chat` returns a `debug` object with the active RAG pipeline name, rewritten query, multi-query search variants, retrieval hit counts, selected chunk previews, and context compression status.
+- Default `debug.rag_pipeline` is `RAGPipeline`.
+- To test the optional LangChain Core wrapper, start the backend with:
+
+```bash
+SMARTFEED_RAG_PIPELINE=langchain uvicorn app.main:app --reload
+```
+
+- In that mode, `debug.rag_pipeline` should be `LangChainRAGPipeline`; if initialization fails, the backend falls back to `RAGPipeline`.
 - `GET /debug` renders this diagnostics data in the browser so retrieval misses can be inspected without reading large terminal JSON.
 - The `debug` object is for development. UI clients should continue relying on stable fields such as `status`, `error_code`, `answer`, `sources`, `source_type`, `intent`, `retrieval_scope`, and `fallback_policy`.
 
