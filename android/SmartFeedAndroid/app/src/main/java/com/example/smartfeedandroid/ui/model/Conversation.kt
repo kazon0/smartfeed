@@ -1,4 +1,4 @@
-package com.example.smartfeedandroid.ui.home
+package com.example.smartfeedandroid.ui.model
 
 data class Conversation(
     val id: String,

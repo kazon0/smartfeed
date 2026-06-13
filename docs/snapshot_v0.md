@@ -337,10 +337,16 @@
   - 删除文章后会刷新文章列表和知识库统计。
   - Profile tab 当前为占位页。
   - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
-  - `HomeViewModel` 负责上传、文章状态查询、提问、本地 UI 状态、本地 conversations 列表和当前 messages。
+  - `HomeViewModel` 负责 Home、分享入口、会话打开、上传入口、聊天入口、本地 conversations 列表和当前 messages。
+  - `ChatViewModel` 负责聊天详情页输入框状态、发送状态和聊天请求触发。
+  - `AnalysisViewModel` 负责 Analysis 页 `/stats`、`/insights` 和文章列表数据加载。
+  - `ArticleManagerViewModel` 负责文章管理页文章列表加载和删除文章。
+  - `ConversationCoordinator` 负责选择、删除、创建、打开 conversation，以及消息追加后的本地状态计算。
+  - `ArticleUploadCoordinator` 负责文章状态查询、已入库跳过上传、新文章上传。
+  - `ChatCoordinator` 位于 `ui/chat`，负责构造最近聊天 history 并调用 `/chat`。
   - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
-  - 已定义内存级 `Conversation` 和 `ChatMessage`。
+  - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
   - Room 当前表：`conversations` 和 `messages`。
   - messages 已从 conversation 的 `messagesJson` 拆到独立 Room 表。
@@ -478,7 +484,13 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现本地聊天消息列表。
 - Android 端已实现调用当前 `/chat` 并展示 answer 和 sources。
 - Android 端调用 `/chat` 时会发送当前对话最近 messages 作为 history。
-- Android 端已将上传和聊天状态迁入 `HomeViewModel`。
+- Android 端已将上传入口和聊天入口保留在 `HomeViewModel`。
+- Android 端已新增 `AnalysisViewModel` 管理分析页数据。
+- Android 端已新增 `ArticleManagerViewModel` 管理文章列表和删除文章。
+- Android 端已新增 `ChatViewModel` 管理聊天输入和发送状态。
+- Android 端已将本地 conversation 状态计算拆到 `ConversationCoordinator`。
+- Android 端已将上传流程拆到 `ArticleUploadCoordinator`。
+- Android 端已将聊天请求流程拆到 `ui/chat/ChatCoordinator`。
 - Android 端已将本地 conversation 操作从 `HomeViewModel` 拆到 `ConversationManager`。
 - Android 端已将 Room conversation 映射从 `HomeViewModel` 拆到 `ConversationMappers`。
 - Android 端已实现内存级 conversations 列表。

@@ -7,21 +7,24 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.local.ConversationStore
-import com.example.smartfeedandroid.data.remote.ChatHistoryItem
 import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.repository.ArticleRepository
-import com.example.smartfeedandroid.data.repository.ChatRepository
-import com.example.smartfeedandroid.data.repository.StatsRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
+import com.example.smartfeedandroid.ui.chat.ChatSendContext
 import kotlinx.coroutines.launch
 
+import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.example.smartfeedandroid.ui.model.Conversation
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val uploadRepository = UploadRepository()
-    private val chatRepository = ChatRepository()
-    private val statsRepository = StatsRepository()
     private val articleRepository = ArticleRepository()
+    private val articleUploadCoordinator = ArticleUploadCoordinator(
+        articleRepository = articleRepository,
+        uploadRepository = uploadRepository
+    )
     private val conversationStore = ConversationStore(application.applicationContext)
     private val conversationManager = ConversationManager()
+    private val conversationCoordinator = ConversationCoordinator(conversationManager)
 
     var uiState by mutableStateOf(HomeUiState())
         private set
@@ -37,12 +40,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(url = value)
     }
 
-    fun onQueryChange(value: String) {
-        uiState = uiState.copy(query = value)
-    }
-
     fun clearError() {
         uiState = uiState.copy(errorMessage = null)
+    }
+
+    fun showError(message: String) {
+        uiState = uiState.copy(errorMessage = message)
     }
 
     fun handleSharedUrl(url: String) {
@@ -74,11 +77,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 isArticleManagerOpen = false
             )
         }
-        if (tab == AppTab.Analysis) {
-            refreshStats()
-            refreshArticles()
-            refreshInsights()
-        }
     }
 
     fun showConversationList() {
@@ -93,82 +91,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun openArticleManager() {
         uiState = uiState.copy(
             selectedTab = AppTab.Analysis,
-            isArticleManagerOpen = true,
-            articlesErrorMessage = null
+            isArticleManagerOpen = true
         )
-        refreshArticles()
     }
 
     fun closeArticleManager() {
         uiState = uiState.copy(
-            isArticleManagerOpen = false,
-            articlesErrorMessage = null
+            isArticleManagerOpen = false
         )
     }
 
     fun selectConversation(conversationId: String) {
-        val conversation = uiState.conversations.firstOrNull { it.id == conversationId } ?: return
-        uiState = uiState.copy(
-            activeConversationId = conversation.id,
-            selectedTab = AppTab.Home,
-            isChatOpen = true,
-            isArticleManagerOpen = false,
-            activeUrl = conversation.url,
-            messages = conversation.messages,
-            uploadResponse = null,
-            errorMessage = null
-        )
+        uiState = conversationCoordinator.selectConversation(uiState, conversationId)
     }
 
     fun deleteConversation(conversationId: String) {
-        val conversations = uiState.conversations.filterNot { it.id == conversationId }
-        val deletingActiveConversation = uiState.activeConversationId == conversationId
-        uiState = uiState.copy(
-            conversations = conversations,
-            activeConversationId = if (deletingActiveConversation) null else uiState.activeConversationId,
-            activeUrl = if (deletingActiveConversation) "" else uiState.activeUrl,
-            messages = if (deletingActiveConversation) emptyList() else uiState.messages,
-            isChatOpen = if (deletingActiveConversation) false else uiState.isChatOpen,
-            errorMessage = null
-        )
-        persistConversations(conversations)
+        uiState = conversationCoordinator.deleteConversation(uiState, conversationId)
+        persistConversations(uiState.conversations)
     }
 
     fun startGlobalConversation() {
-        val conversation = conversationManager.createGlobalConversation()
-
-        uiState = uiState.copy(
-            activeConversationId = conversation.id,
-            selectedTab = AppTab.Home,
-            isChatOpen = true,
-            isArticleManagerOpen = false,
-            activeUrl = "",
-            uploadResponse = null,
-            errorMessage = null,
-            conversations = listOf(conversation) + uiState.conversations,
-            messages = emptyList()
-        )
+        uiState = conversationCoordinator.startGlobalConversation(uiState)
         persistConversations(uiState.conversations)
     }
 
     fun startArticleConversation(article: SavedArticle) {
-        val conversation = conversationManager.createArticleConversation(
-            url = article.url,
-            title = article.title,
-            storedChunks = article.chunkCount
-        )
-
-        uiState = uiState.copy(
-            activeConversationId = conversation.id,
-            selectedTab = AppTab.Home,
-            isChatOpen = true,
-            isArticleManagerOpen = false,
-            activeUrl = conversation.url,
-            uploadResponse = null,
-            errorMessage = null,
-            conversations = listOf(conversation) + uiState.conversations,
-            messages = emptyList()
-        )
+        uiState = conversationCoordinator.startArticleConversation(uiState, article)
         persistConversations(uiState.conversations)
     }
 
@@ -190,67 +138,47 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         viewModelScope.launch {
-            val existingArticle = articleRepository.getArticleStatus(cleanUrl)
-                .getOrNull()
-                ?.takeIf { it.exists && it.chunkCount > 0 }
-
-            if (existingArticle != null) {
-                val conversation = conversationManager.createArticleConversation(
-                    url = existingArticle.url.ifBlank { cleanUrl },
-                    title = existingArticle.title.ifBlank { cleanUrl },
-                    storedChunks = existingArticle.chunkCount
-                )
-
-                uiState = uiState.copy(
-                    uploadResponse = null,
-                    uploadProgress = null,
-                    activeConversationId = conversation.id,
-                    selectedTab = AppTab.Home,
-                    isChatOpen = true,
-                    isArticleManagerOpen = false,
-                    activeUrl = conversation.url,
-                    conversations = listOf(conversation) + uiState.conversations,
-                    messages = emptyList(),
-                    isUploading = false
-                )
-                persistConversations(uiState.conversations)
-                return@launch
-            }
-
-            uiState = uiState.copy(uploadProgress = UploadProgress.UploadingNewArticle)
-
-            uploadRepository.upload(cleanUrl)
-                .onSuccess { response ->
+            when (
+                val result = articleUploadCoordinator.openOrUpload(cleanUrl) { progress ->
+                    uiState = uiState.copy(uploadProgress = progress)
+                }
+            ) {
+                is ArticleUploadResult.ExistingArticle -> {
+                    val article = result.article
+                    uiState = conversationCoordinator.startExistingArticleConversation(
+                        state = uiState,
+                        url = article.url.ifBlank { cleanUrl },
+                        title = article.title.ifBlank { cleanUrl },
+                        storedChunks = article.chunkCount
+                    )
+                    uiState = uiState.copy(
+                        uploadProgress = null,
+                        isUploading = false
+                    )
+                    persistConversations(uiState.conversations)
+                    return@launch
+                }
+                is ArticleUploadResult.Uploaded -> {
+                    val response = result.response
                     val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
                     val title = response.data?.title?.takeIf { it.isNotBlank() } ?: parsedUrl
-                    val conversations = conversationManager.upsertUploadedConversation(
-                        conversations = uiState.conversations,
+                    uiState = conversationCoordinator.openUploadedConversation(
+                        state = uiState,
                         url = parsedUrl,
                         title = title,
                         summary = response.summary,
                         status = response.status,
                         storedChunks = response.storedChunks
                     )
-                    val conversation = conversations.first()
-
-                    uiState = uiState.copy(
-                        uploadResponse = null,
-                        activeConversationId = conversation.id,
-                        selectedTab = AppTab.Home,
-                        isChatOpen = true,
-                        isArticleManagerOpen = false,
-                        activeUrl = parsedUrl,
-                        conversations = conversations,
-                        messages = conversation.messages
-                    )
                     persistConversations(uiState.conversations)
                 }
-                .onFailure { error ->
+                is ArticleUploadResult.Failed -> {
                     uiState = uiState.copy(
-                        errorMessage = error.message ?: "保存失败。",
+                        errorMessage = result.message,
                         uploadProgress = null
                     )
                 }
+            }
 
             uiState = uiState.copy(
                 isUploading = false,
@@ -259,185 +187,37 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun ask() {
-        val cleanQuery = uiState.query.trim()
-        if (cleanQuery.isEmpty()) {
-            uiState = uiState.copy(errorMessage = "请输入问题。")
-            return
-        }
-
-        val conversation = ensureActiveConversation()
+    fun prepareUserMessage(query: String): ChatSendContext? {
+        val ensured = conversationCoordinator.ensureActiveConversation(uiState)
+        uiState = ensured.first
+        val conversation = ensured.second
         val conversationId = conversation.id
         val activeUrl = conversation.url
-        val history = chatHistoryFrom(conversation.messages)
-        val userMessage = ChatMessage.User(cleanQuery)
+        val userMessage = ChatMessage.User(query)
         val updatedMessages = conversation.messages + userMessage
 
-        uiState = uiState.copy(
-            conversations = conversationManager.updateMessages(
-                conversations = uiState.conversations,
-                conversationId = conversationId,
-                messages = updatedMessages
+        uiState = conversationCoordinator.updateMessages(
+            state = uiState.copy(
+                activeUrl = activeUrl,
             ),
-            activeConversationId = conversationId,
-            selectedTab = AppTab.Home,
-            isChatOpen = true,
-            isArticleManagerOpen = false,
+            conversationId = conversationId,
+            messages = updatedMessages
+        )
+        persistConversations(uiState.conversations)
+        return ChatSendContext(
+            conversationId = conversationId,
             activeUrl = activeUrl,
-            messages = updatedMessages,
-            query = "",
-            isAsking = true,
-            errorMessage = null
+            historyMessages = conversation.messages
+        )
+    }
+
+    fun appendChatMessage(conversationId: String, message: ChatMessage) {
+        uiState = conversationCoordinator.appendMessage(
+            state = uiState,
+            conversationId = conversationId,
+            message = message
         )
         persistConversations(uiState.conversations)
-
-        viewModelScope.launch {
-            chatRepository.ask(cleanQuery, activeUrl, history)
-                .onSuccess { response ->
-                    val conversations = conversationManager.appendMessage(
-                        conversations = uiState.conversations,
-                        conversationId = conversationId,
-                        message = ChatMessage.Assistant(response)
-                    )
-                    uiState = uiState.copy(
-                        conversations = conversations,
-                        messages = activeMessagesFrom(conversations, conversationId)
-                    )
-                    persistConversations(conversations)
-                }
-                .onFailure { error ->
-                    val conversations = conversationManager.appendMessage(
-                        conversations = uiState.conversations,
-                        conversationId = conversationId,
-                        message = ChatMessage.Error(error.message ?: "Chat request failed.")
-                    )
-                    uiState = uiState.copy(
-                        conversations = conversations,
-                        messages = activeMessagesFrom(conversations, conversationId)
-                    )
-                    persistConversations(conversations)
-                }
-
-            uiState = uiState.copy(isAsking = false)
-        }
-    }
-
-    fun refreshStats() {
-        uiState = uiState.copy(
-            isLoadingStats = true,
-            statsErrorMessage = null
-        )
-
-        viewModelScope.launch {
-            statsRepository.getStats()
-                .onSuccess { stats ->
-                    uiState = uiState.copy(statsResponse = stats)
-                }
-                .onFailure { error ->
-                    uiState = uiState.copy(
-                        statsErrorMessage = error.message ?: "加载分析数据失败。"
-                    )
-                }
-
-            uiState = uiState.copy(isLoadingStats = false)
-        }
-    }
-
-    fun refreshInsights() {
-        uiState = uiState.copy(insightsErrorMessage = null)
-
-        viewModelScope.launch {
-            statsRepository.getInsights()
-                .onSuccess { insights ->
-                    uiState = uiState.copy(insightsResponse = insights)
-                }
-                .onFailure { error ->
-                    uiState = uiState.copy(
-                        insightsErrorMessage = error.message ?: "加载智能总结失败。"
-                    )
-                }
-        }
-    }
-
-    fun refreshArticles() {
-        uiState = uiState.copy(
-            isLoadingArticles = true,
-            articlesErrorMessage = null
-        )
-
-        viewModelScope.launch {
-            articleRepository.getArticles()
-                .onSuccess { articles ->
-                    uiState = uiState.copy(articlesResponse = articles)
-                }
-                .onFailure { error ->
-                    uiState = uiState.copy(
-                        articlesErrorMessage = error.message ?: "加载文章列表失败。"
-                    )
-                }
-
-            uiState = uiState.copy(isLoadingArticles = false)
-        }
-    }
-
-    fun deleteArticle(url: String) {
-        val cleanUrl = url.trim()
-        if (cleanUrl.isBlank()) {
-            return
-        }
-
-        uiState = uiState.copy(
-            deletingArticleUrl = cleanUrl,
-            articlesErrorMessage = null
-        )
-
-        viewModelScope.launch {
-            articleRepository.deleteArticle(cleanUrl)
-                .onSuccess {
-                    refreshArticles()
-                    refreshStats()
-                    refreshInsights()
-                }
-                .onFailure { error ->
-                    uiState = uiState.copy(
-                        articlesErrorMessage = error.message ?: "删除文章失败。"
-                    )
-                }
-
-            uiState = uiState.copy(deletingArticleUrl = null)
-        }
-    }
-
-    private fun ensureActiveConversation(): Conversation {
-        val activeConversation = uiState.conversations
-            .firstOrNull { it.id == uiState.activeConversationId }
-        if (activeConversation != null) {
-            return activeConversation
-        }
-
-        val conversation = conversationManager.createGlobalConversation()
-        uiState = uiState.copy(
-            activeConversationId = conversation.id,
-            selectedTab = AppTab.Home,
-            isChatOpen = true,
-            isArticleManagerOpen = false,
-            conversations = listOf(conversation) + uiState.conversations,
-            messages = emptyList(),
-            activeUrl = ""
-        )
-        persistConversations(uiState.conversations)
-        return conversation
-    }
-
-    private fun activeMessagesFrom(
-        conversations: List<Conversation>,
-        updatedConversationId: String
-    ): List<ChatMessage> {
-        return if (uiState.activeConversationId == updatedConversationId) {
-            conversations.firstOrNull { it.id == updatedConversationId }?.messages.orEmpty()
-        } else {
-            uiState.messages
-        }
     }
 
     private fun persistConversations(conversations: List<Conversation>) {
@@ -446,23 +226,4 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun chatHistoryFrom(messages: List<ChatMessage>): List<ChatHistoryItem> {
-        return messages
-            .mapNotNull { message ->
-                when (message) {
-                    is ChatMessage.User -> ChatHistoryItem("user", message.text)
-                    is ChatMessage.Summary -> ChatHistoryItem("summary", message.text)
-                    is ChatMessage.Assistant -> {
-                        val content = message.response.answer.ifBlank {
-                            message.response.message
-                        }
-                        content.takeIf { it.isNotBlank() }?.let {
-                            ChatHistoryItem("assistant", it)
-                        }
-                    }
-                    is ChatMessage.Error -> null
-                }
-            }
-            .takeLast(8)
-    }
 }

@@ -62,6 +62,8 @@ import androidx.compose.material3.Icon
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.example.smartfeedandroid.ui.model.Conversation
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,

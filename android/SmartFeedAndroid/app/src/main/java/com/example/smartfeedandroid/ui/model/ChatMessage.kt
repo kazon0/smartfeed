@@ -1,4 +1,4 @@
-package com.example.smartfeedandroid.ui.home
+package com.example.smartfeedandroid.ui.model
 
 import com.example.smartfeedandroid.data.remote.ChatResponse
 

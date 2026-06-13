@@ -2,6 +2,8 @@ package com.example.smartfeedandroid.ui.home
 
 import java.net.URI
 
+import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.example.smartfeedandroid.ui.model.Conversation
 class ConversationManager {
     fun createGlobalConversation(): Conversation {
         return Conversation(

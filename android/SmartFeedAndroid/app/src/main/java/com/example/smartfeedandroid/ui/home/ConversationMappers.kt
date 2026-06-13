@@ -3,6 +3,8 @@ package com.example.smartfeedandroid.ui.home
 import com.example.smartfeedandroid.data.local.StoredChatMessage
 import com.example.smartfeedandroid.data.local.StoredConversation
 
+import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.example.smartfeedandroid.ui.model.Conversation
 internal fun StoredConversation.toConversation(): Conversation {
     return Conversation(
         id = id,

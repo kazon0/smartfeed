@@ -36,10 +36,10 @@ import com.example.smartfeedandroid.data.remote.TopicDistribution
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.ResultRow
 import com.example.smartfeedandroid.ui.common.topicColor
-import com.example.smartfeedandroid.ui.home.Conversation
 import kotlin.math.min
 import kotlin.math.round
 
+import com.example.smartfeedandroid.ui.model.Conversation
 @Composable
 fun AnalysisScreen(
     conversations: List<Conversation>,

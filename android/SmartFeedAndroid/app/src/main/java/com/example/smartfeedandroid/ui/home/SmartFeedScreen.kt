@@ -14,31 +14,60 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.R
 import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.ui.analysis.AnalysisScreen
+import com.example.smartfeedandroid.ui.analysis.AnalysisUiState
+import com.example.smartfeedandroid.ui.analysis.AnalysisViewModel
 import com.example.smartfeedandroid.ui.articles.ArticleManagerScreen
+import com.example.smartfeedandroid.ui.articles.ArticleManagerUiState
+import com.example.smartfeedandroid.ui.articles.ArticleManagerViewModel
 import com.example.smartfeedandroid.ui.chat.ChatDetailScreen
+import com.example.smartfeedandroid.ui.chat.ChatUiState
+import com.example.smartfeedandroid.ui.chat.ChatViewModel
 import com.example.smartfeedandroid.ui.navigation.AppBottomBar
 import com.example.smartfeedandroid.ui.profile.PlaceholderScreen
 
 @Composable
 fun SmartFeedScreen(
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel(),
+    analysisViewModel: AnalysisViewModel = viewModel(),
+    articleManagerViewModel: ArticleManagerViewModel = viewModel()
 ) {
     SmartFeedContent(
         uiState = viewModel.uiState,
+        chatUiState = chatViewModel.uiState,
+        analysisUiState = analysisViewModel.uiState,
+        articleManagerUiState = articleManagerViewModel.uiState,
         onUrlChange = viewModel::onUrlChange,
         onUpload = viewModel::upload,
-        onQueryChange = viewModel::onQueryChange,
-        onAsk = viewModel::ask,
-        onSelectTab = viewModel::selectTab,
+        onQueryChange = chatViewModel::onQueryChange,
+        onAsk = {
+            chatViewModel.ask(
+                prepareUserMessage = viewModel::prepareUserMessage,
+                appendResultMessage = viewModel::appendChatMessage,
+                showError = viewModel::showError
+            )
+        },
+        onSelectTab = { tab ->
+            viewModel.selectTab(tab)
+            if (tab == AppTab.Analysis) {
+                analysisViewModel.refresh()
+            }
+        },
         onSelectConversation = viewModel::selectConversation,
         onDeleteConversation = viewModel::deleteConversation,
         onStartGlobalConversation = viewModel::startGlobalConversation,
         onBackToConversations = viewModel::showConversationList,
-        onOpenArticleManager = viewModel::openArticleManager,
-        onCloseArticleManager = viewModel::closeArticleManager,
+        onOpenArticleManager = {
+            viewModel.openArticleManager()
+            articleManagerViewModel.refreshArticles()
+        },
+        onCloseArticleManager = {
+            viewModel.closeArticleManager()
+            analysisViewModel.refresh()
+        },
         onOpenArticleChat = viewModel::startArticleConversation,
-        onDeleteArticle = viewModel::deleteArticle,
+        onDeleteArticle = articleManagerViewModel::deleteArticle,
         onDismissError = viewModel::clearError,
         modifier = modifier
     )
@@ -47,6 +76,9 @@ fun SmartFeedScreen(
 @Composable
 private fun SmartFeedContent(
     uiState: HomeUiState,
+    chatUiState: ChatUiState,
+    analysisUiState: AnalysisUiState,
+    articleManagerUiState: ArticleManagerUiState,
     onUrlChange: (String) -> Unit,
     onUpload: () -> Unit,
     onQueryChange: (String) -> Unit,
@@ -97,12 +129,12 @@ private fun SmartFeedContent(
                 AppTab.Home -> {
                     if (uiState.isChatOpen) {
                         ChatDetailScreen(
-                            query = uiState.query,
+                            query = chatUiState.query,
                             onQueryChange = onQueryChange,
                             messages = uiState.messages,
                             activeUrl = uiState.activeUrl,
                             activeTitle = activeConversation?.title.orEmpty(),
-                            isAsking = uiState.isAsking,
+                            isAsking = chatUiState.isAsking,
                             onAsk = onAsk,
                             onBack = onBackToConversations,
                             modifier = Modifier.padding(innerPadding)
@@ -123,10 +155,10 @@ private fun SmartFeedContent(
                 AppTab.Analysis -> {
                     if (uiState.isArticleManagerOpen) {
                         ArticleManagerScreen(
-                            articles = uiState.articlesResponse?.articles.orEmpty(),
-                            isLoadingArticles = uiState.isLoadingArticles,
-                            deletingArticleUrl = uiState.deletingArticleUrl,
-                            articlesErrorMessage = uiState.articlesErrorMessage,
+                            articles = articleManagerUiState.articlesResponse?.articles.orEmpty(),
+                            isLoadingArticles = articleManagerUiState.isLoadingArticles,
+                            deletingArticleUrl = articleManagerUiState.deletingArticleUrl,
+                            articlesErrorMessage = articleManagerUiState.articlesErrorMessage,
                             onBack = onCloseArticleManager,
                             onOpenArticleChat = onOpenArticleChat,
                             onDeleteArticle = onDeleteArticle,
@@ -135,11 +167,13 @@ private fun SmartFeedContent(
                     } else {
                         AnalysisScreen(
                             conversations = uiState.conversations,
-                            stats = uiState.statsResponse,
-                            insights = uiState.insightsResponse,
-                            articles = uiState.articlesResponse?.articles.orEmpty(),
-                            isLoading = uiState.isLoadingStats,
-                            errorMessage = uiState.statsErrorMessage ?: uiState.insightsErrorMessage,
+                            stats = analysisUiState.statsResponse,
+                            insights = analysisUiState.insightsResponse,
+                            articles = analysisUiState.articlesResponse?.articles.orEmpty(),
+                            isLoading = analysisUiState.isLoadingStats,
+                            errorMessage = analysisUiState.statsErrorMessage
+                                ?: analysisUiState.insightsErrorMessage
+                                ?: analysisUiState.articlesErrorMessage,
                             onOpenArticleManager = onOpenArticleManager,
                             modifier = Modifier.padding(innerPadding)
                         )

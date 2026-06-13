@@ -55,8 +55,8 @@ import com.example.smartfeedandroid.data.remote.ChatSource
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
-import com.example.smartfeedandroid.ui.home.ChatMessage
 
+import com.example.smartfeedandroid.ui.model.ChatMessage
 @Composable
 fun ChatDetailScreen(
     query: String,
