@@ -162,11 +162,24 @@
 - `app/services/chat_service.py`
   - 服务类：`ChatService`
   - 当前能力：
-    - 承载 `/chat` 的 query intent、query rewrite、multi-query retrieval、page/global retrieval、keyword retrieval、rerank、context compression、fallback 和 sources 构造流程。
+    - 承载 `/chat` 的 query intent、page/global retrieval 编排、context compression、fallback 和 sources 构造流程。
+    - query rewrite、multi-query retrieval、关键词召回、轻量排序和 LLM rerank 已委托给 `RAGPipeline`。
     - `app/routes/chat.py` 只负责 FastAPI 请求模型和调用 `ChatService`。
-    - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService`，便于测试和后续替换 LangChain pipeline。
+    - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService` 和 `RAGPipeline`，便于测试和后续替换 LangChain pipeline。
     - 对外返回结构保持 `/chat` 当前稳定字段不变。
     - 输出 `debug` 诊断信息，用于 `/debug` 页面展示检索链路。
+
+- `app/services/rag_pipeline.py`
+  - 服务类：`RAGPipeline`
+  - 当前能力：
+    - 调用 `LLMService.rewrite_query()` 生成检索 query，失败时回退原 query。
+    - 调用 `LLMService.generate_search_queries()` 生成 multi-query 检索变体，失败时保留原 query 和 rewritten query。
+    - 对每个 query 同时执行 ChromaDB 向量检索和本地关键词召回。
+    - 合并并去重向量召回和关键词召回结果。
+    - 使用轻量关键词命中分数对 chunks 做排序。
+    - 调用 `LLMService.rerank_chunks()` 对候选 chunks 做语义重排，失败时保留原排序。
+    - 使用 configurable threshold 筛选高相关 chunks。
+    - 保留检索 debug 信息，包括 retrieval steps、rerank before/after 和 chunk previews。
 
 - `app/services/web_parser.py`
   - 服务类：`WebParserService`

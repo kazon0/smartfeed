@@ -1,15 +1,15 @@
 <resources>
-    <string name="app_name">智享咨询</string>
+    <string name="app_name">SmartFeed</string>
     <string name="tab_home">首页</string>
     <string name="tab_analysis">分析</string>
     <string name="tab_profile">我的</string>
     <string name="new_chat">新聊天</string>
     <string name="recent_conversations">最近对话</string>
-    <string name="search_conversations">搜索对话、文章或消息</string>
+    <string name="search_conversations">搜索对话、文章或消息...</string>
     <string name="no_matching_conversations">没有匹配的对话。</string>
     <string name="conversation_filter_all">全部</string>
     <string name="conversation_filter_page">文章对话</string>
-    <string name="paste_or_share_article_link">粘贴或分享文章链接</string>
+    <string name="paste_or_share_article_link">粘贴或分享文章链接...</string>
     <string name="first_conversation_hint">保存一篇文章后，这里会出现对话记录。</string>
     <string name="ask_knowledge_base">向知识库提问</string>
     <string name="page_conversation">网页对话</string>

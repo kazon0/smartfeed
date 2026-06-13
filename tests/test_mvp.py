@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.llm_service import LLMService
+from app.services.rag_pipeline import RAGPipeline
 from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
 
@@ -128,6 +129,27 @@ def test_llm_generate_search_queries_parses_json_array(monkeypatch):
     )
 
     assert queries == ["十个基础算法 清单", "排序算法 搜索算法 图算法 动态规划"]
+
+
+def test_rag_pipeline_builds_search_queries_from_rewrite_and_multi_query():
+    class FakeLLMService:
+        def generate_search_queries(self, question, rewritten_query, url=None):
+            return ["十个基础算法 清单", rewritten_query, "排序算法 搜索算法"]
+
+    pipeline = RAGPipeline(llm_service_factory=FakeLLMService)
+
+    queries = pipeline.search_queries(
+        "十种算法有哪些",
+        "程序员基础算法",
+        url="https://example.com/algorithms",
+    )
+
+    assert queries == [
+        "程序员基础算法",
+        "十种算法有哪些",
+        "十个基础算法 清单",
+        "排序算法 搜索算法",
+    ]
 
 
 def test_llm_rerank_chunks_parses_json_array(monkeypatch):

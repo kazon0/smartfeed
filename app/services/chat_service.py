@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 from app.services.llm_service import LLMService
 from app.services.query_intent import QueryIntentService
+from app.services.rag_pipeline import RAGPipeline
 from app.services.vector_store import VectorStoreService
 
 
@@ -26,10 +27,16 @@ class ChatService:
         vector_store_factory: Callable[[], VectorStoreService] = VectorStoreService,
         llm_service_factory: Callable[[], LLMService] = LLMService,
         intent_service_factory: Callable[[], QueryIntentService] = QueryIntentService,
+        rag_pipeline_factory: Callable[[], RAGPipeline] | None = None,
     ):
         self.vector_store_factory = vector_store_factory
         self.llm_service_factory = llm_service_factory
         self.intent_service_factory = intent_service_factory
+        self.rag_pipeline = (
+            rag_pipeline_factory()
+            if rag_pipeline_factory
+            else RAGPipeline(llm_service_factory=llm_service_factory)
+        )
 
     def chat(
         self,
@@ -52,8 +59,8 @@ class ChatService:
             return self._no_retrieval_response(intent, debug)
 
         vector_store = self.vector_store_factory()
-        rewritten_query = self._rewrite_query(contextual_query, url)
-        search_queries = self._search_queries(contextual_query, rewritten_query, url)
+        rewritten_query = self.rag_pipeline.rewrite_query(contextual_query, url)
+        search_queries = self.rag_pipeline.search_queries(contextual_query, rewritten_query, url)
         ranking_query = " ".join(search_queries)
         debug["rewritten_query"] = rewritten_query
         debug["search_queries"] = search_queries
@@ -70,17 +77,20 @@ class ChatService:
                 debug,
             )
 
-        global_chunks = self._retrieve_chunks(
+        global_chunks = self.rag_pipeline.retrieve_chunks(
             vector_store,
             search_queries,
-            all_chunks=self._get_all_chunks(vector_store),
+            all_chunks=self.rag_pipeline.get_all_chunks(vector_store),
             scope="global",
             debug=debug,
         )
-        ranked_chunks = self._rank_chunks(ranking_query, global_chunks)
+        ranked_chunks = self.rag_pipeline.rank_chunks(ranking_query, global_chunks)
         debug["ranked_chunks"] = self._debug_chunk_refs(ranked_chunks)
-        ranked_chunks = self._llm_rerank_chunks(query, ranked_chunks, debug)
-        relevant_chunks = self._high_relevance_chunks(ranked_chunks)
+        ranked_chunks = self.rag_pipeline.llm_rerank_chunks(query, ranked_chunks, debug)
+        relevant_chunks = self.rag_pipeline.high_relevance_chunks(
+            ranked_chunks,
+            self.RELEVANCE_THRESHOLD,
+        )
         debug["relevant_chunks"] = self._debug_chunk_refs(relevant_chunks)
         answer, source_type, selected_chunks = self._answer_with_policy(
             contextual_query,
@@ -114,7 +124,7 @@ class ChatService:
     ) -> dict:
         all_page_chunks = vector_store.get_chunks_by_url(url)
         debug["page_chunk_count"] = len(all_page_chunks)
-        page_chunks = self._retrieve_chunks(
+        page_chunks = self.rag_pipeline.retrieve_chunks(
             vector_store,
             search_queries,
             metadata_filter={"url": url},
@@ -122,10 +132,13 @@ class ChatService:
             scope="page",
             debug=debug,
         )
-        ranked_page_chunks = self._rank_chunks(ranking_query, page_chunks)
+        ranked_page_chunks = self.rag_pipeline.rank_chunks(ranking_query, page_chunks)
         debug["ranked_chunks"] = self._debug_chunk_refs(ranked_page_chunks)
-        ranked_page_chunks = self._llm_rerank_chunks(query, ranked_page_chunks, debug)
-        relevant_page_chunks = self._high_relevance_chunks(ranked_page_chunks)
+        ranked_page_chunks = self.rag_pipeline.llm_rerank_chunks(query, ranked_page_chunks, debug)
+        relevant_page_chunks = self.rag_pipeline.high_relevance_chunks(
+            ranked_page_chunks,
+            self.RELEVANCE_THRESHOLD,
+        )
         debug["relevant_chunks"] = self._debug_chunk_refs(relevant_page_chunks)
 
         if all_page_chunks and self._is_page_wide_query(query, intent):

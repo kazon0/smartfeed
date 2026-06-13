@@ -29,6 +29,7 @@ Backend 已实现：
 * `VectorStoreService`
 * `LLMService`
 * `QueryIntentService`
+* `RAGPipeline`
 * ChromaDB 持久化存储
 * DeepSeek summary / answer
 * DeepSeek article topic classification
@@ -173,6 +174,7 @@ Backend:
 * `app/services/vector_store.py`
 * `app/services/llm_service.py`
 * `app/services/query_intent.py`
+* `app/services/rag_pipeline.py`
 
 Docs:
 
@@ -207,7 +209,8 @@ Runtime/generated files that should not be committed:
 * 不新增用户系统，除非明确要求。
 * 不修改 DeepSeek API key 管理方式，继续使用 `.env` + `python-dotenv`。
 * 不提交运行产物，例如 `chroma_db`、`__pycache__`、`.pyc`。
-* 修改 `/chat` 业务流程时优先修改 `app/services/chat_service.py`，保持 `app/routes/chat.py` 只做请求入口。
+* 修改 `/chat` 回答策略、fallback、sources 展示时优先修改 `app/services/chat_service.py`，保持 `app/routes/chat.py` 只做请求入口。
+* 修改 `/chat` 检索流程、query rewrite、multi-query、关键词召回或 rerank 时优先修改 `app/services/rag_pipeline.py`。
 * 修改 `/chat` 时必须注意 Android 客户端稳定字段：
   * `status`
   * `error_code`

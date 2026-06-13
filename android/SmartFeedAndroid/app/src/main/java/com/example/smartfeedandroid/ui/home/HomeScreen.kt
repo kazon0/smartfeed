@@ -138,7 +138,6 @@ fun HomeScreen(
                             strokeWidth = 2.5.dp
                         )
                     } else {
-                        // 2. 正常状态下，是一个圆形的小图标按钮
                         IconButton(
                             onClick = onUpload,
                             enabled = uiState.url.isNotBlank(), // URL 有内容时才允许点击
@@ -150,7 +149,6 @@ fun HomeScreen(
                                     shape = CircleShape // 变成正圆背景
                                 )
                         ) {
-                            // 这里可以用你想要的图标，比如一个向右的箭头 ➔ 或者保存图标
                             Text(
                                 text = "➔",
                                 color = Color.White,
@@ -303,8 +301,9 @@ private fun SwipeDeleteConversationRow(
                 .align(Alignment.CenterEnd)
                 .width(actionWidth)
                 .height(rowHeight)
-                .background(SoftRed),
-            contentAlignment = Alignment.Center
+                .background(SoftRed,
+                    shape = RoundedCornerShape(bottomEnd = 5.dp, topEnd = 5.dp)),
+            contentAlignment = Alignment.Center,
         ) {
             TextButton(
                 onClick = { onDeleteConversation(conversation.id) }
@@ -372,7 +371,7 @@ private fun ConversationItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(0.dp),
+        shape = RoundedCornerShape(5.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) {
                 SoftBlueLight
@@ -384,12 +383,12 @@ private fun ConversationItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                //.padding(12.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(end = 74.dp),
+                    .padding(start = 12.dp, top = 12.dp,end = 74.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
@@ -438,7 +437,7 @@ private fun TopicBookmark(
         modifier = modifier
             .background(
                 color = color,
-                shape = RoundedCornerShape(bottomStart = 12.dp)
+                shape = RoundedCornerShape(bottomStart = 12.dp, topEnd = 5.dp)
             )
             .padding(horizontal = 10.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center
