@@ -643,7 +643,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 当前本地持久化使用 Room。
 - Android 当前没有 WebSocket。
 - PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离、conversation/message 云 API、Android 认证和 Android Room/云端同步已接入。
-- 后端已提供 Dockerfile、`scripts/start_server.sh`、`GET /health`、`CHROMA_PERSIST_DIR` 和 `CORS_ALLOW_ORIGINS`，用于公网部署准备。
+- 后端已通过 GHCR 镜像部署到 Sealos 公网环境，地址为 `https://lxfxyunzhlxi.sealoshzh.site`。
+- Sealos 环境已使用 PostgreSQL、`/data` 持久化 ChromaDB、`GET /health`、`CHROMA_PERSIST_DIR` 和 Android 生产 base URL 完成第一版验证。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前已展示账号信息、同步状态和退出登录。
 

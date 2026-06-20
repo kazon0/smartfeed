@@ -69,6 +69,39 @@ Expected response:
 {"status":"ok"}
 ```
 
+## Sealos Deployment
+
+The first public deployment is available at:
+
+```text
+https://lxfxyunzhlxi.sealoshzh.site
+```
+
+Current deployed components:
+
+- Sealos app `smartfeed-api`
+- GHCR image `ghcr.io/kazon0/smartfeed-api:latest`
+- Sealos PostgreSQL
+- Persistent ChromaDB mount at `/data`
+- `CHROMA_PERSIST_DIR=/data/chroma_db`
+- Public HTTPS access enabled on container port `8000`
+
+Verify the deployed service:
+
+```bash
+curl https://lxfxyunzhlxi.sealoshzh.site/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+Security note: rotate any API keys or database passwords that were exposed
+during manual deployment, then update the Sealos environment variables and
+restart the app.
+
 ## Local Docker Smoke Test
 
 ```bash

@@ -98,6 +98,18 @@ GitHub Actions publishes the backend image to:
 ghcr.io/kazon0/smartfeed-api:latest
 ```
 
+The first public deployment is running on Sealos:
+
+```text
+https://lxfxyunzhlxi.sealoshzh.site
+```
+
+Verify it with:
+
+```bash
+curl https://lxfxyunzhlxi.sealoshzh.site/health
+```
+
 Health check:
 
 ```bash

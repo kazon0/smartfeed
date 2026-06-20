@@ -96,7 +96,7 @@
 
 ## 5. 服务器部署
 
-状态：后端已支持 `/health`、环境变量配置的 Chroma 持久化目录、CORS origins、Dockerfile、容器启动脚本，以及 Android Gradle 参数切换后端 base URL；实际公网部署和持久化验证仍待完成。
+状态：Sealos 第一版公网部署已完成，已使用 GHCR 镜像、Sealos PostgreSQL、`/data` 持久化 ChromaDB、`/health` 健康检查和 Android Gradle 生产 base URL 验证注册登录链路；密钥和数据库密码轮换仍需手动完成。
 
 目标：提供可供 Android 和简历演示使用的公网 HTTPS 服务。
 
