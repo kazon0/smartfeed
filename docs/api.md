@@ -629,7 +629,7 @@ Diagnostics:
 SMARTFEED_RAG_PIPELINE=langchain uvicorn app.main:app --reload
 ```
 
-- In that mode, `debug.rag_pipeline` should be `LangChainRAGPipeline`, and `debug.langchain_stages` records the Runnable stages. Initialization or chain execution failures fall back to classic `RAGPipeline` behavior.
+- In that mode, `debug.rag_pipeline` should be `LangChainRAGPipeline`, and `debug.langchain_stages` records rewrite, multi-query, retrieval, rank, rerank, compression, and answer stages. Initialization or chain execution failures fall back to classic `RAGPipeline` behavior.
 - `GET /debug` renders this diagnostics data in the browser so retrieval misses can be inspected without reading large terminal JSON.
 - The `debug` object is for development. UI clients should continue relying on stable fields such as `status`, `error_code`, `answer`, `sources`, `source_type`, `intent`, `retrieval_scope`, and `fallback_policy`.
 

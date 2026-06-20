@@ -269,11 +269,11 @@ def test_rag_eval_incomplete_cross_section_compression_is_rejected():
         "[2] url: https://example.com/article section_title: 第二章 section_index: 1\n第二章依据",
     ]
 
-    assert not service._compression_preserves_context_coverage(
+    assert not service.rag_pipeline.compression_preserves_context_coverage(
         context_chunks[0],
         context_chunks,
     )
-    assert service._compression_preserves_context_coverage(
+    assert service.rag_pipeline.compression_preserves_context_coverage(
         "\n".join(context_chunks),
         context_chunks,
     )

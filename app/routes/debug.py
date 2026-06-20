@@ -135,10 +135,13 @@ function renderDebug(debug) {
   `).join("");
   return `
     <div class="debug-grid">
+      <div class="debug-card"><strong>Pipeline</strong>${escapeHtml(debug.rag_pipeline || "")}</div>
+      <div class="debug-card"><strong>LangChain stages</strong>${escapeHtml((debug.langchain_stages || []).join(" → ") || "n/a")}</div>
       <div class="debug-card"><strong>Rewritten query</strong>${escapeHtml(debug.rewritten_query || "")}</div>
       <div class="debug-card"><strong>Search queries</strong>${escapeHtml((debug.search_queries || []).join(" | "))}</div>
       <div class="debug-card"><strong>Retrieved chunks</strong>${escapeHtml(debug.retrieved_chunk_count ?? 0)}</div>
       <div class="debug-card"><strong>Context</strong>compressed: ${escapeHtml(Boolean(debug.context && debug.context.compressed))}, raw: ${escapeHtml(debug.context?.raw_length ?? 0)}, compressed: ${escapeHtml(debug.context?.compressed_length ?? 0)}</div>
+      <div class="debug-card"><strong>Fallback</strong>${escapeHtml(debug.langchain_fallback ? JSON.stringify(debug.langchain_fallback) : "none")}</div>
     </div>
     <h5>Retrieval steps</h5>
     ${retrievalRows ? `

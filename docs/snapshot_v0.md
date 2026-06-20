@@ -210,7 +210,8 @@
   - 服务类：`LangChainRAGPipeline`
   - 当前能力：
     - 基于 `langchain-core` 的单个 RunnableSequence 串联 query rewrite、multi-query、retrieval、rank 和 rerank/filter。
-    - `debug.langchain_stages` 记录实际执行阶段；chain 异常时记录 `debug.langchain_fallback` 并回退 classic `run()`。
+    - retrieval RunnableSequence 后接 compression/answer RunnableSequence，形成 rewrite、multi-query、retrieval、rank、rerank、compression、answer 完整编排。
+    - `debug.langchain_stages` 记录实际执行阶段；chain 异常时记录 `debug.langchain_fallback` 并回退 classic pipeline 对应阶段。
     - 当前不替换 ChromaDB 存储结构、不修改 Android `/chat` 协议、不改变默认行为。
 
 - `app/services/rag_pipeline_factory.py`

@@ -329,6 +329,38 @@ def test_langchain_pipeline_run_records_runnable_stages():
     assert result["relevant_chunks"]
 
 
+def test_langchain_pipeline_runs_compression_and_answer_stages():
+    class FakeLLMService:
+        def compress_context(self, question, context_chunks):
+            return "[1] section_title: 协程\nFlow 是异步数据流。"
+
+        def answer(self, question, context_chunks):
+            assert context_chunks == ["[1] section_title: 协程\nFlow 是异步数据流。"]
+            return "Flow 可以表示异步数据流。"
+
+    debug = {"langchain_stages": ["rewrite", "multi_query", "retrieve", "rank", "rerank"]}
+    pipeline = LangChainRAGPipeline(llm_service_factory=FakeLLMService)
+
+    answer = pipeline.answer_with_context(
+        "Flow 是什么",
+        ["[1] section_title: 协程\nFlow 用于异步数据流。"],
+        FakeLLMService(),
+        debug,
+    )
+
+    assert answer == "Flow 可以表示异步数据流。"
+    assert debug["langchain_stages"] == [
+        "rewrite",
+        "multi_query",
+        "retrieve",
+        "rank",
+        "rerank",
+        "compress",
+        "answer",
+    ]
+    assert debug["context"]["compressed"] is True
+
+
 def test_langchain_pipeline_run_falls_back_to_classic_on_chain_error():
     class FakeLLMService:
         def rewrite_query(self, question, url=None):

@@ -864,70 +864,17 @@ class ChatService:
                 self._format_context_chunk(index, chunk)
                 for index, chunk in enumerate(chunks)
             ]
-            compressed_context = self._compress_context(query, context_chunks, llm_service)
-            answer_context = [compressed_context] if compressed_context else context_chunks
-            if debug is not None:
-                debug["context"] = {
-                    "chunk_count": len(context_chunks),
-                    "compressed": bool(compressed_context),
-                    "compressed_length": len(compressed_context),
-                    "raw_length": sum(len(chunk) for chunk in context_chunks),
-                }
-            answer = llm_service.answer(question=query, context_chunks=answer_context)
+            answer = self.rag_pipeline.answer_with_context(
+                query,
+                context_chunks,
+                llm_service,
+                debug,
+            )
             if answer.startswith("LLM unavailable"):
                 return "LLM unavailable"
             return answer
         except Exception:
             return "LLM unavailable"
-
-    def _compress_context(
-        self,
-        query: str,
-        context_chunks: list[str],
-        llm_service: LLMService,
-    ) -> str:
-        try:
-            compressed_context = llm_service.compress_context(query, context_chunks)
-        except Exception:
-            return ""
-
-        if not compressed_context or compressed_context.startswith("LLM unavailable"):
-            return ""
-        if not self._compression_preserves_context_coverage(
-            compressed_context,
-            context_chunks,
-        ):
-            return ""
-        return compressed_context
-
-    def _compression_preserves_context_coverage(
-        self,
-        compressed_context: str,
-        context_chunks: list[str],
-    ) -> bool:
-        urls = {
-            match.group(1)
-            for chunk in context_chunks
-            if (match := re.search(r"\burl:\s*(\S+)", chunk))
-        }
-        section_titles = {
-            match.group(1).strip()
-            for chunk in context_chunks
-            if (
-                match := re.search(
-                    r"\bsection_title:\s*(.*?)(?:\s+section_index:|\n|$)",
-                    chunk,
-                )
-            )
-        }
-
-        if len(urls) > 1 and any(url not in compressed_context for url in urls):
-            return False
-        if len(section_titles) > 1 and any(
-            title not in compressed_context for title in section_titles
-        ):
-            return False
-        return True
 
     def _format_context_chunk(self, index: int, chunk: dict) -> str:
         metadata = chunk.get("metadata", {})

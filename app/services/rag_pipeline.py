@@ -66,6 +66,78 @@ class RAGPipeline:
             "relevant_chunks": relevant_chunks,
         }
 
+    def answer_with_context(
+        self,
+        query: str,
+        context_chunks: list[str],
+        llm_service: LLMService,
+        debug: dict | None = None,
+    ) -> str:
+        answer_context = self.prepare_answer_context(
+            query,
+            context_chunks,
+            llm_service,
+            debug,
+        )
+        return llm_service.answer(question=query, context_chunks=answer_context)
+
+    def prepare_answer_context(
+        self,
+        query: str,
+        context_chunks: list[str],
+        llm_service: LLMService,
+        debug: dict | None = None,
+    ) -> list[str]:
+        compressed_context = ""
+        try:
+            candidate = llm_service.compress_context(query, context_chunks)
+            if (
+                candidate
+                and not candidate.startswith("LLM unavailable")
+                and self.compression_preserves_context_coverage(candidate, context_chunks)
+            ):
+                compressed_context = candidate
+        except Exception:
+            compressed_context = ""
+
+        if debug is not None:
+            debug["context"] = {
+                "chunk_count": len(context_chunks),
+                "compressed": bool(compressed_context),
+                "compressed_length": len(compressed_context),
+                "raw_length": sum(len(chunk) for chunk in context_chunks),
+            }
+        return [compressed_context] if compressed_context else context_chunks
+
+    def compression_preserves_context_coverage(
+        self,
+        compressed_context: str,
+        context_chunks: list[str],
+    ) -> bool:
+        urls = {
+            match.group(1)
+            for chunk in context_chunks
+            if (match := re.search(r"\burl:\s*(\S+)", chunk))
+        }
+        section_titles = {
+            match.group(1).strip()
+            for chunk in context_chunks
+            if (
+                match := re.search(
+                    r"\bsection_title:\s*(.*?)(?:\s+section_index:|\n|$)",
+                    chunk,
+                )
+            )
+        }
+
+        if len(urls) > 1 and any(url not in compressed_context for url in urls):
+            return False
+        if len(section_titles) > 1 and any(
+            title not in compressed_context for title in section_titles
+        ):
+            return False
+        return True
+
     def rewrite_query(self, query: str, url: str | None = None) -> str:
         try:
             result = self.llm_service_factory().rewrite_query(query, url=url)

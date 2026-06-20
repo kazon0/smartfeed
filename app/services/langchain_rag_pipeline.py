@@ -22,6 +22,10 @@ class LangChainRAGPipeline(RAGPipeline):
             | RunnableLambda(self._rank_step)
             | RunnableLambda(self._rerank_step)
         )
+        self._answer_chain = (
+            RunnableLambda(self._compress_step)
+            | RunnableLambda(self._answer_step)
+        )
 
     def _ensure_langchain_available(self) -> None:
         try:
@@ -71,6 +75,34 @@ class LangChainRAGPipeline(RAGPipeline):
                 scope=scope,
                 relevance_threshold=relevance_threshold,
                 debug=debug,
+            )
+
+    def answer_with_context(
+        self,
+        query: str,
+        context_chunks: list[str],
+        llm_service: LLMService,
+        debug: dict | None = None,
+    ) -> str:
+        payload = {
+            "query": query,
+            "context_chunks": context_chunks,
+            "llm_service": llm_service,
+            "debug": debug,
+        }
+        try:
+            return self._answer_chain.invoke(payload)
+        except Exception as exc:
+            if debug is not None:
+                debug["langchain_fallback"] = {
+                    "stage": "answer_chain",
+                    "reason": str(exc),
+                }
+            return super().answer_with_context(
+                query,
+                context_chunks,
+                llm_service,
+                debug,
             )
 
     def _rewrite_step(self, payload: dict) -> dict:
@@ -144,6 +176,23 @@ class LangChainRAGPipeline(RAGPipeline):
             "ranked_chunks": reranked_chunks,
             "relevant_chunks": relevant_chunks,
         }
+
+    def _compress_step(self, payload: dict) -> dict:
+        self._record_stage(payload, "compress")
+        answer_context = super().prepare_answer_context(
+            payload["query"],
+            payload["context_chunks"],
+            payload["llm_service"],
+            payload.get("debug"),
+        )
+        return {**payload, "answer_context": answer_context}
+
+    def _answer_step(self, payload: dict) -> str:
+        self._record_stage(payload, "answer")
+        return payload["llm_service"].answer(
+            question=payload["query"],
+            context_chunks=payload["answer_context"],
+        )
 
     def _record_stage(self, payload: dict, stage: str) -> None:
         debug = payload.get("debug")
