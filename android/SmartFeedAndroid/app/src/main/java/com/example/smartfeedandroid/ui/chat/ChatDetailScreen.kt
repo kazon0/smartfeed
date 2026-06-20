@@ -2,7 +2,6 @@ package com.example.smartfeedandroid.ui.chat
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +49,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.res.painterResource
 import com.example.smartfeedandroid.R
 import com.example.smartfeedandroid.data.remote.ChatResponse
-import com.example.smartfeedandroid.data.remote.ChatSource
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
@@ -417,84 +414,6 @@ private fun BubbleTriangle(color: Color, pointsRight: Boolean) {
         }
         path.close()
         drawPath(path = path, color = color)
-    }
-}
-
-@Composable
-private fun SourceCard(source: ChatSource) {
-    var expanded by remember { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
-    val title = source.displayTitle.ifBlank {
-        source.title.ifBlank { stringResource(R.string.untitled_source) }
-    }
-    val explanation = source.sourceSummary.ifBlank {
-        source.sectionTitle.ifBlank { source.url }
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (explanation.isNotBlank()) {
-                Text(
-                    text = stringResource(R.string.source_relation),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = explanation,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (expanded) Int.MAX_VALUE else 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (expanded && source.sectionTitle.isNotBlank() && source.sourceSummary.isNotBlank()) {
-                Text(
-                    text = stringResource(R.string.source_section, source.sectionTitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (expanded && source.url.isNotBlank()) {
-                Text(
-                    text = source.url,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { expanded = !expanded }) {
-                    Text(
-                        text = if (expanded) {
-                            stringResource(R.string.hide_source_detail)
-                        } else {
-                            stringResource(R.string.view_source_detail)
-                        }
-                    )
-                }
-                if (source.url.isNotBlank()) {
-                    TextButton(onClick = { uriHandler.openUri(source.url) }) {
-                        Text(text = stringResource(R.string.open_original_page))
-                    }
-                }
-            }
-        }
     }
 }
 
