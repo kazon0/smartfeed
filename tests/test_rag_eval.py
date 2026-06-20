@@ -233,6 +233,46 @@ def assert_source_url(response, expected_url):
     assert all(source.get("url") == expected_url for source in response["sources"])
 
 
+def test_rag_eval_cross_section_context_keeps_each_matched_section():
+    service = make_service()
+    first_section = [
+        chunk(
+            ALG_URL,
+            "长文章",
+            f"第一章背景材料 {index}。" + "这一段提供完整背景信息。" * 8,
+            index,
+            "第一章",
+            0,
+        )
+        for index in range(14)
+    ]
+    second_section = [
+        chunk(
+            ALG_URL,
+            "长文章",
+            f"第二章结论 {index}。" + "这一段解释最终结论和影响。" * 8,
+            14 + index,
+            "第二章",
+            1,
+        )
+        for index in range(2)
+    ]
+
+    selected = service._expand_section_chunks(
+        [first_section[11], second_section[1]],
+        first_section + second_section,
+    )
+
+    selected_sections = {
+        item["metadata"]["section_index"]
+        for item in selected
+    }
+    assert len(selected) == 12
+    assert selected_sections == {0, 1}
+    assert first_section[11] in selected
+    assert second_section[1] in selected
+
+
 def test_rag_eval_page_wide_algorithm_list_uses_clean_current_page_sources():
     response = make_service().chat("十大算法是什么", url=ALG_URL)
     preview = response["sources"][0]["content_preview"]

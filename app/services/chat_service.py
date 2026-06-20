@@ -622,16 +622,56 @@ class ChatService:
         if not selected_sections:
             return []
 
-        selected_chunks = [
-            chunk
-            for chunk in all_page_chunks
-            if chunk.get("metadata", {}).get("section_index") in selected_sections
-        ]
-        selected_chunks = self._filter_context_quality(selected_chunks) or selected_chunks
-        return sorted(
-            selected_chunks,
+        selected_sections = selected_sections[:limit]
+        section_chunks = {}
+        section_anchor_indexes = {}
+        for section_index in selected_sections:
+            chunks = [
+                chunk
+                for chunk in all_page_chunks
+                if chunk.get("metadata", {}).get("section_index") == section_index
+            ]
+            section_chunks[section_index] = self._filter_context_quality(chunks) or chunks
+            section_anchor_indexes[section_index] = [
+                chunk.get("metadata", {}).get("chunk_index")
+                for chunk in relevant_chunks
+                if chunk.get("metadata", {}).get("section_index") == section_index
+                and isinstance(chunk.get("metadata", {}).get("chunk_index"), int)
+            ]
+
+        section_limit = max(1, limit // len(selected_sections))
+        balanced_chunks = []
+        for section_index in selected_sections:
+            anchors = section_anchor_indexes[section_index]
+            chunks = sorted(
+                section_chunks[section_index],
+                key=lambda chunk: (
+                    min(
+                        (
+                            abs(chunk.get("metadata", {}).get("chunk_index", 0) - anchor)
+                            for anchor in anchors
+                        ),
+                        default=0,
+                    ),
+                    chunk.get("metadata", {}).get("chunk_index", 0),
+                ),
+            )
+            balanced_chunks.extend(chunks[:section_limit])
+
+        remaining_chunks = sorted(
+            [
+                chunk
+                for section_index in selected_sections
+                for chunk in section_chunks[section_index]
+                if chunk not in balanced_chunks
+            ],
             key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
-        )[:limit]
+        )
+        balanced_chunks.extend(remaining_chunks[: max(0, limit - len(balanced_chunks))])
+        return sorted(
+            balanced_chunks[:limit],
+            key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
+        )
 
     def _filter_context_quality(self, chunks: list[dict]) -> list[dict]:
         return [

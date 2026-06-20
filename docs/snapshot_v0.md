@@ -139,6 +139,7 @@
     - 对更具体的问题，先使用向量检索当前网页 chunks，同时在当前 URL 全部 chunks 中做轻量关键词召回。
     - 当前网页向量结果和关键词结果会合并去重，再优先扩展到命中 chunk 所在 section。
     - 当前网页具体问题扩展 section 上下文时，会保留同 section 的正文上下文，并过滤低质量推荐、作者卡片等噪声 chunks。
+    - 多个 section 同时命中时，会在 context chunk 上限内均衡分配章节额度，避免前置长章节挤掉后续章节。
     - 如果旧 chunks 没有 section metadata，则 fallback 到相邻 chunks 扩展。
     - 如果当前 URL 没有可用 chunks，不使用全局知识库假装回答该网页，而是返回已保存文章建议。
     - 如果请求不包含 `url`，执行全局知识库检索。
