@@ -7,3 +7,6 @@ sentence-transformers
 python-dotenv
 pytest
 langchain-core
+sqlalchemy
+alembic
+psycopg[binary]

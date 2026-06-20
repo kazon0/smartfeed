@@ -313,6 +313,21 @@
     - `search_history` 返回 `global` + `no_llm_general_answer`。
     - `unsupported_action` 返回 `none` + `unsupported_action`。
 
+### cloud database 基础
+
+- `app/db/base.py`
+  - 定义 SQLAlchemy 2 declarative base 和稳定 constraint naming convention。
+- `app/db/session.py`
+  - 从 `DATABASE_URL` 创建数据库 engine 和 session factory。
+  - 兼容部署平台常见的 `postgres://` / `postgresql://` URL，并转换为 psycopg driver URL。
+- `app/models/*`
+  - 已定义 `users`、`articles`、`conversations`、`messages` ORM models。
+  - article、conversation 明确保存 `owner_id`；message 绑定 conversation。
+  - 同一用户 URL 唯一，同一 conversation 的 message position 唯一。
+- `migrations/versions/0001_cloud_schema.py`
+  - 提供首个 Alembic migration，可创建和回滚四张云端业务表。
+  - 当前 schema 尚未接入现有 FastAPI routes；认证和 repository 接入属于下一阶段。
+
 ### Android MVP
 
 - 项目路径：`android/SmartFeedAndroid`
@@ -599,6 +614,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
 - Android 当前没有登录、WebSocket 或 session。
+- PostgreSQL schema 已建立，但现有 API 仍运行在单用户存储路径，尚未执行 JWT 鉴权或 `user_id` 隔离。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前只是占位页，没有真实用户功能。
 
@@ -610,6 +626,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Primary web reader：Jina Reader `https://r.jina.ai/`
 - HTML parser：BeautifulSoup / beautifulsoup4
 - Vector database：ChromaDB
+- Relational database：PostgreSQL
+- ORM / migration：SQLAlchemy 2 / Alembic / psycopg
 - Embedding：sentence-transformers
 - Embedding model：all-MiniLM-L6-v2
 - Fallback embedding：deterministic mock embedding

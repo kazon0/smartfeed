@@ -24,6 +24,10 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - Python
 - FastAPI
 - ChromaDB
+- PostgreSQL
+- SQLAlchemy 2
+- Alembic
+- psycopg
 - sentence-transformers
 - requests
 - BeautifulSoup
@@ -55,6 +59,14 @@ Create a `.env` file:
 
 ```env
 DEEPSEEK_API_KEY=your_api_key_here
+DATABASE_URL=postgresql+psycopg://smartfeed:smartfeed@localhost:5432/smartfeed
+JWT_SECRET=replace_with_a_long_random_secret
+```
+
+Create or upgrade the cloud metadata schema:
+
+```bash
+alembic upgrade head
 ```
 
 Start the backend:
@@ -68,6 +80,8 @@ Health check:
 ```bash
 curl http://127.0.0.1:8000/
 ```
+
+The PostgreSQL schema currently provides `users`, `articles`, `conversations`, and `messages`. Existing APIs still use the current single-user storage path until authentication and repository integration are completed.
 
 ## Main API Endpoints
 
