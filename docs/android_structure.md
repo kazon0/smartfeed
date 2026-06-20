@@ -31,6 +31,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Feature UI：
   - `ui/home/HomeScreen.kt`
   - `ui/chat/ChatDetailScreen.kt`
+  - `ui/chat/ChatBubbles.kt`
   - `ui/chat/ChatSourceCard.kt`
   - `ui/analysis/AnalysisScreen.kt`
   - `ui/articles/ArticleManagerScreen.kt`
@@ -51,6 +52,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/chat/ChatCoordinator.kt`：构造最近聊天 history 并调用 `/chat`。
 - Chat local models：`ui/chat/ChatModels.kt` 保存 `ChatSendContext` 和 `ChatResult`，避免继续堆在 ViewModel 或 coordinator 文件中。
 - Chat source UI：`ui/chat/ChatSourceCard.kt` 保存回答依据卡片展开和打开原文逻辑。
+- Chat bubble UI：`ui/chat/ChatBubbles.kt` 保存用户消息、助手消息、thinking 和气泡绘制组件。
 - Model：`ui/model/Conversation.kt`、`ui/model/ChatMessage.kt`
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`

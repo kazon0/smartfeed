@@ -326,6 +326,7 @@
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
   - Chat 页面实现位置：`ui/chat/ChatDetailScreen.kt`。
   - Chat 页 sources 当前以“回答依据”短卡片展示，默认只显示标题和说明，点击后展开来源详情。
+  - Chat 气泡 UI 已拆到 `ui/chat/ChatBubbles.kt`。
   - Chat source 卡片 UI 已拆到 `ui/chat/ChatSourceCard.kt`。
   - Articles tab 调用后端 `/articles` 展示已保存文章列表。
   - Articles tab 用顶部 topic tabs 切换文章分类。
