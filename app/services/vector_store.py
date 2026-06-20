@@ -124,7 +124,8 @@ class VectorStoreService:
     _embedding_model = None
     _embedding_model_loaded = False
 
-    def __init__(self) -> None:
+    def __init__(self, user_id: str | None = None) -> None:
+        self.user_id = str(user_id) if user_id else None
         self.client = chromadb.PersistentClient(path=self.PERSIST_DIR)
         self.collection = self.client.get_or_create_collection(
             name=self.COLLECTION_NAME,
@@ -142,16 +143,22 @@ class VectorStoreService:
         if not clean_chunks:
             return 0
 
+        user_id = self._require_user_id()
+        scoped_metadata = {
+            **self._normalize_metadata(metadata),
+            "user_id": user_id,
+        }
         embeddings = self._embed(clean_chunks)
         ids = [
-            self._build_chunk_id(chunk, index, metadata)
+            self._build_chunk_id(chunk, index, scoped_metadata)
             for index, chunk in enumerate(clean_chunks)
         ]
         metadatas = [
             {
-                **self._normalize_metadata(metadata),
+                **scoped_metadata,
                 **self._normalize_metadata(self._chunk_metadata_at(chunk_metadata, index)),
                 "chunk_index": index,
+                "user_id": user_id,
             }
             for index in range(len(clean_chunks))
         ]
@@ -173,14 +180,17 @@ class VectorStoreService:
         if not url:
             return 0
 
-        result = self.collection.get(where={"url": url})
+        result = self.collection.get(where=self._scoped_filter({"url": url}))
         ids = result.get("ids", [])
         if ids:
             self.collection.delete(ids=ids)
         return len(ids)
 
     def list_sources(self, limit: int = 10) -> list[dict[str, Any]]:
-        result = self.collection.get(include=["metadatas"])
+        result = self.collection.get(
+            where=self._scoped_filter(),
+            include=["metadatas"],
+        )
         metadatas = result.get("metadatas", [])
         sources = []
         seen_urls = set()
@@ -292,7 +302,7 @@ class VectorStoreService:
             return []
 
         result = self.collection.get(
-            where={"url": url},
+            where=self._scoped_filter({"url": url}),
             include=["documents", "metadatas"],
         )
         documents = result.get("documents", [])
@@ -312,6 +322,7 @@ class VectorStoreService:
 
     def get_all_chunks(self, limit: int = 1000) -> list[dict[str, Any]]:
         result = self.collection.get(
+            where=self._scoped_filter(),
             include=["documents", "metadatas"],
             limit=limit,
         )
@@ -415,8 +426,7 @@ class VectorStoreService:
             "n_results": top_k,
             "include": ["documents", "metadatas", "distances"],
         }
-        if metadata_filter:
-            query_args["where"] = metadata_filter
+        query_args["where"] = self._scoped_filter(metadata_filter)
 
         result = self.collection.query(**query_args)
 
@@ -471,8 +481,22 @@ class VectorStoreService:
 
     def _build_chunk_id(self, chunk: str, index: int, metadata: dict) -> str:
         source = metadata.get("url", "")
-        digest = hashlib.sha256(f"{source}:{index}:{chunk}".encode("utf-8")).hexdigest()
+        user_id = metadata.get("user_id", "")
+        digest = hashlib.sha256(
+            f"{user_id}:{source}:{index}:{chunk}".encode("utf-8")
+        ).hexdigest()
         return str(uuid.uuid5(uuid.NAMESPACE_URL, digest))
+
+    def _require_user_id(self) -> str:
+        if not self.user_id:
+            raise RuntimeError("VectorStoreService requires an authenticated user_id")
+        return self.user_id
+
+    def _scoped_filter(self, metadata_filter: dict | None = None) -> dict:
+        user_filter = {"user_id": self._require_user_id()}
+        if not metadata_filter:
+            return user_filter
+        return {"$and": [user_filter, metadata_filter]}
 
     def _normalize_metadata(self, metadata: dict) -> dict:
         normalized = {}

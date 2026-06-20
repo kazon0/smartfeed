@@ -1,8 +1,10 @@
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.models.user import User
+from app.routes.auth import get_current_user
 from app.services.chat_service import ChatService
 from app.services.llm_service import LLMService
 from app.services.query_intent import QueryIntentService
@@ -19,9 +21,11 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat")
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, user: User = Depends(get_current_user)):
+    vector_store = VectorStoreService()
+    vector_store.user_id = str(user.id)
     return ChatService(
-        vector_store_factory=VectorStoreService,
+        vector_store_factory=lambda: vector_store,
         llm_service_factory=LLMService,
         intent_service_factory=QueryIntentService,
     ).chat(

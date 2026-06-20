@@ -65,6 +65,8 @@ Backend 已实现：
 * Android 已入库 URL 跳过重复上传并新建文章聊天
 * Android Room 本地历史对话保存
 * Android Room messages 独立表保存
+* JWT 注册、登录和当前用户 API
+* ChromaDB chunks 按认证用户强制隔离
 * Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`

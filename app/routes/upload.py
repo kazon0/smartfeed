@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.models.user import User
+from app.routes.auth import get_current_user
 from app.services.llm_service import LLMService
 from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
@@ -13,7 +15,7 @@ class UploadRequest(BaseModel):
 
 
 @router.post("/upload")
-def upload_article(request: UploadRequest):
+def upload_article(request: UploadRequest, user: User = Depends(get_current_user)):
     data = WebParserService().prepare(request.url)
     stored_chunks = 0
     summary = ""
@@ -30,6 +32,7 @@ def upload_article(request: UploadRequest):
         llm_service = LLMService()
         summary = llm_service.summarize(data["content"])
         vector_store = VectorStoreService()
+        vector_store.user_id = str(user.id)
         topic_result = llm_service.classify_topic(
             title=data["title"],
             url=data["url"],

@@ -1,6 +1,10 @@
+from types import SimpleNamespace
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routes.auth import get_current_user
 from app.services.chat_service import ChatService
 from app.services.langchain_rag_pipeline import LangChainRAGPipeline
 from app.services.llm_service import LLMService
@@ -11,6 +15,14 @@ from app.services.web_parser import WebParserService
 
 
 client = TestClient(app)
+TEST_USER = SimpleNamespace(id="test-user-id")
+
+
+@pytest.fixture(autouse=True)
+def authenticated_user():
+    app.dependency_overrides[get_current_user] = lambda: TEST_USER
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_root_status_ok():
@@ -18,6 +30,24 @@ def test_root_status_ok():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_business_api_requires_authentication():
+    from app.db.dependencies import get_db
+
+    def override_get_db():
+        yield None
+
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        response = client.get("/stats")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or missing access token."
 
 
 def test_auth_register_login_and_current_user(monkeypatch):
@@ -44,6 +74,7 @@ def test_auth_register_login_and_current_user(monkeypatch):
         finally:
             session.close()
 
+    app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides[get_db] = override_get_db
     try:
         register_response = client.post(
@@ -619,6 +650,7 @@ def test_vector_store_add_chunks_keeps_section_metadata():
     service = VectorStoreService.__new__(VectorStoreService)
     service.collection = FakeCollection()
     service.embedding_model = None
+    service.user_id = "user-a"
 
     stored = service.add_chunks(
         ["冒泡排序内容"],
@@ -629,6 +661,7 @@ def test_vector_store_add_chunks_keeps_section_metadata():
     assert stored == 1
     assert captured["metadatas"][0]["section_index"] == 1
     assert captured["metadatas"][0]["section_title"] == "排序算法"
+    assert captured["metadatas"][0]["user_id"] == "user-a"
 
 
 def test_vector_store_delete_by_url_does_not_crash():
@@ -641,6 +674,7 @@ def test_vector_store_delete_by_url_does_not_crash():
 
     service = VectorStoreService.__new__(VectorStoreService)
     service.collection = FakeCollection()
+    service.user_id = "user-a"
 
     service.delete_by_url("https://example.com")
 
@@ -732,11 +766,17 @@ def test_article_status_returns_existing_article(monkeypatch):
 def test_vector_store_article_status_returns_missing_for_unknown_url():
     class FakeCollection:
         def get(self, where, include):
-            assert where == {"url": "https://example.com/missing"}
+            assert where == {
+                "$and": [
+                    {"user_id": "user-a"},
+                    {"url": "https://example.com/missing"},
+                ]
+            }
             return {"documents": [], "metadatas": []}
 
     service = VectorStoreService.__new__(VectorStoreService)
     service.collection = FakeCollection()
+    service.user_id = "user-a"
 
     status = service.article_status("https://example.com/missing")
 

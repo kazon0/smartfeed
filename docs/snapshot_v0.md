@@ -12,7 +12,9 @@
 - `GET /auth/me`
   - 通过 `Authorization: Bearer ...` 解析当前用户。
   - 无效、过期或用户不存在的 token 返回 HTTP `401`。
-- 当前认证 routes 已实现，但 articles/chat/upload/search/stats/insights 尚未强制绑定当前用户。
+- `/upload`、`/search`、`/chat`、`/articles`、`/stats`、`/insights` 已强制校验 JWT 并绑定当前用户。
+- Chroma chunks 写入当前 `user_id`；查询、聚合和删除都由服务端强制追加用户过滤，客户端不能指定或覆盖 owner。
+- 隔离功能启用前写入的旧 chunks 没有 `user_id`，升级后需要登录并重新上传文章。
 
 - `GET /articles`
   - 定义位置：`app/routes/articles.py`
@@ -68,6 +70,7 @@
   - 页面展示 parser、stored chunks、summary、chunks、answer、sources、source_type 和 chat diagnostics。
   - sources 默认展示文章标题、URL、摘要和 chunk 索引，原始 `content_preview` 放在折叠的 Raw preview 中。
   - diagnostics 展示 rewritten query、multi-query 列表、每个 query 的向量/关键词命中数、selected chunks 和 context compression 状态。
+  - 页面仍可公开打开，但其业务 API 请求需要 bearer token；Android 认证接入完成前优先用 API curl 验证。
 
 - `POST /upload`
   - 定义位置：`app/routes/upload.py`

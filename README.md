@@ -99,10 +99,15 @@ The PostgreSQL schema currently provides `users`, `articles`, `conversations`, a
 - `GET /articles` saved articles
 - `DELETE /articles` delete an article from the knowledge base by URL
 
+All business endpoints require `Authorization: Bearer $ACCESS_TOKEN` and operate
+only on the authenticated user's data. Articles stored before user isolation must
+be uploaded again because their Chroma metadata has no owner.
+
 Example upload:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/upload \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com"}'
 ```
@@ -111,6 +116,7 @@ Example chat:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"What is this article about?","url":"https://example.com"}'
 ```

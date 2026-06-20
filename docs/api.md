@@ -1,5 +1,9 @@
 # SmartFeed API
 
+Except for `GET /`, `GET /debug`, `POST /auth/register`, and `POST /auth/login`,
+all endpoints require `Authorization: Bearer $ACCESS_TOKEN`. Article, search,
+statistics, insights, upload, and chat data are scoped to the authenticated user.
+
 ## GET /
 
 Health check.
@@ -82,7 +86,10 @@ curl http://127.0.0.1:8000/auth/me \
 
 Missing, invalid, expired, or deleted-user tokens return HTTP `401`.
 
-Authentication requires `DATABASE_URL` and a `JWT_SECRET` containing at least 32 characters. Existing article and chat APIs are not protected until the next user-isolation stage.
+Authentication requires `DATABASE_URL` and a `JWT_SECRET` containing at least 32 characters. Missing, invalid, or expired credentials on protected business endpoints return HTTP `401`.
+
+Chroma chunks created before user isolation do not contain `user_id` and are not
+visible to any account. Re-upload those articles after signing in.
 
 ## GET /debug
 
