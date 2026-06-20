@@ -106,6 +106,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 ## Unit Tests
 
 - `ConversationManagerTest` 覆盖文章 conversation 元数据、URL 归一化去重、重复上传时摘要替换、新 conversation 排序和消息追加规则。
+- `ConversationMappersTest` 覆盖 conversation 完整 round-trip、旧 `sourceUrl` fallback、未知旧消息类型兼容和消息顺序。
 - 这些规则使用本地 JVM 单元测试运行，不依赖 Android 设备或后端服务。
 
 ## 后续建议
