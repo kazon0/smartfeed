@@ -65,7 +65,7 @@ fun ArticleManagerScreen(
     isLoadingArticles: Boolean,
     deletingArticleUrl: String?,
     articlesErrorMessage: String?,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -102,18 +102,20 @@ fun ArticleManagerScreen(
                 .background(Color.LightGray.copy(0.1f)),
             contentAlignment = Alignment.Center
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .size(48.dp)
-                    .align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.back),
-                    tint = Color.Black,
-                    modifier = Modifier.size(28.dp)
-                )
+            if (onBack != null) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.CenterStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.back),
+                        tint = Color.Black,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
 
             Text(

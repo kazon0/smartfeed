@@ -58,8 +58,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             url = cleanUrl,
             lastSharedUrl = cleanUrl,
             selectedTab = AppTab.Home,
-            isChatOpen = false,
-            isArticleManagerOpen = false
+            isChatOpen = false
         )
         upload()
     }
@@ -68,13 +67,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = if (tab == AppTab.Home) {
             uiState.copy(
                 selectedTab = tab,
-                isChatOpen = false,
-                isArticleManagerOpen = false
+                isChatOpen = false
             )
         } else {
             uiState.copy(
-                selectedTab = tab,
-                isArticleManagerOpen = false
+                selectedTab = tab
             )
         }
     }
@@ -83,21 +80,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(
             selectedTab = AppTab.Home,
             isChatOpen = false,
-            isArticleManagerOpen = false,
             errorMessage = null
-        )
-    }
-
-    fun openArticleManager() {
-        uiState = uiState.copy(
-            selectedTab = AppTab.Analysis,
-            isArticleManagerOpen = true
-        )
-    }
-
-    fun closeArticleManager() {
-        uiState = uiState.copy(
-            isArticleManagerOpen = false
         )
     }
 

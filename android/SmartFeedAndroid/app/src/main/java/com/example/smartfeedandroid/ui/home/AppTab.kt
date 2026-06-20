@@ -5,6 +5,7 @@ import com.example.smartfeedandroid.R
 
 enum class AppTab(@StringRes val labelRes: Int) {
     Home(R.string.tab_home),
+    Articles(R.string.tab_articles),
     Analysis(R.string.tab_analysis),
     Profile(R.string.tab_profile)
 }

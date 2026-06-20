@@ -50,22 +50,16 @@ fun SmartFeedScreen(
         },
         onSelectTab = { tab ->
             viewModel.selectTab(tab)
-            if (tab == AppTab.Analysis) {
-                analysisViewModel.refresh()
+            when (tab) {
+                AppTab.Analysis -> analysisViewModel.refresh()
+                AppTab.Articles -> articleManagerViewModel.refreshArticles()
+                else -> Unit
             }
         },
         onSelectConversation = viewModel::selectConversation,
         onDeleteConversation = viewModel::deleteConversation,
         onStartGlobalConversation = viewModel::startGlobalConversation,
         onBackToConversations = viewModel::showConversationList,
-        onOpenArticleManager = {
-            viewModel.openArticleManager()
-            articleManagerViewModel.refreshArticles()
-        },
-        onCloseArticleManager = {
-            viewModel.closeArticleManager()
-            analysisViewModel.refresh()
-        },
         onOpenArticleChat = viewModel::startArticleConversation,
         onDeleteArticle = articleManagerViewModel::deleteArticle,
         onDismissError = viewModel::clearError,
@@ -88,8 +82,6 @@ private fun SmartFeedContent(
     onDeleteConversation: (String) -> Unit,
     onStartGlobalConversation: () -> Unit,
     onBackToConversations: () -> Unit,
-    onOpenArticleManager: () -> Unit,
-    onCloseArticleManager: () -> Unit,
     onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
     onDismissError: () -> Unit,
@@ -101,13 +93,11 @@ private fun SmartFeedContent(
     Surface(modifier = modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
-                if (
-                    !(uiState.selectedTab == AppTab.Home && uiState.isChatOpen) &&
-                    !(uiState.selectedTab == AppTab.Analysis && uiState.isArticleManagerOpen)
-                ) {
+                if (!(uiState.selectedTab == AppTab.Home && uiState.isChatOpen)) {
                     AppBottomBar(
                         selectedTab = uiState.selectedTab,
-                        onSelectTab = onSelectTab
+                        onSelectTab = onSelectTab,
+                        onNewChat = onStartGlobalConversation
                     )
                 }
             }
@@ -146,38 +136,35 @@ private fun SmartFeedContent(
                             onUpload = onUpload,
                             onSelectConversation = onSelectConversation,
                             onDeleteConversation = onDeleteConversation,
-                            onStartGlobalConversation = onStartGlobalConversation,
                             modifier = Modifier.padding(innerPadding)
                         )
                     }
                 }
 
+                AppTab.Articles -> {
+                    ArticleManagerScreen(
+                        articles = articleManagerUiState.articlesResponse?.articles.orEmpty(),
+                        isLoadingArticles = articleManagerUiState.isLoadingArticles,
+                        deletingArticleUrl = articleManagerUiState.deletingArticleUrl,
+                        articlesErrorMessage = articleManagerUiState.articlesErrorMessage,
+                        onOpenArticleChat = onOpenArticleChat,
+                        onDeleteArticle = onDeleteArticle,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+
                 AppTab.Analysis -> {
-                    if (uiState.isArticleManagerOpen) {
-                        ArticleManagerScreen(
-                            articles = articleManagerUiState.articlesResponse?.articles.orEmpty(),
-                            isLoadingArticles = articleManagerUiState.isLoadingArticles,
-                            deletingArticleUrl = articleManagerUiState.deletingArticleUrl,
-                            articlesErrorMessage = articleManagerUiState.articlesErrorMessage,
-                            onBack = onCloseArticleManager,
-                            onOpenArticleChat = onOpenArticleChat,
-                            onDeleteArticle = onDeleteArticle,
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    } else {
-                        AnalysisScreen(
-                            conversations = uiState.conversations,
-                            stats = analysisUiState.statsResponse,
-                            insights = analysisUiState.insightsResponse,
-                            articles = analysisUiState.articlesResponse?.articles.orEmpty(),
-                            isLoading = analysisUiState.isLoadingStats,
-                            errorMessage = analysisUiState.statsErrorMessage
-                                ?: analysisUiState.insightsErrorMessage
-                                ?: analysisUiState.articlesErrorMessage,
-                            onOpenArticleManager = onOpenArticleManager,
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
+                    AnalysisScreen(
+                        conversations = uiState.conversations,
+                        stats = analysisUiState.statsResponse,
+                        insights = analysisUiState.insightsResponse,
+                        articles = analysisUiState.articlesResponse?.articles.orEmpty(),
+                        isLoading = analysisUiState.isLoadingStats,
+                        errorMessage = analysisUiState.statsErrorMessage
+                            ?: analysisUiState.insightsErrorMessage
+                            ?: analysisUiState.articlesErrorMessage,
+                        modifier = Modifier.padding(innerPadding)
+                    )
                 }
 
                 AppTab.Profile -> {

@@ -13,7 +13,6 @@ class ConversationCoordinator(
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
-            isArticleManagerOpen = false,
             activeUrl = conversation.url,
             messages = conversation.messages,
             uploadResponse = null,
@@ -138,7 +137,6 @@ class ConversationCoordinator(
             activeConversationId = conversationId,
             selectedTab = AppTab.Home,
             isChatOpen = true,
-            isArticleManagerOpen = false,
             messages = messages,
             errorMessage = null
         )
@@ -176,7 +174,6 @@ class ConversationCoordinator(
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
-            isArticleManagerOpen = false,
             activeUrl = activeUrl,
             uploadResponse = null,
             errorMessage = null,

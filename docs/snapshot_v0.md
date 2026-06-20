@@ -316,25 +316,26 @@
   - 已封装 `SmartFeedApi`、`SmartFeedNetwork`、`UploadRepository`、`ChatRepository`。
   - 已实现 `/upload` 请求模型和响应模型。
   - 已实现 `/chat` 请求模型和响应模型。
-  - `SmartFeedScreen` 使用 Jetpack Compose 组装 Home / Analysis / Profile 三个底部 tab。
+  - `SmartFeedScreen` 使用 Jetpack Compose 组装 Home / Articles / Analysis / Profile 底部 tab，并在底部栏中间提供新聊天加号动作。
   - Android UI 已按 feature 拆分到 `ui/home`、`ui/chat`、`ui/analysis`、`ui/articles`、`ui/navigation`、`ui/common`、`ui/profile`。
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
+  - Home tab 不再在右上角展示新聊天按钮，新聊天入口已移动到底部栏中间的加号动作。
   - Home 页面实现位置：`ui/home/HomeScreen.kt`。
   - 点击 Home 中的 conversation 会进入聊天详情页。
   - 聊天详情页展示 summary、用户消息、AI 回答和 sources。
   - Chat 页面实现位置：`ui/chat/ChatDetailScreen.kt`。
   - Chat 页 sources 当前以“回答依据”短卡片展示，默认只显示标题和说明，点击后展开来源详情。
+  - Articles tab 调用后端 `/articles` 展示已保存文章列表。
+  - Articles tab 用顶部 topic tabs 切换文章分类。
+  - Articles tab 点击文章会基于该文章新建一条聊天，并进入聊天详情页。
+  - Articles tab 左滑文章会显示 Delete 按钮，点击按钮后调用后端 `DELETE /articles` 按 URL 删除知识库文章。
+  - 文章页面实现位置：`ui/articles/ArticleManagerScreen.kt`。
+  - 文章页面当前由 `selectedTab == AppTab.Articles` 直接驱动，不再保留 Analysis 页内打开文章管理的二级 UI 状态。
   - Analysis tab 当前调用后端 `/stats`、`/articles` 和 `/insights` 展示智能总结、知识库画像、主题占比、内容厚度和来源域名。
   - Analysis tab 的 Topic share 当前基于 `/articles` 返回的文章 `topic` 按文章数量统计。
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
   - Analysis 页面实现位置：`ui/analysis/AnalysisScreen.kt`。
-  - Analysis tab 右上角提供文章管理入口。
-  - 文章管理页调用后端 `/articles` 展示已保存文章列表。
-  - 文章管理页用顶部 topic tabs 切换文章分类。
-  - 文章管理页点击文章会基于该文章新建一条聊天，并进入聊天详情页。
-  - 文章管理页左滑文章会显示 Delete 按钮，点击按钮后调用后端 `DELETE /articles` 按 URL 删除知识库文章。
-  - 文章管理页面实现位置：`ui/articles/ArticleManagerScreen.kt`。
-  - 删除文章后会刷新文章列表和知识库统计。
+  - 删除文章后会刷新文章列表。
   - Profile tab 当前为占位页。
   - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
   - `HomeViewModel` 负责 Home、分享入口、会话打开、上传入口、聊天入口、本地 conversations 列表和当前 messages。
@@ -497,7 +498,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现上传 URL 后创建新 conversation。
 - Android 端已实现 summary 作为聊天消息展示。
 - Android 端已实现当前进程内 conversation 切换。
-- Android 端已实现 Home / Analysis / Profile 底部 tab 结构。
+- Android 端已实现 Home / Articles / Analysis / Profile 底部 tab 结构。
+- Android 端底部栏中间已实现新聊天加号动作。
 - Android 端已将历史对话列表和聊天详情页拆开。
 - Android 端 Home 最近对话已支持按全部、新聊天、文章对话和 topic 过滤。
 - Android 端 Home 最近对话已支持本地搜索标题、摘要、URL、topic 和最近消息。
@@ -512,7 +514,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现 Analysis 页调用后端 `/stats`。
 - Android 端已实现知识库主题占比饼图。
 - Android 端已展示智能总结、知识库画像、主题占比、内容厚度和来源域名分布。
-- Android 端已通过 Analysis 右上角入口进入文章管理页。
+- Android 端已将文章管理页提升为底部 Articles tab。
 - Android Analysis Topic share 已改为按文章数量统计 topic。
 - Android 文章管理页已使用 topic tabs 展示已保存文章。
 - Android 文章管理页已支持点击文章后新建文章聊天。

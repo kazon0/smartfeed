@@ -10,7 +10,6 @@ data class HomeUiState(
     val activeConversationId: String? = null,
     val selectedTab: AppTab = AppTab.Home,
     val isChatOpen: Boolean = false,
-    val isArticleManagerOpen: Boolean = false,
     val isUploading: Boolean = false,
     val uploadProgress: UploadProgress? = null,
     val uploadResponse: UploadResponse? = null,

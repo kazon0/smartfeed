@@ -56,9 +56,7 @@ import com.example.smartfeedandroid.ui.common.SoftBlue
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
 import com.example.smartfeedandroid.ui.common.SoftRed
 import com.example.smartfeedandroid.ui.common.topicColor
-import androidx.compose.ui.res.painterResource
 import com.example.smartfeedandroid.R
-import androidx.compose.material3.Icon
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -71,7 +69,6 @@ fun HomeScreen(
     onUpload: () -> Unit,
     onSelectConversation: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
-    onStartGlobalConversation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -95,19 +92,6 @@ fun HomeScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = onStartGlobalConversation,
-                    modifier = Modifier
-                        .size(48.dp) // 控制整个按钮的点击热区大小
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_new_chat),
-                        contentDescription = stringResource(R.string.new_chat),
-                        tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
             }
 
 //            Text(
@@ -618,7 +602,6 @@ private fun HomeScreenPreview() {
         onUrlChange = {},
         onUpload = {},
         onSelectConversation = {},
-        onDeleteConversation = {},
-        onStartGlobalConversation = {}
+        onDeleteConversation = {}
     )
 }

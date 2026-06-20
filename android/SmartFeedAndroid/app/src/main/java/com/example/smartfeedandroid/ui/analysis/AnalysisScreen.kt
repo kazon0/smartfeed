@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,7 +45,6 @@ fun AnalysisScreen(
     articles: List<SavedArticle>,
     isLoading: Boolean,
     errorMessage: String?,
-    onOpenArticleManager: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val localMessages = conversations.sumOf { it.messages.size }
@@ -61,29 +57,11 @@ fun AnalysisScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.analysis),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            IconButton(
-                onClick = onOpenArticleManager,
-                modifier = Modifier
-                    .size(48.dp) // 控制整个按钮的点击热区大小
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_summary),
-                    contentDescription = stringResource(R.string.open_article_manager),
-                    tint = Color.Black,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
+        Text(
+            text = stringResource(R.string.analysis),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
 
         Text(
             text = stringResource(R.string.knowledge_distribution_subtitle),
@@ -405,7 +383,6 @@ private fun AnalysisScreenPreview() {
             )
         ),
         isLoading = false,
-        errorMessage = null,
-        onOpenArticleManager = {}
+        errorMessage = null
     )
 }

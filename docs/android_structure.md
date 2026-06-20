@@ -18,7 +18,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
     ├── common/             # 通用颜色、ResultCard、ResultRow
     ├── home/               # Home 入口、HomeViewModel、UI state、会话模型和会话规则
     ├── model/              # 跨页面 UI model，例如 Conversation、ChatMessage
-    ├── navigation/         # Bottom navigation
+    ├── navigation/         # Bottom navigation，包含中间新聊天动作按钮
     ├── profile/            # Profile 占位页
     └── theme/              # Compose theme
 ```
@@ -26,6 +26,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 ## 当前 MVVM 对应关系
 
 - View：`ui/home/SmartFeedScreen.kt` 负责页面组装和导航。
+- Bottom navigation：当前包含 `首页`、`文章`、中间 `新聊天` 加号动作、`分析`、`我的`。
 - Feature UI：
   - `ui/home/HomeScreen.kt`
   - `ui/chat/ChatDetailScreen.kt`
@@ -33,7 +34,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/articles/ArticleManagerScreen.kt`
   - `ui/profile/PlaceholderScreen.kt`
 - ViewModel：
-  - `ui/home/HomeViewModel.kt`：Home、分享入口、会话打开、上传入口和聊天入口。
+  - `ui/home/HomeViewModel.kt`：Home、分享入口、会话打开、上传入口和底部新聊天入口。
   - `ui/chat/ChatViewModel.kt`：聊天输入框状态、发送状态和聊天请求触发。
   - `ui/analysis/AnalysisViewModel.kt`：Analysis 页 `/stats`、`/insights` 和文章列表数据。
   - `ui/articles/ArticleManagerViewModel.kt`：文章管理页文章列表和删除文章。
@@ -61,6 +62,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - 如果后端已有该 URL 且 `chunk_count > 0`，Android 会跳过重复 `/upload`，直接新建一条文章聊天。
 - 如果后端没有该 URL，Android 才调用 `/upload` 解析并入库。
 - 文章管理页点击已保存文章也会新建一条文章聊天，不复用旧会话。
+- 已保存文章列表现在是底部 `文章` tab 的一级页面，不再作为 Analysis 页的二级入口。
 
 ## Preview
 
