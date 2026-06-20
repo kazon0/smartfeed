@@ -201,6 +201,9 @@ class EvalLLMService:
             assert "推荐文章" not in context
             return "根据《程序员应该知道的十个基础算法》，十大算法包括冒泡排序、快速排序、归并排序、二分查找、广度优先搜索、深度优先搜索、最短路径算法、最小生成树算法、背包问题和最长公共子序列。"
         if "二分查找" in question:
+            assert "冒泡排序" in context
+            assert "动态规划" in context
+            assert "推荐文章" not in context
             return "根据当前网页，二分查找适用于有序数组，通过不断缩小搜索范围定位目标。"
         if "菌子" in question or "中毒" in question:
             return "根据野生菌中毒文章，可能出现胃肠道症状、幻觉、意识障碍和肝肾损伤。"

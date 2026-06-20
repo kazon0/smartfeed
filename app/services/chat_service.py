@@ -706,10 +706,20 @@ class ChatService:
             for chunk in all_page_chunks
             if chunk.get("metadata", {}).get("section_index") in selected_sections
         ]
+        selected_chunks = self._filter_context_quality(selected_chunks) or selected_chunks
         return sorted(
             selected_chunks,
             key=lambda chunk: chunk.get("metadata", {}).get("chunk_index", 0),
         )[:limit]
+
+    def _filter_context_quality(self, chunks: list[dict]) -> list[dict]:
+        return [
+            chunk
+            for chunk in chunks
+            if self._chunk_quality_score(chunk) >= 0.25
+            or self._contains_article_end_marker(chunk.get("content", ""))
+            or self._looks_like_list_content(chunk.get("content", ""))
+        ]
 
     def _expand_page_chunks(
         self,

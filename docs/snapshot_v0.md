@@ -138,6 +138,7 @@
     - 页面级上下文选择会降低链接密度高、作者卡片、广告、推荐文章、页脚和导航类 chunks 的优先级。
     - 对更具体的问题，先使用向量检索当前网页 chunks，同时在当前 URL 全部 chunks 中做轻量关键词召回。
     - 当前网页向量结果和关键词结果会合并去重，再优先扩展到命中 chunk 所在 section。
+    - 当前网页具体问题扩展 section 上下文时，会保留同 section 的正文上下文，并过滤低质量推荐、作者卡片等噪声 chunks。
     - 如果旧 chunks 没有 section metadata，则 fallback 到相邻 chunks 扩展。
     - 如果当前 URL 没有可用 chunks，不使用全局知识库假装回答该网页，而是返回已保存文章建议。
     - 如果请求不包含 `url`，执行全局知识库检索。
@@ -454,6 +455,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat 对当前网页页面级上下文做 chunk quality filtering 已实现。
 - chat 对当前网页具体问题使用向量检索 + 关键词召回合并已实现。
 - chat 对当前网页具体问题优先扩展到命中 section 已实现。
+- chat 对当前网页具体问题扩展 section 时会过滤低质量噪声 chunks，避免把推荐文章、作者卡片等传给 LLM。
 - chat 对没有 section metadata 的旧 chunks 使用相邻 chunks fallback 已实现。
 - chat 当前 URL 没有可用 chunks 时返回已保存文章建议已实现。
 - chat 全局知识库检索已实现。
