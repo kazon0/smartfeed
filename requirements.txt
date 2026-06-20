@@ -10,3 +10,6 @@ langchain-core
 sqlalchemy
 alembic
 psycopg[binary]
+pwdlib[argon2]
+PyJWT
+email-validator

@@ -61,6 +61,7 @@ Create a `.env` file:
 DEEPSEEK_API_KEY=your_api_key_here
 DATABASE_URL=postgresql+psycopg://smartfeed:smartfeed@localhost:5432/smartfeed
 JWT_SECRET=replace_with_a_long_random_secret
+JWT_ACCESS_TOKEN_MINUTES=60
 ```
 
 Create or upgrade the cloud metadata schema:
@@ -86,6 +87,9 @@ The PostgreSQL schema currently provides `users`, `articles`, `conversations`, a
 ## Main API Endpoints
 
 - `GET /` health check
+- `POST /auth/register` create an account and return a bearer token
+- `POST /auth/login` authenticate and return a bearer token
+- `GET /auth/me` return the authenticated user
 - `GET /debug` browser-based debug page
 - `POST /upload` upload and parse a web article
 - `POST /search` semantic search over saved chunks

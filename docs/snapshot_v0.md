@@ -4,6 +4,16 @@
 
 ### FastAPI routes
 
+- `POST /auth/register`
+  - 使用 Argon2 保存密码哈希，创建 PostgreSQL user，并返回 JWT bearer token。
+  - email 归一化为小写；重复 email 返回 HTTP `409`。
+- `POST /auth/login`
+  - 校验 email/password 并返回 JWT bearer token 和 user。
+- `GET /auth/me`
+  - 通过 `Authorization: Bearer ...` 解析当前用户。
+  - 无效、过期或用户不存在的 token 返回 HTTP `401`。
+- 当前认证 routes 已实现，但 articles/chat/upload/search/stats/insights 尚未强制绑定当前用户。
+
 - `GET /articles`
   - 定义位置：`app/routes/articles.py`
   - 当前流程：
@@ -326,7 +336,10 @@
   - 同一用户 URL 唯一，同一 conversation 的 message position 唯一。
 - `migrations/versions/0001_cloud_schema.py`
   - 提供首个 Alembic migration，可创建和回滚四张云端业务表。
-  - 当前 schema 尚未接入现有 FastAPI routes；认证和 repository 接入属于下一阶段。
+  - users schema 已接入 auth routes；articles、conversations、messages repository 接入属于下一阶段。
+- `app/security/*`、`app/services/auth_service.py`、`app/routes/auth.py`
+  - 使用 pwdlib Argon2 做密码哈希，PyJWT HS256 生成和验证 access token。
+  - 提供注册、登录和当前用户查询，数据库 session 通过 FastAPI dependency 注入。
 
 ### Android MVP
 

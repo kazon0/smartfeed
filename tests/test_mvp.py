@@ -20,6 +20,77 @@ def test_root_status_ok():
     assert response.json() == {"status": "ok"}
 
 
+def test_auth_register_login_and_current_user(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.db.base import Base
+    from app.db.dependencies import get_db
+
+    monkeypatch.setenv("JWT_SECRET", "test-secret-with-at-least-32-characters")
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_get_db():
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "email": "User@Example.com",
+                "password": "strong-password",
+                "display_name": "SmartFeed User",
+            },
+        )
+        assert register_response.status_code == 201
+        register_data = register_response.json()
+        assert register_data["user"]["email"] == "user@example.com"
+        assert register_data["token_type"] == "bearer"
+
+        duplicate_response = client.post(
+            "/auth/register",
+            json={"email": "user@example.com", "password": "strong-password"},
+        )
+        assert duplicate_response.status_code == 409
+
+        invalid_login = client.post(
+            "/auth/login",
+            json={"email": "user@example.com", "password": "wrong-password"},
+        )
+        assert invalid_login.status_code == 401
+
+        login_response = client.post(
+            "/auth/login",
+            json={"email": "user@example.com", "password": "strong-password"},
+        )
+        assert login_response.status_code == 200
+        access_token = login_response.json()["access_token"]
+
+        me_response = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert me_response.status_code == 200
+        assert me_response.json()["display_name"] == "SmartFeed User"
+        assert client.get("/auth/me").status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
 def test_upload_invalid_url_does_not_crash():
     response = client.post("/upload", json={"url": "http://invalid.localhost.test"})
     data = response.json()

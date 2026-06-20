@@ -27,6 +27,63 @@ curl http://127.0.0.1:8000/
 - Server is not running.
 - Port is not `8000`.
 
+## POST /auth/register
+
+Creates a user with an Argon2 password hash and returns a JWT access token.
+
+```json
+{
+  "email": "user@example.com",
+  "password": "strong-password",
+  "display_name": "SmartFeed User"
+}
+```
+
+Successful response uses HTTP `201`:
+
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer",
+  "user": {
+    "id": "...",
+    "email": "user@example.com",
+    "display_name": "SmartFeed User",
+    "created_at": "2026-06-21T00:00:00Z",
+    "updated_at": "2026-06-21T00:00:00Z"
+  }
+}
+```
+
+- Duplicate normalized email returns HTTP `409`.
+- Passwords must contain 8 to 128 characters.
+
+## POST /auth/login
+
+Authenticates an email and password and returns the same token response as registration.
+
+```json
+{
+  "email": "user@example.com",
+  "password": "strong-password"
+}
+```
+
+Invalid credentials return HTTP `401`.
+
+## GET /auth/me
+
+Returns the current user for a bearer access token.
+
+```bash
+curl http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Missing, invalid, expired, or deleted-user tokens return HTTP `401`.
+
+Authentication requires `DATABASE_URL` and a `JWT_SECRET` containing at least 32 characters. Existing article and chat APIs are not protected until the next user-isolation stage.
+
 ## GET /debug
 
 Development-only browser page for manually testing upload and chat flows.
