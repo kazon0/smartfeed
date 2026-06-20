@@ -196,6 +196,7 @@
 - `app/services/rag_pipeline.py`
   - 服务类：`RAGPipeline`
   - 当前能力：
+    - 提供统一 `run()` 边界，一次返回 rewrite、multi-query、retrieved、ranked 和 relevant chunks，供 classic 与 LangChain pipeline 共用。
     - 调用 `LLMService.rewrite_query()` 生成检索 query，失败时回退原 query。
     - 调用 `LLMService.generate_search_queries()` 生成 multi-query 检索变体，失败时保留原 query 和 rewritten query。
     - 对每个 query 同时执行 ChromaDB 向量检索和本地关键词召回。

@@ -14,6 +14,58 @@ class RAGPipeline:
     ):
         self.llm_service_factory = llm_service_factory
 
+    def run(
+        self,
+        query: str,
+        vector_store: VectorStoreService,
+        *,
+        rerank_query: str | None = None,
+        url: str | None = None,
+        metadata_filter: dict | None = None,
+        all_chunks: list[dict] | None = None,
+        scope: str = "global",
+        relevance_threshold: float = 0.25,
+        debug: dict | None = None,
+    ) -> dict:
+        rewritten_query = self.rewrite_query(query, url)
+        search_queries = self.search_queries(query, rewritten_query, url)
+        ranking_query = " ".join(search_queries)
+        retrieved_chunks = self.retrieve_chunks(
+            vector_store,
+            search_queries,
+            metadata_filter=metadata_filter,
+            all_chunks=all_chunks,
+            scope=scope,
+            debug=debug,
+        )
+        ranked_chunks = self.rank_chunks(ranking_query, retrieved_chunks)
+        if debug is not None:
+            debug["rewritten_query"] = rewritten_query
+            debug["search_queries"] = search_queries
+            debug["ranking_query"] = ranking_query
+            debug["ranked_chunks"] = self.debug_chunk_refs(ranked_chunks)
+
+        reranked_chunks = self.llm_rerank_chunks(
+            rerank_query or query,
+            ranked_chunks,
+            debug,
+        )
+        relevant_chunks = self.high_relevance_chunks(
+            reranked_chunks,
+            relevance_threshold,
+        )
+        if debug is not None:
+            debug["relevant_chunks"] = self.debug_chunk_refs(relevant_chunks)
+
+        return {
+            "rewritten_query": rewritten_query,
+            "search_queries": search_queries,
+            "ranking_query": ranking_query,
+            "retrieved_chunks": retrieved_chunks,
+            "ranked_chunks": reranked_chunks,
+            "relevant_chunks": relevant_chunks,
+        }
+
     def rewrite_query(self, query: str, url: str | None = None) -> str:
         try:
             result = self.llm_service_factory().rewrite_query(query, url=url)

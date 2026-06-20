@@ -60,39 +60,27 @@ class ChatService:
             return self._no_retrieval_response(intent, debug)
 
         vector_store = self.vector_store_factory()
-        rewritten_query = self.rag_pipeline.rewrite_query(contextual_query, url)
-        search_queries = self.rag_pipeline.search_queries(contextual_query, rewritten_query, url)
-        ranking_query = " ".join(search_queries)
-        debug["rewritten_query"] = rewritten_query
-        debug["search_queries"] = search_queries
-        debug["ranking_query"] = ranking_query
         if url:
             return self._chat_with_current_page(
                 query,
                 contextual_query,
-                search_queries,
-                ranking_query,
                 url,
                 intent,
                 vector_store,
                 debug,
             )
 
-        global_chunks = self.rag_pipeline.retrieve_chunks(
+        pipeline_result = self.rag_pipeline.run(
+            contextual_query,
             vector_store,
-            search_queries,
+            rerank_query=query,
             all_chunks=self.rag_pipeline.get_all_chunks(vector_store),
             scope="global",
+            relevance_threshold=self.RELEVANCE_THRESHOLD,
             debug=debug,
         )
-        ranked_chunks = self.rag_pipeline.rank_chunks(ranking_query, global_chunks)
-        debug["ranked_chunks"] = self._debug_chunk_refs(ranked_chunks)
-        ranked_chunks = self.rag_pipeline.llm_rerank_chunks(query, ranked_chunks, debug)
-        relevant_chunks = self.rag_pipeline.high_relevance_chunks(
-            ranked_chunks,
-            self.RELEVANCE_THRESHOLD,
-        )
-        debug["relevant_chunks"] = self._debug_chunk_refs(relevant_chunks)
+        global_chunks = pipeline_result["retrieved_chunks"]
+        relevant_chunks = pipeline_result["relevant_chunks"]
         answer, source_type, selected_chunks = self._answer_with_policy(
             contextual_query,
             intent["fallback_policy"],
@@ -116,8 +104,6 @@ class ChatService:
         self,
         query: str,
         contextual_query: str,
-        search_queries: list[str],
-        ranking_query: str,
         url: str,
         intent: dict,
         vector_store: VectorStoreService,
@@ -125,22 +111,18 @@ class ChatService:
     ) -> dict:
         all_page_chunks = vector_store.get_chunks_by_url(url)
         debug["page_chunk_count"] = len(all_page_chunks)
-        page_chunks = self.rag_pipeline.retrieve_chunks(
+        pipeline_result = self.rag_pipeline.run(
+            contextual_query,
             vector_store,
-            search_queries,
+            rerank_query=query,
+            url=url,
             metadata_filter={"url": url},
             all_chunks=all_page_chunks,
             scope="page",
+            relevance_threshold=self.RELEVANCE_THRESHOLD,
             debug=debug,
         )
-        ranked_page_chunks = self.rag_pipeline.rank_chunks(ranking_query, page_chunks)
-        debug["ranked_chunks"] = self._debug_chunk_refs(ranked_page_chunks)
-        ranked_page_chunks = self.rag_pipeline.llm_rerank_chunks(query, ranked_page_chunks, debug)
-        relevant_page_chunks = self.rag_pipeline.high_relevance_chunks(
-            ranked_page_chunks,
-            self.RELEVANCE_THRESHOLD,
-        )
-        debug["relevant_chunks"] = self._debug_chunk_refs(relevant_page_chunks)
+        relevant_page_chunks = pipeline_result["relevant_chunks"]
 
         if all_page_chunks and self._is_page_wide_query(query, intent):
             selected_page_chunks = self._select_page_context(

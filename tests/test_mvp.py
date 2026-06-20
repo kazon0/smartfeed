@@ -155,6 +155,56 @@ def test_rag_pipeline_builds_search_queries_from_rewrite_and_multi_query():
     ]
 
 
+def test_rag_pipeline_run_returns_unified_retrieval_result():
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            return {"query": "动态规划 状态复用"}
+
+        def generate_search_queries(self, question, rewritten_query, url=None):
+            return ["动态规划 重叠子问题"]
+
+        def rerank_chunks(self, question, candidates):
+            return [0]
+
+    class FakeVectorStore:
+        def query(self, query, metadata_filter=None):
+            return [
+                {
+                    "content": "该方法保存重叠子问题的结果。",
+                    "metadata": {
+                        "url": "https://example.com/algorithms",
+                        "title": "算法",
+                        "section_title": "动态规划",
+                        "section_index": 1,
+                        "chunk_index": 2,
+                    },
+                    "score": 0.9,
+                }
+            ]
+
+    debug = {"retrieval_steps": []}
+    result = RAGPipeline(llm_service_factory=FakeLLMService).run(
+        "这个方法怎么实现",
+        FakeVectorStore(),
+        rerank_query="动态规划怎么实现",
+        url="https://example.com/algorithms",
+        metadata_filter={"url": "https://example.com/algorithms"},
+        scope="page",
+        relevance_threshold=0.25,
+        debug=debug,
+    )
+
+    assert result["rewritten_query"] == "动态规划 状态复用"
+    assert result["search_queries"] == [
+        "动态规划 状态复用",
+        "这个方法怎么实现",
+        "动态规划 重叠子问题",
+    ]
+    assert result["relevant_chunks"][0]["metadata"]["section_title"] == "动态规划"
+    assert debug["ranking_query"] == " ".join(result["search_queries"])
+    assert len(debug["retrieval_steps"]) == 3
+
+
 def test_rag_pipeline_merges_duplicate_chunks_using_highest_score():
     pipeline = RAGPipeline()
     low_score = {
