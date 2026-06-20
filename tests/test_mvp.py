@@ -20,13 +20,14 @@ client = TestClient(app)
 TEST_USER = SimpleNamespace(id="test-user-id")
 
 
+def empty_db_override():
+    yield None
+
+
 @pytest.fixture(autouse=True)
 def authenticated_user():
-    def override_get_db():
-        yield None
-
     app.dependency_overrides[get_current_user] = lambda: TEST_USER
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = empty_db_override
     yield
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_db, None)
@@ -180,6 +181,75 @@ def test_article_service_isolates_same_url_by_owner():
         assert len(service.list(db, owner_id="user-b")) == 1
     finally:
         db.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_conversation_sync_round_trip_and_owner_isolation():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.db.base import Base
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_get_db():
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    payload = {
+        "title": "RAG article",
+        "source_url": "https://example.com/rag",
+        "summary": "Article summary",
+        "status": "ready",
+        "topic": "科技",
+        "stored_chunks": 4,
+        "created_at_millis": 1_700_000_000_000,
+        "updated_at_millis": 1_700_000_001_000,
+        "messages": [
+            {"type": "user", "text": "Explain RAG"},
+            {
+                "type": "assistant",
+                "response": {
+                    "status": "success",
+                    "answer": "RAG combines retrieval and generation.",
+                    "sources": [{"url": "https://example.com/rag"}],
+                },
+            },
+        ],
+    }
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        saved = client.put("/conversations/conversation-1", json=payload)
+        assert saved.status_code == 200
+        assert saved.json()["messages"][1]["response"]["sources"][0]["url"] == payload["source_url"]
+
+        restored = client.get("/conversations")
+        assert restored.status_code == 200
+        assert restored.json()["total"] == 1
+        assert restored.json()["conversations"][0]["stored_chunks"] == 4
+
+        stale_payload = {**payload, "title": "Stale title", "updated_at_millis": 1}
+        stale = client.put("/conversations/conversation-1", json=stale_payload)
+        assert stale.json()["title"] == "RAG article"
+
+        app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="user-b")
+        assert client.get("/conversations").json()["total"] == 0
+        assert client.delete("/conversations/conversation-1").json()["status"] == "not_found"
+        assert client.put("/conversations/conversation-1", json=payload).status_code == 409
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+        app.dependency_overrides[get_db] = empty_db_override
         Base.metadata.drop_all(engine)
         engine.dispose()
 

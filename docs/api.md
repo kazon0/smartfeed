@@ -483,6 +483,54 @@ curl -X DELETE http://127.0.0.1:8000/articles \
 - URL does not exist in the local ChromaDB collection.
 - ChromaDB dependencies or local database files are unavailable.
 
+## GET /conversations
+
+Returns all conversations and messages owned by the authenticated user, newest
+first. The response fields map directly to the Android Room conversation model:
+`source_url`, `topic`, `title`, `summary`, `status`, `stored_chunks`,
+`created_at_millis`, `updated_at_millis`, and `messages`.
+
+```bash
+curl http://127.0.0.1:8000/conversations \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+## PUT /conversations/{id}
+
+Creates or replaces one owned conversation and its complete ordered message
+list. This endpoint is idempotent and uses `updated_at_millis` for latest-write
+wins behavior. A stale device write returns the newer server version without
+overwriting it.
+
+```json
+{
+  "title": "RAG article",
+  "source_url": "https://example.com/rag",
+  "summary": "Article summary",
+  "status": "ready",
+  "topic": "科技",
+  "stored_chunks": 4,
+  "created_at_millis": 1700000000000,
+  "updated_at_millis": 1700000001000,
+  "messages": [
+    {"type": "user", "text": "Explain RAG"},
+    {
+      "type": "assistant",
+      "response": {"status": "success", "answer": "...", "sources": []}
+    }
+  ]
+}
+```
+
+Message `type` is one of `user`, `summary`, `assistant`, or `error`. Assistant
+`response` preserves the complete Android `ChatResponse`, including sources.
+Using an id already owned by another user returns HTTP `409`.
+
+## DELETE /conversations/{id}
+
+Deletes one conversation and its messages only when it belongs to the current
+user. Returns `status: "not_found"` for missing or foreign conversations.
+
 ## POST /chat
 
 Runs retrieval and sends retrieved context to DeepSeek to generate an answer.

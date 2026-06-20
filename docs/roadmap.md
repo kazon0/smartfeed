@@ -75,6 +75,8 @@
 
 ## 4. Android 账号与云同步
 
+状态：后端 conversation/message 全量同步 API 已完成；Android 登录、token 管理、Room 同步接入仍待完成。
+
 目标：Android 能使用云端账号并恢复用户数据。
 
 范围：

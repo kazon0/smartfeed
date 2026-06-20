@@ -98,6 +98,9 @@ The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messag
 - `GET /insights` AI-generated knowledge base summary
 - `GET /articles` saved articles
 - `DELETE /articles` delete an article from the knowledge base by URL
+- `GET /conversations` restore the authenticated user's cloud conversations
+- `PUT /conversations/{id}` replace one conversation and its messages
+- `DELETE /conversations/{id}` delete one owned conversation
 
 All business endpoints require `Authorization: Bearer $ACCESS_TOKEN` and operate
 only on the authenticated user's data. Articles stored before user isolation must

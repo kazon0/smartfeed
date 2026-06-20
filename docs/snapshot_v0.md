@@ -15,6 +15,9 @@
 - `/upload`、`/search`、`/chat`、`/articles`、`/stats`、`/insights` 已强制校验 JWT 并绑定当前用户。
 - Chroma chunks 写入当前 `user_id`；查询、聚合和删除都由服务端强制追加用户过滤，客户端不能指定或覆盖 owner。
 - 隔离功能启用前写入的旧 chunks 没有 `user_id`，升级后需要登录并重新上传文章。
+- `GET /conversations`、`PUT /conversations/{id}`、`DELETE /conversations/{id}` 已提供用户隔离的云端会话同步。
+- conversation 保存 Android 所需的 source URL、topic、title、summary、status、chunk count 和时间戳；message payload 可完整恢复 Assistant answer/sources。
+- 同步采用 `updated_at_millis` 最新者优先策略，旧设备数据不会覆盖服务端较新版本。
 
 - `GET /articles`
   - 定义位置：`app/routes/articles.py`
@@ -631,7 +634,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
 - Android 当前没有登录、WebSocket 或 session。
-- PostgreSQL schema、JWT 鉴权、文章 metadata repository 和 Chroma `user_id` 隔离已接入；conversation/message 云同步 API 尚未实现。
+- PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离和 conversation/message 云同步 API 已接入；Android 账号与 Room 同步尚未实现。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前只是占位页，没有真实用户功能。
 

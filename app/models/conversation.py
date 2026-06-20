@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 from sqlalchemy import Index
+from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy.orm import Mapped
@@ -36,6 +37,9 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(Text, default="新聊天")
     source_url: Mapped[str] = mapped_column(Text, default="")
     topic: Mapped[str] = mapped_column(String(80), default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(40), default="")
+    stored_chunks: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

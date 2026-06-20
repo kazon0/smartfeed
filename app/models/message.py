@@ -38,6 +38,7 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text)
+    payload: Mapped[str] = mapped_column(Text, default="{}")
     position: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

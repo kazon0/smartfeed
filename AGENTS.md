@@ -68,6 +68,7 @@ Backend 已实现：
 * JWT 注册、登录和当前用户 API
 * ChromaDB chunks 按认证用户强制隔离
 * PostgreSQL article metadata upsert、列表、状态和删除
+* PostgreSQL conversation/message 云同步 API
 * Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
