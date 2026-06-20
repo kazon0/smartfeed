@@ -154,6 +154,55 @@ def test_rag_pipeline_builds_search_queries_from_rewrite_and_multi_query():
     ]
 
 
+def test_rag_pipeline_merges_duplicate_chunks_using_highest_score():
+    pipeline = RAGPipeline()
+    low_score = {
+        "content": "快速排序通过分区处理数据",
+        "metadata": {"url": "https://example.com", "chunk_index": 2},
+        "score": 0.4,
+    }
+    high_score = {**low_score, "score": 0.9}
+
+    merged = pipeline.merge_chunks([low_score], [high_score])
+
+    assert merged == [high_score]
+
+
+def test_rag_pipeline_keyword_retrieval_prefers_more_term_hits():
+    pipeline = RAGPipeline()
+    chunks = [
+        {
+            "content": "排序算法概览",
+            "metadata": {"title": "算法", "chunk_index": 0},
+            "score": 0.1,
+        },
+        {
+            "content": "快速排序使用分区算法",
+            "metadata": {"title": "算法", "chunk_index": 1},
+            "score": 0.1,
+        },
+    ]
+
+    results = pipeline.keyword_retrieve_chunks("快速排序算法", chunks)
+
+    assert results[0]["metadata"]["chunk_index"] == 1
+    assert results[0]["score"] > chunks[0]["score"]
+
+
+def test_rag_pipeline_keeps_ranked_chunks_when_llm_rerank_fails():
+    class FailingLLMService:
+        def rerank_chunks(self, question, candidates):
+            raise RuntimeError("rerank unavailable")
+
+    pipeline = RAGPipeline(llm_service_factory=FailingLLMService)
+    chunks = [
+        {"content": "第一段", "metadata": {"chunk_index": 0}, "score": 0.8},
+        {"content": "第二段", "metadata": {"chunk_index": 1}, "score": 0.7},
+    ]
+
+    assert pipeline.llm_rerank_chunks("问题", chunks) == chunks
+
+
 def test_rag_pipeline_factory_can_create_langchain_pipeline(monkeypatch):
     monkeypatch.setenv("SMARTFEED_RAG_PIPELINE", "langchain")
 

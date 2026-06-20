@@ -183,6 +183,7 @@
   - 当前能力：
     - 承载 `/chat` 的 query intent、page/global retrieval 编排、context compression、fallback 和 sources 构造流程。
     - query rewrite、multi-query retrieval、关键词召回、轻量排序和 LLM rerank 已委托给 `RAGPipeline`。
+    - 不再保留上述检索步骤的重复私有实现，避免 classic pipeline 行为出现两套维护入口。
     - `app/routes/chat.py` 只负责 FastAPI 请求模型和调用 `ChatService`。
     - 支持注入 `VectorStoreService`、`LLMService`、`QueryIntentService` 和 `RAGPipeline`，便于测试和后续替换 LangChain pipeline。
     - 对外返回结构保持 `/chat` 当前稳定字段不变。
