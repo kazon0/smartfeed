@@ -103,11 +103,21 @@ class RAGPipeline:
         terms = self.query_terms(query)
 
         def rank_score(chunk: dict) -> float:
-            content = chunk.get("content", "")
-            keyword_hits = sum(1 for term in terms if term and term in content)
-            return chunk.get("score", 0) + keyword_hits
+            metadata = chunk.get("metadata", {})
+            content_hits = self.term_hits(terms, chunk.get("content", ""))
+            section_hits = self.term_hits(terms, metadata.get("section_title", ""))
+            title_hits = self.term_hits(terms, metadata.get("title", ""))
+            return (
+                chunk.get("score", 0)
+                + content_hits
+                + section_hits * 1.5
+                + title_hits * 0.25
+            )
 
         return sorted(chunks, key=rank_score, reverse=True)
+
+    def term_hits(self, terms: list[str], text: str) -> int:
+        return sum(1 for term in terms if term and term in text)
 
     def llm_rerank_chunks(
         self,

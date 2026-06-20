@@ -1,5 +1,6 @@
 from app.services.chat_service import ChatService
 from app.services.query_intent import QueryIntentService
+from app.services.rag_pipeline import RAGPipeline
 
 
 ALG_URL = "https://cloud.tencent.com/developer/article/2352039"
@@ -232,6 +233,33 @@ def make_service():
 def assert_source_url(response, expected_url):
     assert response["sources"]
     assert all(source.get("url") == expected_url for source in response["sources"])
+
+
+def test_rag_eval_section_title_keeps_pronoun_heavy_section_ranked_first():
+    chunks = [
+        chunk(
+            ALG_URL,
+            "算法指南",
+            "这里只是顺带提到动态规划，正文重点是算法发展历史。",
+            4,
+            "背景",
+            0,
+            0.9,
+        ),
+        chunk(
+            ALG_URL,
+            "算法指南",
+            "该方法保存重叠子问题的结果，并复用已经计算的状态。",
+            8,
+            "动态规划",
+            1,
+            0.7,
+        ),
+    ]
+
+    ranked = RAGPipeline().rank_chunks("动态规划怎么实现", chunks)
+
+    assert ranked[0]["metadata"]["section_title"] == "动态规划"
 
 
 def test_rag_eval_cross_section_context_keeps_each_matched_section():

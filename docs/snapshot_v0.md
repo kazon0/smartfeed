@@ -199,7 +199,7 @@
     - 调用 `LLMService.generate_search_queries()` 生成 multi-query 检索变体，失败时保留原 query 和 rewritten query。
     - 对每个 query 同时执行 ChromaDB 向量检索和本地关键词召回。
     - 合并并去重向量召回和关键词召回结果。
-    - 使用轻量关键词命中分数对 chunks 做排序。
+    - 使用正文、`section_title` 和文章标题的关键词命中分数对 chunks 做排序，其中章节标题命中权重更高。
     - 调用 `LLMService.rerank_chunks()` 对候选 chunks 做语义重排，失败时保留原排序。
     - 使用 configurable threshold 筛选高相关 chunks。
     - 保留检索 debug 信息，包括 retrieval steps、rerank before/after 和 chunk previews。

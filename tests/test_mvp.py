@@ -190,6 +190,34 @@ def test_rag_pipeline_keyword_retrieval_prefers_more_term_hits():
     assert results[0]["score"] > chunks[0]["score"]
 
 
+def test_rag_pipeline_ranking_uses_section_title_for_pronoun_heavy_chunks():
+    pipeline = RAGPipeline()
+    chunks = [
+        {
+            "content": "本文只是顺带提到动态规划，重点讨论其他算法。",
+            "metadata": {
+                "title": "算法指南",
+                "section_title": "延伸阅读",
+                "chunk_index": 4,
+            },
+            "score": 0.9,
+        },
+        {
+            "content": "该方法会保存重叠子问题的结果，并复用已经计算的状态。",
+            "metadata": {
+                "title": "算法指南",
+                "section_title": "动态规划",
+                "chunk_index": 8,
+            },
+            "score": 0.7,
+        },
+    ]
+
+    ranked = pipeline.rank_chunks("动态规划怎么实现", chunks)
+
+    assert ranked[0]["metadata"]["section_title"] == "动态规划"
+
+
 def test_rag_pipeline_keeps_ranked_chunks_when_llm_rerank_fails():
     class FailingLLMService:
         def rerank_chunks(self, question, candidates):
