@@ -55,7 +55,7 @@
 
 ## 3. 注册登录与用户隔离
 
-状态：后端 JWT 认证、PostgreSQL article metadata 和 Chroma `user_id` 强制隔离已完成；conversation/message 跨设备同步仍待完成。
+状态：后端 JWT 认证、PostgreSQL article metadata、conversation/message 云端同步 API 和 Chroma `user_id` 强制隔离已完成。
 
 目标：实现可实际使用的多用户知识库。
 
@@ -75,7 +75,7 @@
 
 ## 4. Android 账号与云同步
 
-状态：后端 conversation/message 全量同步 API，以及 Android 注册登录、Keystore token、Bearer 注入和 Room owner 分区已完成；Room 与云端自动同步仍待完成。
+状态：后端 conversation/message 全量同步 API，以及 Android 注册登录、Keystore token、Bearer 注入、Room owner 分区和 Room/云端自动同步已完成。
 
 目标：Android 能使用云端账号并恢复用户数据。
 
@@ -86,7 +86,7 @@
 - token 失效统一处理。
 - Profile 展示账号、同步状态和退出登录。
 - 云端 conversation/message API 接入。
-- 第一版同步采用清晰的 server-authoritative 或时间戳合并策略，不做复杂冲突解决。
+- 第一版同步采用 `updatedAtMillis` 时间戳合并策略，不做复杂冲突解决。
 
 完成标准：
 

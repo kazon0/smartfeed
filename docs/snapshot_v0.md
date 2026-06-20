@@ -387,7 +387,7 @@
   - Analysis tab 使用 Compose Canvas 绘制主题占比饼图。
   - Analysis 页面实现位置：`ui/analysis/AnalysisScreen.kt`。
   - 删除文章后会刷新文章列表。
-  - Profile tab 当前为占位页。
+  - Profile tab 当前展示认证用户信息、云同步状态和退出登录。
   - 主要页面已添加 Compose Preview，便于在 Android Studio 中查看和调整 UI。
   - `HomeViewModel` 负责 Home、分享入口、会话打开、上传入口、聊天入口、本地 conversations 列表和当前 messages。
   - `ChatViewModel` 负责聊天详情页输入框状态、发送状态和聊天请求触发。
@@ -400,17 +400,17 @@
   - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Home 最近对话筛选、搜索和 topic fallback 规则已拆到 `ui/home/ConversationFilters.kt`。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
-  - `ConversationPersistence` 封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
+  - `ConversationPersistence` 封装 UI conversation 与 `ConversationStore`、云端 conversation sync 之间的加载、保存、删除和 mapper 调用。
   - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。
   - `Conversation` 当前明确保存 `sourceUrl`、`topic`、`title`、`createdAtMillis` 和 `updatedAtMillis`，用于稳定支持首页分类、文章入口和历史恢复。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
   - Android Room database、DAO、entity、migration 已从 `ConversationStore` 拆到 `data/local` 独立文件，降低本地持久化耦合。
   - Room 当前表：`conversations` 和 `messages`。
-  - Room 当前版本为 3，`MIGRATION_2_3` 会为旧 conversations 补齐 `sourceUrl`、`topic` 和 `createdAtMillis`。
+  - Room 当前版本为 4，`MIGRATION_2_3` 会为旧 conversations 补齐 `sourceUrl`、`topic` 和 `createdAtMillis`，`MIGRATION_3_4` 会增加 `ownerId`。
   - messages 已从 conversation 的 `messagesJson` 拆到独立 Room 表。
   - 旧 `messagesJson` 字段当前保留为本地迁移来源，首次加载旧数据时会迁移到 `messages` 表。
   - 旧 SharedPreferences conversations 会在首次 Room 加载为空时自动迁移到 Room。
-  - App 启动时会从 Room 加载本地保存的 conversations。
+  - App 登录后会从 Room 加载当前用户本地 conversations，并与云端 `GET /conversations` 按 `updatedAtMillis` 合并。
   - 已注册 Android 系统分享入口，支持接收 `text/plain` 类型的分享文本。
   - App 会从分享文本中提取第一个 `http` / `https` URL。
   - 从浏览器分享 URL 到 SmartFeed 后，会自动调用上传流程。
@@ -423,7 +423,7 @@
   - 上传返回的 summary 会作为当前 conversation 的 summary 消息展示。
   - 可以创建 global knowledge chat。
   - 可以在当前进程内切换已有 conversation。
-  - 当前 conversations 和 messages 会保存到本地 Room。
+  - 当前 conversations 和 messages 会保存到本地 Room，并通过 `PUT /conversations/{id}` 同步到云端；删除会调用 `DELETE /conversations/{id}`。
 
 ## 2. 当前数据流
 
@@ -569,6 +569,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现上传/分享流程状态提示。
 - Android 端已实现 Room 级本地历史对话保存。
 - Android 端 Room conversations 已保存 `sourceUrl`、`topic`、`createdAtMillis` 和 `updatedAtMillis`。
+- Android 端已接入云端 conversation/message 同步，登录后合并云端和本地会话，保存后 PUT 云端，删除后 DELETE 云端。
 - Android 端已将本地 messages 拆到独立 Room 表保存。
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
@@ -636,10 +637,10 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - stats chunks 主题分类当前仍是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
-- Android 当前没有登录、WebSocket 或 session。
-- PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离、conversation/message 云 API 和 Android 认证已接入；Android Room 与云端自动同步尚未实现。
+- Android 当前没有 WebSocket。
+- PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离、conversation/message 云 API、Android 认证和 Android Room/云端同步已接入。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
-- Android Profile 当前只是占位页，没有真实用户功能。
+- Android Profile 当前已展示账号信息、同步状态和退出登录。
 
 ## 6. 技术栈总结
 

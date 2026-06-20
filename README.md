@@ -82,7 +82,7 @@ Health check:
 curl http://127.0.0.1:8000/
 ```
 
-The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messages`. Authentication and article metadata now use PostgreSQL; ChromaDB stores user-scoped chunks for retrieval. Conversation and message sync APIs are the next repository integration step.
+The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messages`. Authentication, article metadata, conversation sync, and message sync now use PostgreSQL; ChromaDB stores user-scoped chunks for retrieval.
 
 ## Main API Endpoints
 
@@ -133,8 +133,9 @@ android/SmartFeedAndroid
 ```
 
 The Android app now provides registration, login, encrypted token persistence,
-automatic Bearer authentication, a real Profile screen, and owner-scoped Room
-conversation storage. Cloud conversation synchronization is the next Android step.
+automatic Bearer authentication, a real Profile screen, owner-scoped Room
+conversation storage, and cloud conversation/message sync with timestamp-based
+merge.
 
 The Android client currently uses:
 
@@ -168,7 +169,7 @@ SmartFeed is beyond a minimal MVP and now has a working RAG loop:
 URL -> article parsing -> sections/chunks -> embeddings -> ChromaDB -> retrieval -> DeepSeek answer
 ```
 
-The current delivery roadmap is: complete the LangChain Runnable RAG pipeline, add PostgreSQL-backed users and cloud metadata, enforce JWT-based multi-user isolation across APIs and ChromaDB, connect Android authentication and conversation sync, deploy the HTTPS backend with persistent storage, and add authenticated WebSocket streaming while retaining `POST /chat` as a fallback. See `docs/roadmap.md` for the execution order.
+The completed delivery work now includes the LangChain Runnable RAG pipeline, PostgreSQL-backed users and metadata, JWT-based user isolation across APIs and ChromaDB, Android authentication, and cloud conversation sync. The remaining delivery roadmap is: deploy the HTTPS backend with persistent storage, switch Android to a production backend configuration, add authenticated WebSocket streaming while retaining `POST /chat` as a fallback, and finish the demo assets. See `docs/roadmap.md` for the execution order.
 
 ## Notes
 

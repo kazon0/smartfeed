@@ -3,8 +3,11 @@ package com.example.smartfeedandroid.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
+import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -20,6 +23,18 @@ interface SmartFeedApi {
 
     @GET("articles")
     suspend fun articles(): ArticlesResponse
+
+    @GET("conversations")
+    suspend fun conversations(): ConversationListResponse
+
+    @PUT("conversations/{id}")
+    suspend fun putConversation(
+        @Path("id") id: String,
+        @Body request: ConversationSyncRequest
+    ): ConversationSyncResponse
+
+    @DELETE("conversations/{id}")
+    suspend fun deleteConversation(@Path("id") id: String): DeleteConversationResponse
 
     @GET("articles/status")
     suspend fun articleStatus(@Query("url") url: String): ArticleStatusResponse
@@ -73,6 +88,61 @@ data class AuthUser(
     val createdAt: String = "",
     @SerialName("updated_at")
     val updatedAt: String = ""
+)
+
+@Serializable
+data class ConversationListResponse(
+    val conversations: List<ConversationSyncResponse> = emptyList(),
+    val total: Int = 0
+)
+
+@Serializable
+data class ConversationSyncResponse(
+    val id: String,
+    val url: String = "",
+    val title: String = "",
+    @SerialName("source_url")
+    val sourceUrl: String = "",
+    val summary: String = "",
+    val status: String = "",
+    val topic: String = "",
+    @SerialName("stored_chunks")
+    val storedChunks: Int = 0,
+    @SerialName("created_at_millis")
+    val createdAtMillis: Long = 0,
+    @SerialName("updated_at_millis")
+    val updatedAtMillis: Long = 0,
+    val messages: List<ConversationMessageSync> = emptyList()
+)
+
+@Serializable
+data class ConversationSyncRequest(
+    val title: String = "",
+    @SerialName("source_url")
+    val sourceUrl: String = "",
+    val summary: String = "",
+    val status: String = "",
+    val topic: String = "",
+    @SerialName("stored_chunks")
+    val storedChunks: Int = 0,
+    @SerialName("created_at_millis")
+    val createdAtMillis: Long = 0,
+    @SerialName("updated_at_millis")
+    val updatedAtMillis: Long = 0,
+    val messages: List<ConversationMessageSync> = emptyList()
+)
+
+@Serializable
+data class ConversationMessageSync(
+    val type: String,
+    val text: String = "",
+    val response: ChatResponse? = null
+)
+
+@Serializable
+data class DeleteConversationResponse(
+    val status: String = "",
+    val id: String = ""
 )
 
 @Serializable

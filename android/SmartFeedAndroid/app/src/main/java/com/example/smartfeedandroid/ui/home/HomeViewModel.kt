@@ -100,7 +100,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteConversation(conversationId: String) {
         uiState = conversationCoordinator.deleteConversation(uiState, conversationId)
-        persistConversations(uiState.conversations)
+        deletePersistedConversation(conversationId, uiState.conversations)
     }
 
     fun startGlobalConversation() {
@@ -220,6 +220,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val ownerId = AuthSession.state.value.user?.id ?: return
         viewModelScope.launch {
             conversationPersistence.save(ownerId, conversations)
+        }
+    }
+
+    private fun deletePersistedConversation(
+        conversationId: String,
+        conversations: List<Conversation>
+    ) {
+        val ownerId = AuthSession.state.value.user?.id ?: return
+        viewModelScope.launch {
+            conversationPersistence.delete(ownerId, conversationId, conversations)
         }
     }
 
