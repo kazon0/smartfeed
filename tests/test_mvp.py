@@ -186,6 +186,33 @@ def test_llm_compress_context_returns_text(monkeypatch):
     assert compressed == "[1] 快速排序核心上下文"
 
 
+def test_llm_answer_prompt_requires_synthesized_explanation(monkeypatch):
+    service = LLMService()
+    captured = {}
+
+    def fake_chat(prompt):
+        captured["prompt"] = prompt
+        return "根据当前网页，二分查找适用于有序数组。"
+
+    monkeypatch.setattr(service, "_chat", fake_chat)
+
+    answer = service.answer(
+        "二分查找怎么理解",
+        [
+            "[1] title: 算法文章 section_title: 搜索算法 chunk_index: 2\n"
+            "二分查找适用于有序数组。",
+            "[2] title: 算法文章 section_title: 搜索算法 chunk_index: 3\n"
+            "广度优先搜索按层次遍历。",
+        ],
+    )
+
+    prompt = captured["prompt"]
+    assert answer.startswith("根据当前网页")
+    assert "综合相关片段的上下文关系" in prompt
+    assert "不要按 chunk 顺序机械拼接摘要" in prompt
+    assert "不要使用“来源[1]”" in prompt
+
+
 def test_vector_store_add_chunks_keeps_section_metadata():
     captured = {}
 

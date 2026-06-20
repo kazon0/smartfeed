@@ -25,6 +25,9 @@ venv/bin/python -m pytest tests/test_rag_eval.py -q
   - 不应跳到全局知识库。
   - 传给 LLM 的 context 应包含同 section 的前后正文 chunks，不应只给孤立命中片段。
   - context 不应包含推荐文章等低质量噪声 chunks。
+- 回答 prompt 策略
+  - 应要求模型先综合相关片段的上下文关系，再自然解释给用户。
+  - 不应退化成按 chunk 顺序机械拼接摘要。
 - 全局知识库健康问题：`吃菌子中毒会怎么样`
   - 应命中已保存健康/新闻文章。
 - 全局学习问题：`如何学习 Kotlin`

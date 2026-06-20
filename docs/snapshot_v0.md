@@ -150,6 +150,7 @@
     - 根据 `fallback_policy` 决定是否调用 LLM 兜底、是否拒绝实时猜测、是否只返回知识库未命中。
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
     - 传给 LLM 的 context 使用 `[1]`、`[2]`、`[3]` 形式的来源编号。
+    - 回答 prompt 要求先综合相关片段的上下文关系，再用自然语言解释，避免按 chunk 顺序机械拼接摘要。
     - 回答前会尝试调用 `LLMService.compress_context()` 压缩上下文，保留与问题相关的来源头信息、步骤、代码、清单和结论。
     - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
@@ -463,6 +464,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat 高相关 score 阈值判断已实现，当前阈值为 `0.25`。
 - chat keyword rerank 已实现。
 - chat policy-based fallback 已实现。
+- chat 回答 prompt 已要求综合相关片段上下文后解释，避免机械拼接 chunk 摘要。
 - chat sources 返回已实现。
 - chat sources 连续 chunk 合并展示已实现。
 - chat sources 返回 `display_title` 已实现。
