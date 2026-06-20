@@ -132,6 +132,10 @@ Android project path:
 android/SmartFeedAndroid
 ```
 
+The Android app now provides registration, login, encrypted token persistence,
+automatic Bearer authentication, a real Profile screen, and owner-scoped Room
+conversation storage. Cloud conversation synchronization is the next Android step.
+
 The Android client currently uses:
 
 ```text

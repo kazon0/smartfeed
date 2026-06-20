@@ -7,6 +7,8 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "conversations")
 data class ConversationEntity(
     @PrimaryKey val id: String,
+    @ColumnInfo(defaultValue = "''")
+    val ownerId: String = "",
     val title: String,
     val url: String,
     @ColumnInfo(defaultValue = "''")

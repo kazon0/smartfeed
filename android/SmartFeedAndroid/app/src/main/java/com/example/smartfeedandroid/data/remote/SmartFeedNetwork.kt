@@ -1,5 +1,7 @@
 package com.example.smartfeedandroid.data.remote
 
+import android.content.Context
+import com.example.smartfeedandroid.data.auth.AuthSession
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -11,6 +13,10 @@ import java.util.concurrent.TimeUnit
 object SmartFeedNetwork {
     private const val BASE_URL = "http://10.0.2.2:8000/"
 
+    fun initialize(context: Context) {
+        AuthSession.initialize(context.applicationContext)
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -20,6 +26,23 @@ object SmartFeedNetwork {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val original = chain.request()
+            val token = AuthSession.accessToken()
+            val request = if (token.isNullOrBlank()) {
+                original
+            } else {
+                original.newBuilder()
+                    .header("Authorization", "Bearer $token")
+                    .build()
+            }
+            val response = chain.proceed(request)
+            val authRequest = original.url.encodedPath.startsWith("/auth/")
+            if (response.code == 401 && !authRequest) {
+                AuthSession.clear()
+            }
+            response
+        }
         .addInterceptor(
             HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC

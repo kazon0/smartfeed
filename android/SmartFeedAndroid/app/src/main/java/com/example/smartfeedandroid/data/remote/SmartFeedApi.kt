@@ -9,6 +9,15 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface SmartFeedApi {
+    @POST("auth/register")
+    suspend fun register(@Body request: RegisterRequest): AuthResponse
+
+    @POST("auth/login")
+    suspend fun login(@Body request: LoginRequest): AuthResponse
+
+    @GET("auth/me")
+    suspend fun me(): AuthUser
+
     @GET("articles")
     suspend fun articles(): ArticlesResponse
 
@@ -30,6 +39,41 @@ interface SmartFeedApi {
     @POST("chat")
     suspend fun chat(@Body request: ChatRequest): ChatResponse
 }
+
+@Serializable
+data class RegisterRequest(
+    val email: String,
+    val password: String,
+    @SerialName("display_name")
+    val displayName: String = ""
+)
+
+@Serializable
+data class LoginRequest(
+    val email: String,
+    val password: String
+)
+
+@Serializable
+data class AuthResponse(
+    @SerialName("access_token")
+    val accessToken: String,
+    @SerialName("token_type")
+    val tokenType: String = "bearer",
+    val user: AuthUser
+)
+
+@Serializable
+data class AuthUser(
+    val id: String,
+    val email: String,
+    @SerialName("display_name")
+    val displayName: String = "",
+    @SerialName("created_at")
+    val createdAt: String = "",
+    @SerialName("updated_at")
+    val updatedAt: String = ""
+)
 
 @Serializable
 data class UploadRequest(

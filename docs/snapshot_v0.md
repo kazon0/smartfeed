@@ -18,6 +18,9 @@
 - `GET /conversations`、`PUT /conversations/{id}`、`DELETE /conversations/{id}` 已提供用户隔离的云端会话同步。
 - conversation 保存 Android 所需的 source URL、topic、title、summary、status、chunk count 和时间戳；message payload 可完整恢复 Assistant answer/sources。
 - 同步采用 `updated_at_millis` 最新者优先策略，旧设备数据不会覆盖服务端较新版本。
+- Android 已接入注册、登录、session 恢复和退出登录，业务请求由 OkHttp 自动附加 bearer token。
+- Android access token 使用 Android Keystore AES-GCM 加密后存储；业务接口返回 `401` 时自动清理本地 session。
+- Android Room schema v4 为 conversation 增加 `ownerId`，账号切换只加载当前用户分区；旧无 owner 数据由第一个登录账号认领。
 
 - `GET /articles`
   - 定义位置：`app/routes/articles.py`
@@ -634,7 +637,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
 - Android 当前没有登录、WebSocket 或 session。
-- PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离和 conversation/message 云同步 API 已接入；Android 账号与 Room 同步尚未实现。
+- PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离、conversation/message 云 API 和 Android 认证已接入；Android Room 与云端自动同步尚未实现。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前只是占位页，没有真实用户功能。
 

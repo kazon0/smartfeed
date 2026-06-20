@@ -7,12 +7,16 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.remote.SavedArticle
+import com.example.smartfeedandroid.data.auth.AuthSession
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
 import com.example.smartfeedandroid.ui.chat.ChatSendContext
 import com.example.smartfeedandroid.ui.state.HomeUiState
 import com.example.smartfeedandroid.ui.state.UploadProgress
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 import com.example.smartfeedandroid.ui.model.ChatMessage
 import com.example.smartfeedandroid.ui.model.Conversation
@@ -32,8 +36,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            val conversations = conversationPersistence.load()
-            uiState = uiState.copy(conversations = conversations)
+            AuthSession.state
+                .map { it.user?.id }
+                .distinctUntilChanged()
+                .collectLatest { ownerId ->
+                    val conversations = ownerId?.let { conversationPersistence.load(it) }.orEmpty()
+                    uiState = HomeUiState(conversations = conversations)
+                }
         }
     }
 
@@ -208,8 +217,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun persistConversations(conversations: List<Conversation>) {
+        val ownerId = AuthSession.state.value.user?.id ?: return
         viewModelScope.launch {
-            conversationPersistence.save(conversations)
+            conversationPersistence.save(ownerId, conversations)
         }
     }
 

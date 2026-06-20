@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ConversationEntity::class, MessageEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class SmartFeedDatabase : RoomDatabase() {
@@ -27,7 +27,7 @@ abstract class SmartFeedDatabase : RoomDatabase() {
                     SmartFeedDatabase::class.java,
                     "smartfeed.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -44,6 +44,14 @@ abstract class SmartFeedDatabase : RoomDatabase() {
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 MIGRATION_2_3_STATEMENTS.forEach { statement ->
+                    db.execSQL(statement)
+                }
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_3_4_STATEMENTS.forEach { statement ->
                     db.execSQL(statement)
                 }
             }
@@ -68,6 +76,10 @@ abstract class SmartFeedDatabase : RoomDatabase() {
             "ALTER TABLE conversations ADD COLUMN createdAtMillis INTEGER NOT NULL DEFAULT 0",
             "UPDATE conversations SET sourceUrl = url WHERE sourceUrl = ''",
             "UPDATE conversations SET createdAtMillis = updatedAtMillis WHERE createdAtMillis = 0"
+        )
+
+        internal val MIGRATION_3_4_STATEMENTS = listOf(
+            "ALTER TABLE conversations ADD COLUMN ownerId TEXT NOT NULL DEFAULT ''"
         )
     }
 }

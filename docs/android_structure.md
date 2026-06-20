@@ -9,6 +9,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 ├── MainActivity.kt
 ├── data/
 │   ├── local/              # Room、本地会话持久化
+│   ├── auth/               # Keystore token 和当前认证 session
 │   ├── remote/             # Retrofit API、请求/响应 DTO
 │   └── repository/         # 后端接口封装
 └── ui/
@@ -19,7 +20,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
     ├── home/               # Home 入口、HomeViewModel、UI state、会话模型和会话规则
     ├── model/              # 跨页面 UI model，例如 Conversation、ChatMessage
     ├── navigation/         # Bottom navigation，包含中间新聊天动作按钮
-    ├── profile/            # Profile 占位页
+    ├── profile/            # 注册登录、AuthViewModel 和真实 Profile
     ├── state/              # 跨根页面状态，例如 HomeUiState
     └── theme/              # Compose theme
 ```
@@ -36,12 +37,14 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/chat/ChatSourceCard.kt`
   - `ui/analysis/AnalysisScreen.kt`
   - `ui/articles/ArticleManagerScreen.kt`
-  - `ui/profile/PlaceholderScreen.kt`
+  - `ui/profile/AuthScreen.kt`
+  - `ui/profile/ProfileScreen.kt`
 - ViewModel：
   - `ui/home/HomeViewModel.kt`：Home、分享入口、会话打开、上传入口和底部新聊天入口。
   - `ui/chat/ChatViewModel.kt`：聊天输入框状态、发送状态和聊天请求触发。
   - `ui/analysis/AnalysisViewModel.kt`：Analysis 页 `/stats`、`/insights` 和文章列表数据。
   - `ui/articles/ArticleManagerViewModel.kt`：文章管理页文章列表和删除文章。
+  - `ui/profile/AuthViewModel.kt`：session 恢复、注册、登录和退出登录。
 - State：
   - `ui/state/HomeUiState.kt`
   - `ui/chat/ChatUiState.kt`
@@ -63,12 +66,13 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Local persistence coordinator：`ui/home/ConversationPersistence.kt`，封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
 - Repository：`data/repository/*`
 - Network DTO：`data/remote/SmartFeedApi.kt`
+- Authentication：`data/auth/AuthSession.kt` 保存认证状态，`SecureTokenStore.kt` 使用 Android Keystore AES-GCM 加密 access token，OkHttp 自动附加 Bearer header。
 - Local persistence：
   - `data/local/ConversationStore.kt`：本地 conversation 加载、保存和 legacy SharedPreferences 迁移。
   - `data/local/StoredConversation.kt`：本地持久化 DTO。
   - `data/local/ConversationEntity.kt`：Room entity。
   - `data/local/ConversationDao.kt`、`data/local/MessageDao.kt`：Room DAO。
-  - `data/local/SmartFeedDatabase.kt`：Room database 和 migrations。
+  - `data/local/SmartFeedDatabase.kt`：Room database 和 migrations；schema v4 使用 `ownerId` 隔离账号本地会话。
 
 ## Share And Article Status Flow
 
@@ -100,7 +104,6 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - `ChatDetailScreenPreview`
 - `AnalysisScreenPreview`
 - `ArticleManagerScreenPreview`
-- `PlaceholderScreenPreview`
 
 在 Android Studio 中打开对应文件，切换到 `Split` 或 `Design` 即可查看预览。
 
@@ -108,7 +111,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 - `ConversationManagerTest` 覆盖文章 conversation 元数据、URL 归一化去重、重复上传时摘要替换、新 conversation 排序和消息追加规则。
 - `ConversationMappersTest` 覆盖 conversation 完整 round-trip、旧 `sourceUrl` fallback、未知旧消息类型兼容和消息顺序。
-- `SmartFeedDatabaseMigrationTest` 使用 SQLite JDBC 内存数据库执行 Room 共用的 migration SQL，验证 `1 -> 2 -> 3`、messages 表创建以及旧 conversation metadata 回填。
+- `SmartFeedDatabaseMigrationTest` 使用 SQLite JDBC 内存数据库执行 Room 共用的 migration SQL，验证 `1 -> 2 -> 3 -> 4`、messages 表创建、owner 分区字段以及旧 conversation metadata 回填。
 - `ConversationFiltersTest` 覆盖 topic 优先级和 fallback、筛选项排序、筛选匹配以及最近消息搜索范围。
 - `ChatCoordinatorTest` 覆盖 `/chat` history 的消息类型映射、错误过滤、助手消息 fallback 和最近 8 条限制。
 - `ArticleFiltersTest` 覆盖文章主题顺序、搜索字段组合、主题叠加筛选和排序规则。

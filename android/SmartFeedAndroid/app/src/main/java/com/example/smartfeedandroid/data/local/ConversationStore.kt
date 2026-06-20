@@ -15,9 +15,10 @@ class ConversationStore(context: Context) {
         ignoreUnknownKeys = true
     }
 
-    suspend fun load(): List<StoredConversation> {
+    suspend fun load(ownerId: String): List<StoredConversation> {
+        database.conversationDao().claimUnowned(ownerId)
         val roomConversations = database.conversationDao()
-            .getAll()
+            .getAll(ownerId)
             .map { conversation ->
                 val messages = database.messageDao()
                     .getByConversationId(conversation.id)
@@ -41,13 +42,13 @@ class ConversationStore(context: Context) {
 
         val legacyConversations = loadLegacyConversations()
         if (legacyConversations.isNotEmpty()) {
-            save(legacyConversations)
+            save(ownerId, legacyConversations)
         }
         return legacyConversations
     }
 
-    suspend fun save(conversations: List<StoredConversation>) {
-        val conversationEntities = conversations.map { it.toEntity() }
+    suspend fun save(ownerId: String, conversations: List<StoredConversation>) {
+        val conversationEntities = conversations.map { it.toEntity(ownerId) }
         val messageEntities = conversations.flatMap { conversation ->
                 conversation.messages.mapIndexed { index, message ->
                     message.toEntity(conversation.id, index)
@@ -55,8 +56,8 @@ class ConversationStore(context: Context) {
             }
 
         database.withTransaction {
-            database.messageDao().deleteAll()
-            database.conversationDao().deleteAll()
+            database.messageDao().deleteByOwner(ownerId)
+            database.conversationDao().deleteByOwner(ownerId)
             database.conversationDao().insertAll(conversationEntities)
             if (messageEntities.isNotEmpty()) {
                 database.messageDao().insertAll(messageEntities)
@@ -74,9 +75,10 @@ class ConversationStore(context: Context) {
         }.getOrDefault(emptyList())
     }
 
-    private fun StoredConversation.toEntity(): ConversationEntity {
+    private fun StoredConversation.toEntity(ownerId: String): ConversationEntity {
         return ConversationEntity(
             id = id,
+            ownerId = ownerId,
             title = title,
             url = url,
             sourceUrl = sourceUrl.ifBlank { url },

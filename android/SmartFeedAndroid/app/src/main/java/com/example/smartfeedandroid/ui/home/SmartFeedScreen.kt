@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.R
 import com.example.smartfeedandroid.data.remote.SavedArticle
+import com.example.smartfeedandroid.data.remote.AuthUser
 import com.example.smartfeedandroid.ui.analysis.AnalysisScreen
 import com.example.smartfeedandroid.ui.analysis.AnalysisUiState
 import com.example.smartfeedandroid.ui.analysis.AnalysisViewModel
@@ -23,7 +24,10 @@ import com.example.smartfeedandroid.ui.chat.ChatDetailScreen
 import com.example.smartfeedandroid.ui.chat.ChatUiState
 import com.example.smartfeedandroid.ui.chat.ChatViewModel
 import com.example.smartfeedandroid.ui.navigation.AppBottomBar
-import com.example.smartfeedandroid.ui.profile.PlaceholderScreen
+import com.example.smartfeedandroid.ui.profile.AuthScreen
+import com.example.smartfeedandroid.ui.profile.AuthViewModel
+import com.example.smartfeedandroid.ui.profile.ProfileScreen
+import com.example.smartfeedandroid.ui.profile.SessionLoadingScreen
 import com.example.smartfeedandroid.ui.state.HomeUiState
 
 @Composable
@@ -32,8 +36,26 @@ fun SmartFeedScreen(
     viewModel: HomeViewModel = viewModel(),
     chatViewModel: ChatViewModel = viewModel(),
     analysisViewModel: AnalysisViewModel = viewModel(),
-    articleManagerViewModel: ArticleManagerViewModel = viewModel()
+    articleManagerViewModel: ArticleManagerViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
+    val authState = authViewModel.uiState
+    if (authState.isCheckingSession) {
+        SessionLoadingScreen(modifier)
+        return
+    }
+    val user = authState.user
+    if (user == null) {
+        AuthScreen(
+            uiState = authState,
+            onLogin = authViewModel::login,
+            onRegister = authViewModel::register,
+            onClearError = authViewModel::clearError,
+            modifier = modifier
+        )
+        return
+    }
+
     SmartFeedContent(
         uiState = viewModel.uiState,
         chatUiState = chatViewModel.uiState,
@@ -63,6 +85,8 @@ fun SmartFeedScreen(
         onBackToConversations = viewModel::showConversationList,
         onOpenArticleChat = viewModel::startArticleConversation,
         onDeleteArticle = articleManagerViewModel::deleteArticle,
+        profileUser = user,
+        onLogout = authViewModel::logout,
         onDismissError = viewModel::clearError,
         modifier = modifier
     )
@@ -85,6 +109,8 @@ private fun SmartFeedContent(
     onBackToConversations: () -> Unit,
     onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
+    profileUser: AuthUser,
+    onLogout: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -169,9 +195,9 @@ private fun SmartFeedContent(
                 }
 
                 AppTab.Profile -> {
-                    PlaceholderScreen(
-                        title = stringResource(R.string.profile_title),
-                        description = stringResource(R.string.profile_placeholder),
+                    ProfileScreen(
+                        user = profileUser,
+                        onLogout = onLogout,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

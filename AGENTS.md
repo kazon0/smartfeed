@@ -69,6 +69,8 @@ Backend 已实现：
 * ChromaDB chunks 按认证用户强制隔离
 * PostgreSQL article metadata upsert、列表、状态和删除
 * PostgreSQL conversation/message 云同步 API
+* Android 注册、登录、Keystore 加密 token、Bearer 自动注入和退出登录
+* Android Room conversations 按认证 owner 分区
 * Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`

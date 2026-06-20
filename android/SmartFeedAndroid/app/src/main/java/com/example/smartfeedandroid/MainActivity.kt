@@ -7,9 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.ui.home.HomeViewModel
+import com.example.smartfeedandroid.data.remote.SmartFeedNetwork
+import com.example.smartfeedandroid.data.auth.AuthSession
 import com.example.smartfeedandroid.ui.home.SmartFeedScreen
 import com.example.smartfeedandroid.ui.theme.SmartFeedAndroidTheme
 
@@ -19,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SmartFeedNetwork.initialize(applicationContext)
         enableEdgeToEdge()
         pendingSharedUrl = extractSharedUrl(intent)
         setContent {
@@ -26,8 +31,9 @@ class MainActivity : ComponentActivity() {
                 val viewModel: HomeViewModel = viewModel()
                 homeViewModel = viewModel
                 val sharedUrl = pendingSharedUrl
-                LaunchedEffect(sharedUrl) {
-                    sharedUrl?.let {
+                val authSession by AuthSession.state.collectAsState()
+                LaunchedEffect(sharedUrl, authSession.user) {
+                    if (authSession.user != null) sharedUrl?.let {
                         viewModel.handleSharedUrl(it)
                         pendingSharedUrl = null
                     }
@@ -44,7 +50,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val sharedUrl = extractSharedUrl(intent) ?: return
-        homeViewModel?.handleSharedUrl(sharedUrl) ?: run {
+        if (AuthSession.state.value.user != null) {
+            homeViewModel?.handleSharedUrl(sharedUrl) ?: run {
+                pendingSharedUrl = sharedUrl
+            }
+        } else {
             pendingSharedUrl = sharedUrl
         }
     }

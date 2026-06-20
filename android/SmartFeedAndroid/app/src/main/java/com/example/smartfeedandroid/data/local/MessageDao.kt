@@ -13,6 +13,6 @@ interface MessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(messages: List<MessageEntity>)
 
-    @Query("DELETE FROM messages")
-    suspend fun deleteAll()
+    @Query("DELETE FROM messages WHERE conversationId IN (SELECT id FROM conversations WHERE ownerId = :ownerId)")
+    suspend fun deleteByOwner(ownerId: String)
 }

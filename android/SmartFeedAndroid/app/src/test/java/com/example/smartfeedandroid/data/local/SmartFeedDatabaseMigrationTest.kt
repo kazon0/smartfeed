@@ -56,21 +56,24 @@ class SmartFeedDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateVersionOneToThreeCreatesMessagesAndBackfillsMetadata() {
+    fun migrateVersionOneToFourCreatesMessagesAndBackfillsMetadata() {
         executeStatements(SmartFeedDatabase.MIGRATION_1_2_STATEMENTS)
         executeStatements(SmartFeedDatabase.MIGRATION_2_3_STATEMENTS)
+        executeStatements(SmartFeedDatabase.MIGRATION_3_4_STATEMENTS)
 
         assertTrue(tableColumns("messages").containsAll(MESSAGE_COLUMNS))
         assertTrue(tableColumns("conversations").containsAll(VERSION_THREE_COLUMNS))
+        assertTrue(tableColumns("conversations").contains("ownerId"))
 
         connection.prepareStatement(
-            "SELECT sourceUrl, topic, createdAtMillis, updatedAtMillis FROM conversations WHERE id = ?"
+            "SELECT sourceUrl, topic, ownerId, createdAtMillis, updatedAtMillis FROM conversations WHERE id = ?"
         ).use { statement ->
             statement.setString(1, "legacy-conversation")
             statement.executeQuery().use { result ->
                 assertTrue(result.next())
                 assertEquals("https://example.com/legacy", result.getString("sourceUrl"))
                 assertEquals("", result.getString("topic"))
+                assertEquals("", result.getString("ownerId"))
                 assertEquals(456L, result.getLong("createdAtMillis"))
                 assertEquals(456L, result.getLong("updatedAtMillis"))
             }
