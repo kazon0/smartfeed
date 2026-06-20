@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.chat_service import ChatService
 from app.services.langchain_rag_pipeline import LangChainRAGPipeline
 from app.services.llm_service import LLMService
 from app.services.rag_pipeline import RAGPipeline
@@ -260,6 +261,31 @@ def test_llm_answer_prompt_requires_synthesized_explanation(monkeypatch):
     assert "综合相关片段的上下文关系" in prompt
     assert "不要按 chunk 顺序机械拼接摘要" in prompt
     assert "不要使用“来源[1]”" in prompt
+
+
+def test_chat_context_trims_trailing_noise_without_removing_article_urls():
+    service = ChatService()
+    context = service._format_context_chunk(
+        0,
+        {
+            "content": (
+                "项目文档见 https://example.com/docs ，核心结论是保留正文。\n"
+                "原创声明：未经许可不得转载。相关推荐：另一篇文章。"
+            ),
+            "metadata": {
+                "url": "https://example.com/article",
+                "title": "测试文章",
+                "chunk_index": 3,
+                "section_index": 1,
+                "section_title": "结论",
+            },
+        },
+    )
+
+    assert "https://example.com/docs" in context
+    assert "核心结论是保留正文" in context
+    assert "原创声明" not in context
+    assert "相关推荐" not in context
 
 
 def test_vector_store_add_chunks_keeps_section_metadata():

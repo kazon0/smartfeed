@@ -153,6 +153,7 @@
     - 有高相关 chunks 时调用 `LLMService.answer()` 基于 chunks 生成回答。
     - 传给 LLM 的 context 使用 `[1]`、`[2]`、`[3]` 形式的来源编号。
     - 回答 prompt 要求先综合相关片段的上下文关系，再用自然语言解释，避免按 chunk 顺序机械拼接摘要。
+    - 送入回答 LLM 的 context 会保留正文 URL、Markdown 和代码，并截断同一 chunk 中原创声明、相关推荐等尾部噪声。
     - 回答前会尝试调用 `LLMService.compress_context()` 压缩上下文，保留与问题相关的来源头信息、步骤、代码、清单和结论。
     - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。

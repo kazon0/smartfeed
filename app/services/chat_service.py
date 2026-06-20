@@ -507,6 +507,8 @@ class ChatService:
         for chunk in sorted_chunks[start:]:
             content = chunk.get("content", "")
             if self._looks_like_related_content(content) and selected:
+                if self._has_substantive_content_before_noise(content):
+                    selected.append(chunk)
                 break
             selected.append(chunk)
             if self._contains_article_end_marker(content):
@@ -567,6 +569,12 @@ class ChatService:
             "阅读原文",
         )
         return link_count >= 2 and any(term in normalized for term in author_link_terms)
+
+    def _has_substantive_content_before_noise(self, content: str) -> bool:
+        cleaned = self._trim_content_noise(content)
+        return cleaned != content.strip() and (
+            len(cleaned) >= 40 or self._looks_like_list_content(cleaned)
+        )
 
     def _looks_like_list_content(self, content: str) -> bool:
         normalized = re.sub(r"\s+", " ", content.strip())
@@ -923,7 +931,8 @@ class ChatService:
             header += f" section_title: {section_title}"
         if section_index is not None:
             header += f" section_index: {section_index}"
-        return f"{header}\n{chunk.get('content', '')}"
+        content = self._trim_content_noise(chunk.get("content", ""))
+        return f"{header}\n{content}"
 
     def _build_sources(self, chunks: list[dict], query: str | None = None) -> list[dict]:
         sources = self._group_source_chunks(chunks)
@@ -1045,6 +1054,13 @@ class ChatService:
         cleaned = re.sub(r"\[([^\]]+)]\([^)]+\)", r"\1", cleaned)
         cleaned = re.sub(r"https?://\S+", "", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+        return self._trim_content_noise(cleaned)
+
+    def _trim_content_noise(self, content: str) -> str:
+        cleaned = content.strip()
+        if not cleaned:
+            return ""
 
         for marker in (
             "喜欢点赞收藏",
