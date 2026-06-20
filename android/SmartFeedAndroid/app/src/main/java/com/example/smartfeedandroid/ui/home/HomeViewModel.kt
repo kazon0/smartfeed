@@ -11,6 +11,8 @@ import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
 import com.example.smartfeedandroid.ui.chat.ChatSendContext
+import com.example.smartfeedandroid.ui.state.HomeUiState
+import com.example.smartfeedandroid.ui.state.UploadProgress
 import kotlinx.coroutines.launch
 
 import com.example.smartfeedandroid.ui.model.ChatMessage

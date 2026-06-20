@@ -24,6 +24,7 @@ import com.example.smartfeedandroid.ui.chat.ChatUiState
 import com.example.smartfeedandroid.ui.chat.ChatViewModel
 import com.example.smartfeedandroid.ui.navigation.AppBottomBar
 import com.example.smartfeedandroid.ui.profile.PlaceholderScreen
+import com.example.smartfeedandroid.ui.state.HomeUiState
 
 @Composable
 fun SmartFeedScreen(

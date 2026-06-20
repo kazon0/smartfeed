@@ -1,9 +1,10 @@
 package com.example.smartfeedandroid.ui.home
 
 import com.example.smartfeedandroid.data.remote.SavedArticle
-
 import com.example.smartfeedandroid.ui.model.ChatMessage
 import com.example.smartfeedandroid.ui.model.Conversation
+import com.example.smartfeedandroid.ui.state.HomeUiState
+
 class ConversationCoordinator(
     private val conversationManager: ConversationManager
 ) {

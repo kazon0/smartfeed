@@ -1,9 +1,10 @@
-package com.example.smartfeedandroid.ui.home
+package com.example.smartfeedandroid.ui.state
 
 import com.example.smartfeedandroid.data.remote.UploadResponse
-
+import com.example.smartfeedandroid.ui.home.AppTab
 import com.example.smartfeedandroid.ui.model.ChatMessage
 import com.example.smartfeedandroid.ui.model.Conversation
+
 data class HomeUiState(
     val url: String = "",
     val activeUrl: String = "",

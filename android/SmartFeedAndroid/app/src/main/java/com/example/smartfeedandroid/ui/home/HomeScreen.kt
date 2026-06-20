@@ -57,6 +57,8 @@ import com.example.smartfeedandroid.ui.common.SoftBlueLight
 import com.example.smartfeedandroid.ui.common.SoftRed
 import com.example.smartfeedandroid.ui.common.topicColor
 import com.example.smartfeedandroid.R
+import com.example.smartfeedandroid.ui.state.HomeUiState
+import com.example.smartfeedandroid.ui.state.UploadProgress
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 

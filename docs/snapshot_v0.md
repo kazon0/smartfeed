@@ -318,6 +318,7 @@
   - 已实现 `/chat` 请求模型和响应模型。
   - `SmartFeedScreen` 使用 Jetpack Compose 组装 Home / Articles / Analysis / Profile 底部 tab，并在底部栏中间提供新聊天加号动作。
   - Android UI 已按 feature 拆分到 `ui/home`、`ui/chat`、`ui/analysis`、`ui/articles`、`ui/navigation`、`ui/common`、`ui/profile`。
+  - 根页面共享状态已拆到 `ui/state/HomeUiState.kt`。
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
   - Home tab 不再在右上角展示新聊天按钮，新聊天入口已移动到底部栏中间的加号动作。
   - Home 页面实现位置：`ui/home/HomeScreen.kt`。

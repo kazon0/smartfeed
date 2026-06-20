@@ -4,6 +4,7 @@ import com.example.smartfeedandroid.data.remote.ArticleStatusResponse
 import com.example.smartfeedandroid.data.remote.UploadResponse
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
+import com.example.smartfeedandroid.ui.state.UploadProgress
 
 class ArticleUploadCoordinator(
     private val articleRepository: ArticleRepository,

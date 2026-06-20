@@ -20,6 +20,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
     ├── model/              # 跨页面 UI model，例如 Conversation、ChatMessage
     ├── navigation/         # Bottom navigation，包含中间新聊天动作按钮
     ├── profile/            # Profile 占位页
+    ├── state/              # 跨根页面状态，例如 HomeUiState
     └── theme/              # Compose theme
 ```
 
@@ -39,7 +40,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/analysis/AnalysisViewModel.kt`：Analysis 页 `/stats`、`/insights` 和文章列表数据。
   - `ui/articles/ArticleManagerViewModel.kt`：文章管理页文章列表和删除文章。
 - State：
-  - `ui/home/HomeUiState.kt`
+  - `ui/state/HomeUiState.kt`
   - `ui/chat/ChatUiState.kt`
   - `ui/analysis/AnalysisViewModel.kt` 中的 `AnalysisUiState`
   - `ui/articles/ArticleManagerViewModel.kt` 中的 `ArticleManagerUiState`
