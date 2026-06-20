@@ -52,6 +52,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Model：`ui/model/Conversation.kt`、`ui/model/ChatMessage.kt`
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`
+- Local conversation filters：`ui/home/ConversationFilters.kt`，保存 Home 最近对话筛选、搜索和 topic fallback 规则。
 - Local persistence mapper：`ui/home/ConversationMappers.kt`
 - Local persistence coordinator：`ui/home/ConversationPersistence.kt`，封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
 - Repository：`data/repository/*`
