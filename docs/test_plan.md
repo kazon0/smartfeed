@@ -317,6 +317,7 @@ Expected result:
 - Backend should not crash.
 - Response should keep the same `/chat` JSON fields as classic pipeline.
 - `debug.rag_pipeline` should be `LangChainRAGPipeline`.
+- `debug.langchain_stages` should contain `rewrite`, `multi_query`, `retrieve`, `rank`, and `rerank` in order.
 - If LangChain pipeline cannot be initialized, system should fall back to `RAGPipeline`.
 
 Run the focused automated test:

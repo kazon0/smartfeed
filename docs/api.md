@@ -623,13 +623,13 @@ Diagnostics:
 
 - `/chat` returns a `debug` object with the active RAG pipeline name, rewritten query, multi-query search variants, retrieval hit counts, selected chunk previews, and context compression status.
 - Default `debug.rag_pipeline` is `RAGPipeline`.
-- To test the optional LangChain Core wrapper, start the backend with:
+- To run the LangChain Core Runnable retrieval chain, start the backend with:
 
 ```bash
 SMARTFEED_RAG_PIPELINE=langchain uvicorn app.main:app --reload
 ```
 
-- In that mode, `debug.rag_pipeline` should be `LangChainRAGPipeline`; if initialization fails, the backend falls back to `RAGPipeline`.
+- In that mode, `debug.rag_pipeline` should be `LangChainRAGPipeline`, and `debug.langchain_stages` records the Runnable stages. Initialization or chain execution failures fall back to classic `RAGPipeline` behavior.
 - `GET /debug` renders this diagnostics data in the browser so retrieval misses can be inspected without reading large terminal JSON.
 - The `debug` object is for development. UI clients should continue relying on stable fields such as `status`, `error_code`, `answer`, `sources`, `source_type`, `intent`, `retrieval_scope`, and `fallback_policy`.
 

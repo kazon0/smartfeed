@@ -38,7 +38,7 @@ Backend 已实现：
 * DeepSeek multi-query retrieval for `/chat`
 * DeepSeek rerank for `/chat`
 * DeepSeek context compression for `/chat`
-* Optional LangChain Core pipeline wrapper for `/chat`
+* Optional LangChain Core Runnable retrieval chain for `/chat`
 * Rule-based topic fallback
 * Jina Reader 优先网页解析
 * HTML fallback 解析

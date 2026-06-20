@@ -290,6 +290,80 @@ def test_rag_pipeline_factory_can_create_langchain_pipeline(monkeypatch):
     assert isinstance(pipeline, LangChainRAGPipeline)
 
 
+def test_langchain_pipeline_run_records_runnable_stages():
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            return {"query": "Kotlin 协程"}
+
+        def generate_search_queries(self, question, rewritten_query, url=None):
+            return ["Kotlin Flow"]
+
+        def rerank_chunks(self, question, candidates):
+            return [0]
+
+    class FakeVectorStore:
+        def query(self, query, metadata_filter=None):
+            return [
+                {
+                    "content": "Flow 用于异步数据流。",
+                    "metadata": {"url": "https://example.com/kotlin", "chunk_index": 0},
+                    "score": 0.9,
+                }
+            ]
+
+    debug = {"retrieval_steps": []}
+    result = LangChainRAGPipeline(llm_service_factory=FakeLLMService).run(
+        "怎么学习协程",
+        FakeVectorStore(),
+        debug=debug,
+    )
+
+    assert debug["langchain_stages"] == [
+        "rewrite",
+        "multi_query",
+        "retrieve",
+        "rank",
+        "rerank",
+    ]
+    assert result["rewritten_query"] == "Kotlin 协程"
+    assert result["relevant_chunks"]
+
+
+def test_langchain_pipeline_run_falls_back_to_classic_on_chain_error():
+    class FakeLLMService:
+        def rewrite_query(self, question, url=None):
+            return {"query": question}
+
+        def generate_search_queries(self, question, rewritten_query, url=None):
+            return []
+
+    class FakeVectorStore:
+        def query(self, query, metadata_filter=None):
+            return [
+                {
+                    "content": "回退后仍可检索。",
+                    "metadata": {"url": "https://example.com", "chunk_index": 0},
+                    "score": 0.8,
+                }
+            ]
+
+    class BrokenChain:
+        def invoke(self, payload):
+            raise RuntimeError("chain failed")
+
+    pipeline = LangChainRAGPipeline(llm_service_factory=FakeLLMService)
+    pipeline._pipeline_chain = BrokenChain()
+    debug = {"retrieval_steps": []}
+
+    result = pipeline.run("回退测试", FakeVectorStore(), debug=debug)
+
+    assert result["relevant_chunks"]
+    assert debug["langchain_fallback"] == {
+        "stage": "retrieval_chain",
+        "reason": "chain failed",
+    }
+
+
 def test_llm_rerank_chunks_parses_json_array(monkeypatch):
     service = LLMService()
     monkeypatch.setattr(service, "_chat", lambda prompt: "[1,0]")
