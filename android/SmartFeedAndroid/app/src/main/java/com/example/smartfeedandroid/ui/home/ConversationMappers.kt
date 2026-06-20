@@ -10,10 +10,13 @@ internal fun StoredConversation.toConversation(): Conversation {
         id = id,
         title = title,
         url = url,
+        sourceUrl = sourceUrl.ifBlank { url },
         summary = summary,
         status = status,
+        topic = topic,
         storedChunks = storedChunks,
         updatedAtMillis = updatedAtMillis,
+        createdAtMillis = createdAtMillis,
         messages = messages.mapNotNull { it.toChatMessage() }
     )
 }
@@ -23,10 +26,13 @@ internal fun Conversation.toStoredConversation(): StoredConversation {
         id = id,
         title = title,
         url = url,
+        sourceUrl = sourceUrl.ifBlank { url },
         summary = summary,
         status = status,
+        topic = topic,
         storedChunks = storedChunks,
         updatedAtMillis = updatedAtMillis,
+        createdAtMillis = createdAtMillis,
         messages = messages.map { it.toStoredChatMessage() }
     )
 }

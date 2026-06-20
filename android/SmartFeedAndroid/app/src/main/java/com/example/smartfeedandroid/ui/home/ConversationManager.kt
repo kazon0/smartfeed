@@ -6,10 +6,13 @@ import com.example.smartfeedandroid.ui.model.ChatMessage
 import com.example.smartfeedandroid.ui.model.Conversation
 class ConversationManager {
     fun createGlobalConversation(): Conversation {
+        val now = System.currentTimeMillis()
         return Conversation(
             id = createConversationId(),
             title = "新聊天",
-            updatedAtMillis = System.currentTimeMillis()
+            topic = "新聊天",
+            updatedAtMillis = now,
+            createdAtMillis = now
         )
     }
 
@@ -33,16 +36,21 @@ class ConversationManager {
     fun createArticleConversation(
         url: String,
         title: String,
+        topic: String,
         storedChunks: Int
     ): Conversation {
         val cleanUrl = url.trim()
+        val now = System.currentTimeMillis()
         return Conversation(
             id = createConversationId(),
             title = title.ifBlank { cleanUrl.ifBlank { "新聊天" } },
             url = cleanUrl,
+            sourceUrl = cleanUrl,
             status = "saved",
+            topic = topic.ifBlank { "其他" },
             storedChunks = storedChunks,
-            updatedAtMillis = System.currentTimeMillis()
+            updatedAtMillis = now,
+            createdAtMillis = now
         )
     }
 
@@ -69,21 +77,25 @@ class ConversationManager {
         title: String,
         summary: String,
         status: String,
+        topic: String,
         storedChunks: Int
     ): List<Conversation> {
         val now = System.currentTimeMillis()
         val existingConversation = conversations.firstOrNull {
-            sameArticleUrl(it.url, url)
+            sameArticleUrl(it.sourceUrl.ifBlank { it.url }, url)
         }
         val updatedConversation = if (existingConversation == null) {
             Conversation(
                 id = createConversationId(),
                 title = title,
                 url = url,
+                sourceUrl = url,
                 summary = summary,
                 status = status,
+                topic = topic.ifBlank { "其他" },
                 storedChunks = storedChunks,
                 updatedAtMillis = now,
+                createdAtMillis = now,
                 messages = summaryMessages(summary)
             )
         } else {
@@ -93,8 +105,10 @@ class ConversationManager {
             existingConversation.copy(
                 title = title,
                 url = url,
+                sourceUrl = url,
                 summary = summary,
                 status = status,
+                topic = topic.ifBlank { existingConversation.topic },
                 storedChunks = storedChunks,
                 updatedAtMillis = now,
                 messages = summaryMessages(summary) + messagesWithoutOldSummary

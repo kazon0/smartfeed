@@ -1,6 +1,7 @@
 package com.example.smartfeedandroid.data.local
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -91,9 +92,12 @@ class ConversationStore(context: Context) {
             id = id,
             title = title,
             url = url,
+            sourceUrl = sourceUrl.ifBlank { url },
             summary = summary,
             status = status,
+            topic = topic,
             storedChunks = storedChunks,
+            createdAtMillis = createdAtMillis,
             updatedAtMillis = updatedAtMillis,
             messagesJson = json.encodeToString(messages)
         )
@@ -110,9 +114,12 @@ class ConversationStore(context: Context) {
             id = id,
             title = title,
             url = url,
+            sourceUrl = sourceUrl.ifBlank { url },
             summary = summary,
             status = status,
+            topic = topic,
             storedChunks = storedChunks,
+            createdAtMillis = createdAtMillis,
             updatedAtMillis = updatedAtMillis,
             messages = messages
         )
@@ -164,10 +171,13 @@ data class StoredConversation(
     val id: String,
     val title: String,
     val url: String = "",
+    val sourceUrl: String = url,
     val summary: String = "",
     val status: String = "",
+    val topic: String = "",
     val storedChunks: Int = 0,
     val updatedAtMillis: Long,
+    val createdAtMillis: Long = updatedAtMillis,
     val messages: List<StoredChatMessage> = emptyList()
 )
 
@@ -183,9 +193,15 @@ data class ConversationEntity(
     @PrimaryKey val id: String,
     val title: String,
     val url: String,
+    @ColumnInfo(defaultValue = "''")
+    val sourceUrl: String,
     val summary: String,
     val status: String,
+    @ColumnInfo(defaultValue = "''")
+    val topic: String,
     val storedChunks: Int,
+    @ColumnInfo(defaultValue = "0")
+    val createdAtMillis: Long,
     val updatedAtMillis: Long,
     val messagesJson: String
 )
@@ -227,7 +243,7 @@ interface MessageDao {
 
 @Database(
     entities = [ConversationEntity::class, MessageEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SmartFeedDatabase : RoomDatabase() {
@@ -245,7 +261,7 @@ abstract class SmartFeedDatabase : RoomDatabase() {
                     SmartFeedDatabase::class.java,
                     "smartfeed.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -265,6 +281,16 @@ abstract class SmartFeedDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE conversations ADD COLUMN sourceUrl TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN topic TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN createdAtMillis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE conversations SET sourceUrl = url WHERE sourceUrl = ''")
+                db.execSQL("UPDATE conversations SET createdAtMillis = updatedAtMillis WHERE createdAtMillis = 0")
             }
         }
     }

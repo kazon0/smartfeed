@@ -96,7 +96,8 @@ data class ParsedPage(
 @Serializable
 data class PageMetadata(
     val parser: String? = null,
-    val length: Int = 0
+    val length: Int = 0,
+    val topic: String = ""
 )
 
 @Serializable

@@ -386,7 +386,7 @@ private fun ConversationItem(
                 )
                 Text(
                     text = conversation.summary.ifBlank {
-                        if (conversation.url.isBlank()) {
+                        if (conversationSourceUrl(conversation).isBlank()) {
                             stringResource(R.string.ask_knowledge_base)
                         } else {
                             stringResource(R.string.page_conversation)
@@ -450,8 +450,8 @@ private sealed interface ConversationFilter {
     fun matches(conversation: Conversation): Boolean {
         return when (this) {
             All -> true
-            NewChat -> conversation.url.isBlank()
-            Page -> conversation.url.isNotBlank()
+            NewChat -> conversationSourceUrl(conversation).isBlank()
+            Page -> conversationSourceUrl(conversation).isNotBlank()
             is Topic -> conversationTopic(conversation) == topic
         }
     }
@@ -508,7 +508,7 @@ private fun Conversation.matchesSearch(query: String): Boolean {
     val searchable = listOf(
         title,
         summary,
-        url,
+        conversationSourceUrl(this),
         status,
         conversationTopic(this),
         messageText,
@@ -518,11 +518,14 @@ private fun Conversation.matchesSearch(query: String): Boolean {
 }
 
 private fun conversationTopic(conversation: Conversation): String {
-    if (conversation.url.isBlank()) {
+    val sourceUrl = conversationSourceUrl(conversation)
+    if (sourceUrl.isBlank()) {
         return "新聊天"
     }
 
-    val text = listOf(conversation.title, conversation.summary, conversation.url)
+    conversation.topic.takeIf { it.isNotBlank() }?.let { return it }
+
+    val text = listOf(conversation.title, conversation.summary, sourceUrl)
         .joinToString(" ")
         .lowercase()
 
@@ -542,6 +545,10 @@ private fun conversationTopic(conversation: Conversation): String {
         ?.takeIf { it.value > 0 }
         ?.key
         ?: "其他"
+}
+
+private fun conversationSourceUrl(conversation: Conversation): String {
+    return conversation.sourceUrl.ifBlank { conversation.url }
 }
 
 @Composable

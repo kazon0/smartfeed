@@ -48,6 +48,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/home/ArticleUploadCoordinator.kt`：文章状态查询、已入库跳过上传、新文章上传。
   - `ui/chat/ChatCoordinator.kt`：构造最近聊天 history 并调用 `/chat`。
 - Model：`ui/model/Conversation.kt`、`ui/model/ChatMessage.kt`
+  - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`
 - Local persistence mapper：`ui/home/ConversationMappers.kt`
 - Repository：`data/repository/*`
@@ -62,7 +63,17 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - 如果后端已有该 URL 且 `chunk_count > 0`，Android 会跳过重复 `/upload`，直接新建一条文章聊天。
 - 如果后端没有该 URL，Android 才调用 `/upload` 解析并入库。
 - 文章管理页点击已保存文章也会新建一条文章聊天，不复用旧会话。
+- 文章聊天会把后端返回的 topic 保存到本地 conversation，Home 过滤和角标优先使用该字段，旧数据再回退到本地关键词推断。
 - 已保存文章列表现在是底部 `文章` tab 的一级页面，不再作为 Analysis 页的二级入口。
+
+## Current MVVM Boundary
+
+当前结构是轻量 MVVM：页面状态和业务编排已经从 Compose UI 中拆出，但还不是完整的 domain/data/ui 分层。
+
+- `HomeViewModel` 目前仍是根页面状态协调者，负责 Home、分享入口、会话打开和持久化触发。
+- `ConversationManager` 承载本地会话规则，`ConversationCoordinator` 承载 UI state 切换，两者降低了 `HomeViewModel` 的直接复杂度。
+- `ConversationStore` 当前把 Room database、DAO、entity、migration 和 legacy SharedPreferences 迁移放在一个文件里，后续可以单独拆成 `SmartFeedDatabase.kt`、`ConversationDao.kt`、`MessageDao.kt` 和 entity 文件。
+- `ui/model` 文件少是正常的；只有跨页面共享且稳定的 UI model 才放这里，不需要为了“看起来分层”拆空模型。
 
 ## Preview
 
@@ -82,3 +93,4 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 - `ui/state/HomeUiState.kt`
 - `ui/home/HomeViewModel.kt` 后续可进一步改名为根导航 ViewModel。
+- `data/local/ConversationStore.kt` 后续可拆出 database、DAO、entity 和 migration。

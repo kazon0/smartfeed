@@ -132,6 +132,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         state = uiState,
                         url = article.url.ifBlank { cleanUrl },
                         title = article.title.ifBlank { cleanUrl },
+                        topic = article.topic,
                         storedChunks = article.chunkCount
                     )
                     uiState = uiState.copy(
@@ -145,12 +146,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val response = result.response
                     val parsedUrl = response.data?.url?.takeIf { it.isNotBlank() } ?: cleanUrl
                     val title = response.data?.title?.takeIf { it.isNotBlank() } ?: parsedUrl
+                    val topic = response.data?.metadata?.topic.orEmpty()
                     uiState = conversationCoordinator.openUploadedConversation(
                         state = uiState,
                         url = parsedUrl,
                         title = title,
                         summary = response.summary,
                         status = response.status,
+                        topic = topic,
                         storedChunks = response.storedChunks
                     )
                     persistConversations(uiState.conversations)
@@ -175,7 +178,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = ensured.first
         val conversation = ensured.second
         val conversationId = conversation.id
-        val activeUrl = conversation.url
+        val activeUrl = conversation.sourceUrl.ifBlank { conversation.url }
         val userMessage = ChatMessage.User(query)
         val updatedMessages = conversation.messages + userMessage
 

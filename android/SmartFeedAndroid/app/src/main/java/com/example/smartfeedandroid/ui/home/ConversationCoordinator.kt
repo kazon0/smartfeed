@@ -13,7 +13,7 @@ class ConversationCoordinator(
             activeConversationId = conversation.id,
             selectedTab = AppTab.Home,
             isChatOpen = true,
-            activeUrl = conversation.url,
+            activeUrl = conversation.sourceUrl.ifBlank { conversation.url },
             messages = conversation.messages,
             uploadResponse = null,
             errorMessage = null
@@ -48,6 +48,7 @@ class ConversationCoordinator(
         val conversation = conversationManager.createArticleConversation(
             url = article.url,
             title = article.title,
+            topic = article.topic,
             storedChunks = article.chunkCount
         )
         return openConversation(
@@ -55,7 +56,7 @@ class ConversationCoordinator(
             conversation = conversation,
             conversations = listOf(conversation) + state.conversations,
             messages = emptyList(),
-            activeUrl = conversation.url
+            activeUrl = conversation.sourceUrl.ifBlank { conversation.url }
         )
     }
 
@@ -63,11 +64,13 @@ class ConversationCoordinator(
         state: HomeUiState,
         url: String,
         title: String,
+        topic: String,
         storedChunks: Int
     ): HomeUiState {
         val conversation = conversationManager.createArticleConversation(
             url = url,
             title = title,
+            topic = topic,
             storedChunks = storedChunks
         )
         return openConversation(
@@ -75,7 +78,7 @@ class ConversationCoordinator(
             conversation = conversation,
             conversations = listOf(conversation) + state.conversations,
             messages = emptyList(),
-            activeUrl = conversation.url
+            activeUrl = conversation.sourceUrl.ifBlank { conversation.url }
         )
     }
 
@@ -85,6 +88,7 @@ class ConversationCoordinator(
         title: String,
         summary: String,
         status: String,
+        topic: String,
         storedChunks: Int
     ): HomeUiState {
         val conversations = conversationManager.upsertUploadedConversation(
@@ -93,6 +97,7 @@ class ConversationCoordinator(
             title = title,
             summary = summary,
             status = status,
+            topic = topic,
             storedChunks = storedChunks
         )
         val conversation = conversations.first()

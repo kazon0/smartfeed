@@ -348,8 +348,10 @@
   - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
   - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。
+  - `Conversation` 当前明确保存 `sourceUrl`、`topic`、`title`、`createdAtMillis` 和 `updatedAtMillis`，用于稳定支持首页分类、文章入口和历史恢复。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
   - Room 当前表：`conversations` 和 `messages`。
+  - Room 当前版本为 3，`MIGRATION_2_3` 会为旧 conversations 补齐 `sourceUrl`、`topic` 和 `createdAtMillis`。
   - messages 已从 conversation 的 `messagesJson` 拆到独立 Room 表。
   - 旧 `messagesJson` 字段当前保留为本地迁移来源，首次加载旧数据时会迁移到 `messages` 表。
   - 旧 SharedPreferences conversations 会在首次 Room 加载为空时自动迁移到 Room。
@@ -509,6 +511,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android 端已实现已入库 URL 跳过重复上传，并直接新建文章聊天。
 - Android 端已实现上传/分享流程状态提示。
 - Android 端已实现 Room 级本地历史对话保存。
+- Android 端 Room conversations 已保存 `sourceUrl`、`topic`、`createdAtMillis` 和 `updatedAtMillis`。
 - Android 端已将本地 messages 拆到独立 Room 表保存。
 - Android 端已实现 SharedPreferences 旧历史到 Room 的自动迁移。
 - Android 端已实现 Analysis 页调用后端 `/stats`。
