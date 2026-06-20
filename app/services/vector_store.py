@@ -6,10 +6,11 @@ from typing import Any
 
 import chromadb
 
+from app.core.config import chroma_persist_dir
+
 
 class VectorStoreService:
     COLLECTION_NAME = "smartfeed"
-    PERSIST_DIR = "chroma_db"
     EMBEDDING_DIMENSION = 384
     TOPIC_KEYWORDS = {
         "科技": [
@@ -126,7 +127,7 @@ class VectorStoreService:
 
     def __init__(self, user_id: str | None = None) -> None:
         self.user_id = str(user_id) if user_id else None
-        self.client = chromadb.PersistentClient(path=self.PERSIST_DIR)
+        self.client = chromadb.PersistentClient(path=chroma_persist_dir())
         self.collection = self.client.get_or_create_collection(
             name=self.COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"},

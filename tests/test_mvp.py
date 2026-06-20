@@ -40,6 +40,13 @@ def test_root_status_ok():
     assert response.json() == {"status": "ok"}
 
 
+def test_health_status_ok():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_business_api_requires_authentication():
     def override_get_db():
         yield None

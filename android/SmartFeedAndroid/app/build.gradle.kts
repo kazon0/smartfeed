@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val smartfeedBaseUrl = providers.gradleProperty("smartfeedBaseUrl")
+    .orElse("http://10.0.2.2:8000/")
+    .map { value -> if (value.endsWith("/")) value else "$value/" }
+
 android {
     namespace = "com.example.smartfeedandroid"
     compileSdk {
@@ -20,6 +24,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SMARTFEED_BASE_URL", "\"${smartfeedBaseUrl.get()}\"")
     }
 
     buildTypes {
@@ -40,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

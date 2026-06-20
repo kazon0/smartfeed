@@ -69,6 +69,10 @@
   - 定义位置：`app/main.py`
   - 返回：`{"status": "ok"}`
 
+- `GET /health`
+  - 定义位置：`app/main.py`
+  - 返回：`{"status": "ok"}`，用于部署平台健康检查。
+
 - `GET /debug`
   - 定义位置：`app/routes/debug.py`
   - 返回开发调试 HTML 页面。
@@ -277,7 +281,7 @@
 - `app/services/vector_store.py`
   - 服务类：`VectorStoreService`
   - 当前能力：
-    - 使用 `chromadb.PersistentClient(path="chroma_db")`。
+    - 使用 `chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)`，默认值为 `chroma_db`。
     - 使用 collection：`smartfeed`。
     - collection metadata 设置为 cosine：`{"hnsw:space": "cosine"}`。
     - `add_chunks(chunks, metadata, chunk_metadata=None)` 写入 chunks、embeddings、metadata。
@@ -359,7 +363,7 @@
   - 已配置 Android 网络权限。
   - 已允许访问本地开发后端的 cleartext HTTP。
   - 使用 Retrofit 调用 FastAPI 后端。
-  - Retrofit base URL 当前为 `http://10.0.2.2:8000/`。
+  - Retrofit base URL 默认值为 `http://10.0.2.2:8000/`，可通过 Gradle `-PsmartfeedBaseUrl=https://.../` 在构建时切换。
   - 已封装 `SmartFeedApi`、`SmartFeedNetwork`、`UploadRepository`、`ChatRepository`。
   - 已实现 `/upload` 请求模型和响应模型。
   - 已实现 `/chat` 请求模型和响应模型。
@@ -659,10 +663,12 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - LLM API：Chat Completions
 - LLM model：deepseek-chat
 - Env loader：python-dotenv
+- Health check：`GET /health`
+- CORS origins env：`CORS_ALLOW_ORIGINS`
 - Optional RAG orchestration：langchain-core
 - LLM API key env：`DEEPSEEK_API_KEY`
 - Test framework：pytest
-- Persistence path：`chroma_db`
+- Chroma persistence env：`CHROMA_PERSIST_DIR`，默认 `chroma_db`
 - Python package list：`requirements.txt`
 - Android：Kotlin
 - Android UI：Jetpack Compose / Material 3

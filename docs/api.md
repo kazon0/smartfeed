@@ -1,6 +1,6 @@
 # SmartFeed API
 
-Except for `GET /`, `GET /debug`, `POST /auth/register`, and `POST /auth/login`,
+Except for `GET /`, `GET /health`, `GET /debug`, `POST /auth/register`, and `POST /auth/login`,
 all endpoints require `Authorization: Bearer $ACCESS_TOKEN`. Article, search,
 statistics, insights, upload, and chat data are scoped to the authenticated user.
 
@@ -30,6 +30,28 @@ curl http://127.0.0.1:8000/
 
 - Server is not running.
 - Port is not `8000`.
+
+## GET /health
+
+Deployment health check.
+
+### Request JSON
+
+No request body.
+
+### Response JSON
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### curl
+
+```bash
+curl http://127.0.0.1:8000/health
+```
 
 ## POST /auth/register
 

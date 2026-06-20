@@ -1,24 +1,11 @@
-import os
 from collections.abc import Generator
 
-from dotenv import load_dotenv
 from sqlalchemy import Engine
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
-
-
-def database_url() -> str:
-    url = os.getenv("DATABASE_URL", "").strip()
-    if not url:
-        raise RuntimeError("DATABASE_URL is not set")
-    if url.startswith("postgres://"):
-        return "postgresql+psycopg://" + url.removeprefix("postgres://")
-    if url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
-    return url
+from app.core.config import database_url
 
 
 def create_database_engine(url: str | None = None) -> Engine:

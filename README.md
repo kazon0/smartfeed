@@ -62,7 +62,14 @@ DEEPSEEK_API_KEY=your_api_key_here
 DATABASE_URL=postgresql+psycopg://smartfeed:smartfeed@localhost:5432/smartfeed
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_ACCESS_TOKEN_MINUTES=60
+SMARTFEED_RAG_PIPELINE=classic
+CHROMA_PERSIST_DIR=chroma_db
+CORS_ALLOW_ORIGINS=
 ```
+
+For production, set `CHROMA_PERSIST_DIR` to a mounted persistent volume and set
+`CORS_ALLOW_ORIGINS` to comma-separated HTTPS origins if a browser client is
+served from a different domain.
 
 Create or upgrade the cloud metadata schema:
 
@@ -87,6 +94,7 @@ The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messag
 ## Main API Endpoints
 
 - `GET /` health check
+- `GET /health` deployment health check
 - `POST /auth/register` create an account and return a bearer token
 - `POST /auth/login` authenticate and return a bearer token
 - `GET /auth/me` return the authenticated user
@@ -143,7 +151,12 @@ The Android client currently uses:
 http://10.0.2.2:8000
 ```
 
-as the backend base URL for the emulator.
+as the default backend base URL for the emulator. Build against a deployed
+backend with:
+
+```bash
+./gradlew assembleDebug -PsmartfeedBaseUrl=https://your-api.example.com/
+```
 
 Build check:
 

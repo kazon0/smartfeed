@@ -1,6 +1,7 @@
 package com.example.smartfeedandroid.data.remote
 
 import android.content.Context
+import com.example.smartfeedandroid.BuildConfig
 import com.example.smartfeedandroid.data.auth.AuthSession
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -11,8 +12,6 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
 object SmartFeedNetwork {
-    private const val BASE_URL = "http://10.0.2.2:8000/"
-
     fun initialize(context: Context) {
         AuthSession.initialize(context.applicationContext)
     }
@@ -52,7 +51,7 @@ object SmartFeedNetwork {
 
     val api: SmartFeedApi by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(BuildConfig.SMARTFEED_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
