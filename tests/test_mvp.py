@@ -264,6 +264,72 @@ def test_llm_compress_context_returns_text(monkeypatch):
     assert compressed == "[1] 快速排序核心上下文"
 
 
+def test_llm_compress_context_balances_input_across_long_chunks(monkeypatch):
+    service = LLMService()
+    captured = {}
+
+    def fake_chat(prompt):
+        captured["prompt"] = prompt
+        return "压缩结果"
+
+    monkeypatch.setattr(service, "_chat", fake_chat)
+    context_chunks = [
+        f"[{index}] section_title: 第{index}章\n" + character * 6000
+        for index, character in ((1, "甲"), (2, "乙"), (3, "丙"))
+    ]
+
+    service.compress_context("总结三章", context_chunks)
+
+    prompt = captured["prompt"]
+    assert "section_title: 第1章" in prompt
+    assert "section_title: 第2章" in prompt
+    assert "section_title: 第3章" in prompt
+    assert "丙" * 100 in prompt
+
+
+def test_chat_context_compression_falls_back_when_section_is_missing():
+    captured_context = []
+
+    class IncompleteCompressionLLM:
+        def compress_context(self, question, context_chunks):
+            return context_chunks[0]
+
+        def answer(self, question, context_chunks):
+            captured_context.extend(context_chunks)
+            return "综合回答"
+
+    service = ChatService(llm_service_factory=IncompleteCompressionLLM)
+    chunks = [
+        {
+            "content": "排序算法通过比较元素完成排序。",
+            "metadata": {
+                "url": "https://example.com/algorithms",
+                "title": "算法",
+                "section_title": "排序算法",
+                "section_index": 0,
+                "chunk_index": 0,
+            },
+        },
+        {
+            "content": "动态规划复用重叠子问题的计算结果。",
+            "metadata": {
+                "url": "https://example.com/algorithms",
+                "title": "算法",
+                "section_title": "动态规划",
+                "section_index": 1,
+                "chunk_index": 1,
+            },
+        },
+    ]
+
+    answer = service._build_context_answer("比较两种方法", chunks)
+
+    assert answer == "综合回答"
+    assert len(captured_context) == 2
+    assert "section_title: 排序算法" in captured_context[0]
+    assert "section_title: 动态规划" in captured_context[1]
+
+
 def test_llm_answer_prompt_requires_synthesized_explanation(monkeypatch):
     service = LLMService()
     captured = {}

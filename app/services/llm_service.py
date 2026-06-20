@@ -231,7 +231,7 @@ class LLMService:
         return indexes
 
     def compress_context(self, question: str, context_chunks: list[str]) -> str:
-        context = "\n\n".join(chunk.strip() for chunk in context_chunks if chunk.strip())
+        context = self._balanced_context_input(context_chunks)
         if not context:
             return ""
 
@@ -240,17 +240,31 @@ class LLMService:
             "要求："
             "1. 只保留与 question 相关的信息；"
             "2. 保留来源编号、title、url、section_title、chunk_index 等来源头信息；"
-            "3. 如果包含代码、算法步骤、方法列表、数字、结论，必须尽量保留；"
-            "4. 删除广告、导航、无关推荐、重复句子和噪声；"
-            "5. 不要回答 question，只输出压缩后的 context；"
-            "6. 如果 context 中没有相关信息，返回空字符串。\n\n"
+            "3. 如果 context 包含多个相关 section 或多个 URL，每个都至少保留一条关键依据；"
+            "4. 如果包含代码、算法步骤、方法列表、数字、结论，必须尽量保留；"
+            "5. 删除广告、导航、无关推荐、重复句子和噪声；"
+            "6. 不要回答 question，只输出压缩后的 context；"
+            "7. 如果 context 中没有相关信息，返回空字符串。\n\n"
             f"question:\n{question.strip()}\n\n"
-            f"context:\n{context[:12000]}"
+            f"context:\n{context}"
         )
         response = self._chat(prompt)
         if response.startswith("LLM unavailable"):
             return ""
         return response.strip()
+
+    def _balanced_context_input(
+        self,
+        context_chunks: list[str],
+        limit: int = 12000,
+    ) -> str:
+        chunks = [chunk.strip() for chunk in context_chunks if chunk.strip()]
+        if not chunks:
+            return ""
+
+        separator_length = 2 * (len(chunks) - 1)
+        chunk_limit = max(1, (limit - separator_length) // len(chunks))
+        return "\n\n".join(chunk[:chunk_limit] for chunk in chunks)[:limit]
 
     def describe_sources(self, question: str, source_texts: list[str]) -> list[str]:
         if not source_texts:

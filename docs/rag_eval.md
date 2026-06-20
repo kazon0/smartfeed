@@ -10,6 +10,7 @@
 
 - 长文章跨章节问题会在 context chunk 上限内均衡保留每个命中 section，避免前置长章节挤掉后续章节依据。
 - 轻量排序会同时考虑正文、`section_title` 和文章标题，并优先提高章节标题命中，避免代词较多的正文 chunk 被顺带提及关键词的其他章节压过。
+- context compression 输入会在候选 chunks 间均衡分配字符预算；若压缩输出遗漏多个 section 或多个 URL 中的任一个，则回退原始 context。
 - 页面级总结会在多个正文 section 间均衡取样，避免只总结召回最强的单一章节。
 
 运行：

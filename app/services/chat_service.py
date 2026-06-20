@@ -911,7 +911,41 @@ class ChatService:
 
         if not compressed_context or compressed_context.startswith("LLM unavailable"):
             return ""
+        if not self._compression_preserves_context_coverage(
+            compressed_context,
+            context_chunks,
+        ):
+            return ""
         return compressed_context
+
+    def _compression_preserves_context_coverage(
+        self,
+        compressed_context: str,
+        context_chunks: list[str],
+    ) -> bool:
+        urls = {
+            match.group(1)
+            for chunk in context_chunks
+            if (match := re.search(r"\burl:\s*(\S+)", chunk))
+        }
+        section_titles = {
+            match.group(1).strip()
+            for chunk in context_chunks
+            if (
+                match := re.search(
+                    r"\bsection_title:\s*(.*?)(?:\s+section_index:|\n|$)",
+                    chunk,
+                )
+            )
+        }
+
+        if len(urls) > 1 and any(url not in compressed_context for url in urls):
+            return False
+        if len(section_titles) > 1 and any(
+            title not in compressed_context for title in section_titles
+        ):
+            return False
+        return True
 
     def _format_context_chunk(self, index: int, chunk: dict) -> str:
         metadata = chunk.get("metadata", {})

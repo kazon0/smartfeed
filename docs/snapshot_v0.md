@@ -155,6 +155,7 @@
     - 回答 prompt 要求先综合相关片段的上下文关系，再用自然语言解释，避免按 chunk 顺序机械拼接摘要。
     - 送入回答 LLM 的 context 会保留正文 URL、Markdown 和代码，并截断同一 chunk 中原创声明、相关推荐等尾部噪声。
     - 回答前会尝试调用 `LLMService.compress_context()` 压缩上下文，保留与问题相关的来源头信息、步骤、代码、清单和结论。
+    - compression 输入会在候选 chunks 间均衡分配长度预算；压缩输出遗漏跨 section 或跨 URL 依据时回退原始 context。
     - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
     - 返回 sources 时会合并同一 URL、同一 section 下连续 chunks，形成更适合前端展示的引用块。

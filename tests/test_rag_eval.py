@@ -262,6 +262,23 @@ def test_rag_eval_section_title_keeps_pronoun_heavy_section_ranked_first():
     assert ranked[0]["metadata"]["section_title"] == "动态规划"
 
 
+def test_rag_eval_incomplete_cross_section_compression_is_rejected():
+    service = make_service()
+    context_chunks = [
+        "[1] url: https://example.com/article section_title: 第一章 section_index: 0\n第一章依据",
+        "[2] url: https://example.com/article section_title: 第二章 section_index: 1\n第二章依据",
+    ]
+
+    assert not service._compression_preserves_context_coverage(
+        context_chunks[0],
+        context_chunks,
+    )
+    assert service._compression_preserves_context_coverage(
+        "\n".join(context_chunks),
+        context_chunks,
+    )
+
+
 def test_rag_eval_cross_section_context_keeps_each_matched_section():
     service = make_service()
     first_section = [
