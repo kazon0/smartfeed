@@ -108,6 +108,8 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - `ConversationManagerTest` 覆盖文章 conversation 元数据、URL 归一化去重、重复上传时摘要替换、新 conversation 排序和消息追加规则。
 - `ConversationMappersTest` 覆盖 conversation 完整 round-trip、旧 `sourceUrl` fallback、未知旧消息类型兼容和消息顺序。
 - `SmartFeedDatabaseMigrationTest` 使用 SQLite JDBC 内存数据库执行 Room 共用的 migration SQL，验证 `1 -> 2 -> 3`、messages 表创建以及旧 conversation metadata 回填。
+- `ConversationFiltersTest` 覆盖 topic 优先级和 fallback、筛选项排序、筛选匹配以及最近消息搜索范围。
+- `ChatCoordinatorTest` 覆盖 `/chat` history 的消息类型映射、错误过滤、助手消息 fallback 和最近 8 条限制。
 - 这些规则使用本地 JVM 单元测试运行，不依赖 Android 设备或后端服务。
 
 ## 后续建议

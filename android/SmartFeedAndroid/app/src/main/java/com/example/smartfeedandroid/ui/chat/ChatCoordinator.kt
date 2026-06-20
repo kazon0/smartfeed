@@ -20,24 +20,24 @@ class ChatCoordinator(
             }
         )
     }
+}
 
-    private fun chatHistoryFrom(messages: List<ChatMessage>): List<ChatHistoryItem> {
-        return messages
-            .mapNotNull { message ->
-                when (message) {
-                    is ChatMessage.User -> ChatHistoryItem("user", message.text)
-                    is ChatMessage.Summary -> ChatHistoryItem("summary", message.text)
-                    is ChatMessage.Assistant -> {
-                        val content = message.response.answer.ifBlank {
-                            message.response.message
-                        }
-                        content.takeIf { it.isNotBlank() }?.let {
-                            ChatHistoryItem("assistant", it)
-                        }
+internal fun chatHistoryFrom(messages: List<ChatMessage>): List<ChatHistoryItem> {
+    return messages
+        .mapNotNull { message ->
+            when (message) {
+                is ChatMessage.User -> ChatHistoryItem("user", message.text)
+                is ChatMessage.Summary -> ChatHistoryItem("summary", message.text)
+                is ChatMessage.Assistant -> {
+                    val content = message.response.answer.ifBlank {
+                        message.response.message
                     }
-                    is ChatMessage.Error -> null
+                    content.takeIf { it.isNotBlank() }?.let {
+                        ChatHistoryItem("assistant", it)
+                    }
                 }
+                is ChatMessage.Error -> null
             }
-            .takeLast(8)
-    }
+        }
+        .takeLast(8)
 }
