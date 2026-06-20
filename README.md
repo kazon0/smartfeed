@@ -92,6 +92,11 @@ sh scripts/start_server.sh
 The deployment entrypoint runs Alembic migrations by default and starts Uvicorn
 on `$PORT`. See `docs/deployment.md` for required environment variables,
 ChromaDB persistent volume setup, and Android production build verification.
+GitHub Actions publishes the backend image to:
+
+```text
+ghcr.io/kazon0/smartfeed-api:latest
+```
 
 Health check:
 

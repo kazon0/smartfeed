@@ -10,6 +10,17 @@ metadata storage and a persistent ChromaDB directory.
 - Persistent disk or volume mounted for ChromaDB
 - DeepSeek API key
 
+## Docker Image
+
+GitHub Actions builds and publishes the backend image on every push to `main`:
+
+```text
+ghcr.io/kazon0/smartfeed-api:latest
+```
+
+Use this image in Sealos or any container platform when deploying from a
+prebuilt image instead of building from the Git repository.
+
 ## Environment Variables
 
 ```env
