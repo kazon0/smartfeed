@@ -3,8 +3,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db.dependencies import get_db
 from app.main import app
 from app.routes.auth import get_current_user
+from app.services.article_service import ArticleService
 from app.services.chat_service import ChatService
 from app.services.langchain_rag_pipeline import LangChainRAGPipeline
 from app.services.llm_service import LLMService
@@ -20,9 +22,14 @@ TEST_USER = SimpleNamespace(id="test-user-id")
 
 @pytest.fixture(autouse=True)
 def authenticated_user():
+    def override_get_db():
+        yield None
+
     app.dependency_overrides[get_current_user] = lambda: TEST_USER
+    app.dependency_overrides[get_db] = override_get_db
     yield
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_db, None)
 
 
 def test_root_status_ok():
@@ -33,8 +40,6 @@ def test_root_status_ok():
 
 
 def test_business_api_requires_authentication():
-    from app.db.dependencies import get_db
-
     def override_get_db():
         yield None
 
@@ -118,6 +123,63 @@ def test_auth_register_login_and_current_user(monkeypatch):
         assert client.get("/auth/me").status_code == 401
     finally:
         app.dependency_overrides.pop(get_db, None)
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_article_service_isolates_same_url_by_owner():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db.base import Base
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    service = ArticleService()
+    url = "https://example.com/shared"
+    try:
+        service.upsert(
+            db,
+            owner_id="user-a",
+            url=url,
+            title="A",
+            topic="科技",
+            summary="A summary",
+            chunk_count=2,
+        )
+        service.upsert(
+            db,
+            owner_id="user-b",
+            url=url,
+            title="B",
+            topic="学习",
+            summary="B summary",
+            chunk_count=3,
+        )
+        service.upsert(
+            db,
+            owner_id="user-a",
+            url=url,
+            title="A updated",
+            topic="科技",
+            summary="A updated summary",
+            chunk_count=4,
+        )
+
+        articles_a = service.list(db, owner_id="user-a")
+        articles_b = service.list(db, owner_id="user-b")
+        assert len(articles_a) == 1
+        assert articles_a[0].title == "A updated"
+        assert articles_a[0].chunk_count == 4
+        assert len(articles_b) == 1
+        assert articles_b[0].title == "B"
+
+        assert service.delete(db, owner_id="user-a", url=url) is True
+        assert service.list(db, owner_id="user-a") == []
+        assert len(service.list(db, owner_id="user-b")) == 1
+    finally:
+        db.close()
         Base.metadata.drop_all(engine)
         engine.dispose()
 
@@ -715,8 +777,9 @@ def test_stats_returns_content_distribution(monkeypatch):
 
 
 def test_articles_list_returns_saved_articles(monkeypatch):
-    class FakeVectorStoreService:
-        def list_articles(self):
+    class FakeArticleService:
+        def list(self, db, *, owner_id):
+            assert owner_id == TEST_USER.id
             return [
                 {
                     "url": "https://example.com/a",
@@ -727,7 +790,10 @@ def test_articles_list_returns_saved_articles(monkeypatch):
                 }
             ]
 
-    monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+        def to_list_item(self, article):
+            return article
+
+    monkeypatch.setattr("app.routes.articles.ArticleService", FakeArticleService)
 
     response = client.get("/articles")
     data = response.json()
@@ -740,11 +806,11 @@ def test_articles_list_returns_saved_articles(monkeypatch):
 
 
 def test_article_status_returns_existing_article(monkeypatch):
-    class FakeVectorStoreService:
-        def article_status(self, url):
+    class FakeArticleService:
+        def get(self, db, *, owner_id, url):
+            assert owner_id == TEST_USER.id
             assert url == "https://example.com/a"
             return {
-                "exists": True,
                 "url": url,
                 "title": "A",
                 "domain": "example.com",
@@ -752,7 +818,10 @@ def test_article_status_returns_existing_article(monkeypatch):
                 "chunk_count": 3,
             }
 
-    monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+        def status(self, article, *, url):
+            return {"exists": True, **article}
+
+    monkeypatch.setattr("app.routes.articles.ArticleService", FakeArticleService)
 
     response = client.get("/articles/status", params={"url": "https://example.com/a"})
     data = response.json()
@@ -791,8 +860,8 @@ def test_vector_store_article_status_returns_missing_for_unknown_url():
 
 
 def test_insights_returns_smart_summary(monkeypatch):
-    class FakeVectorStoreService:
-        def list_articles(self):
+    class FakeArticleService:
+        def list(self, db, *, owner_id):
             return [
                 {
                     "url": "https://example.com/a",
@@ -802,6 +871,9 @@ def test_insights_returns_smart_summary(monkeypatch):
                     "topic": "科技",
                 }
             ]
+
+        def to_list_item(self, article):
+            return article
 
     class FakeLLMService:
         def summarize_knowledge_base(self, articles):
@@ -813,7 +885,7 @@ def test_insights_returns_smart_summary(monkeypatch):
                 "source": "llm",
             }
 
-    monkeypatch.setattr("app.routes.insights.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.insights.ArticleService", FakeArticleService)
     monkeypatch.setattr("app.routes.insights.LLMService", FakeLLMService)
 
     response = client.get("/insights")
@@ -864,9 +936,14 @@ def test_upload_stores_llm_topic_metadata(monkeypatch):
             captured["metadata"] = metadata
             return len(chunks)
 
+    class FakeArticleService:
+        def upsert(self, db, **values):
+            captured["article"] = values
+
     monkeypatch.setattr("app.routes.upload.WebParserService", FakeWebParserService)
     monkeypatch.setattr("app.routes.upload.LLMService", FakeLLMService)
     monkeypatch.setattr("app.routes.upload.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.upload.ArticleService", FakeArticleService)
 
     response = client.post(
         "/upload",
@@ -879,6 +956,8 @@ def test_upload_stores_llm_topic_metadata(monkeypatch):
     assert data["data"]["metadata"]["topic"] == "新闻"
     assert captured["metadata"]["topic"] == "新闻"
     assert captured["metadata"]["topic_source"] == "llm"
+    assert captured["article"]["owner_id"] == TEST_USER.id
+    assert captured["article"]["chunk_count"] == 1
 
 
 def test_vector_store_classifies_baidu_cctv_article_as_news():
@@ -899,7 +978,14 @@ def test_articles_delete_by_url(monkeypatch):
             assert url == "https://example.com/a"
             return 3
 
+    class FakeArticleService:
+        def delete(self, db, *, owner_id, url):
+            assert owner_id == TEST_USER.id
+            assert url == "https://example.com/a"
+            return True
+
     monkeypatch.setattr("app.routes.articles.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.articles.ArticleService", FakeArticleService)
 
     response = client.request(
         "DELETE",

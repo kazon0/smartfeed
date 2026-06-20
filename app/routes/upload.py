@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from app.db.dependencies import get_db
 from app.models.user import User
 from app.routes.auth import get_current_user
+from app.services.article_service import ArticleService
 from app.services.llm_service import LLMService
 from app.services.vector_store import VectorStoreService
 from app.services.web_parser import WebParserService
@@ -15,7 +18,11 @@ class UploadRequest(BaseModel):
 
 
 @router.post("/upload")
-def upload_article(request: UploadRequest, user: User = Depends(get_current_user)):
+def upload_article(
+    request: UploadRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     data = WebParserService().prepare(request.url)
     stored_chunks = 0
     summary = ""
@@ -66,6 +73,15 @@ def upload_article(request: UploadRequest, user: User = Depends(get_current_user
             data["chunks"],
             metadata,
             data.get("chunk_metadata"),
+        )
+        ArticleService().upsert(
+            db,
+            owner_id=str(user.id),
+            url=data["url"],
+            title=data["title"],
+            topic=topic,
+            summary=summary,
+            chunk_count=stored_chunks,
         )
 
     return {

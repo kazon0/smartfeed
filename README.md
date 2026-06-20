@@ -82,7 +82,7 @@ Health check:
 curl http://127.0.0.1:8000/
 ```
 
-The PostgreSQL schema currently provides `users`, `articles`, `conversations`, and `messages`. Existing APIs still use the current single-user storage path until authentication and repository integration are completed.
+The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messages`. Authentication and article metadata now use PostgreSQL; ChromaDB stores user-scoped chunks for retrieval. Conversation and message sync APIs are the next repository integration step.
 
 ## Main API Endpoints
 

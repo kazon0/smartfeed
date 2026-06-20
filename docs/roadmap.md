@@ -55,7 +55,7 @@
 
 ## 3. 注册登录与用户隔离
 
-状态：后端 JWT 认证和 Chroma `user_id` 强制隔离已完成；PostgreSQL 业务元数据持久化与跨设备会话同步仍待完成。
+状态：后端 JWT 认证、PostgreSQL article metadata 和 Chroma `user_id` 强制隔离已完成；conversation/message 跨设备同步仍待完成。
 
 目标：实现可实际使用的多用户知识库。
 

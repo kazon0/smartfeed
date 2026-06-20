@@ -116,7 +116,7 @@ curl http://127.0.0.1:8000/debug
 
 ## POST /upload
 
-Fetches a web page, extracts readable content, chunks it, stores chunks in ChromaDB, and returns a DeepSeek summary.
+Fetches a web page, extracts readable content, stores user-scoped chunks in ChromaDB, upserts article metadata in PostgreSQL, and returns a DeepSeek summary.
 
 ### Request JSON
 
@@ -314,7 +314,7 @@ curl http://127.0.0.1:8000/stats
 
 ## GET /articles
 
-Lists saved articles currently represented in ChromaDB.
+Lists the authenticated user's saved article metadata from PostgreSQL.
 
 ### Request JSON
 
@@ -346,11 +346,11 @@ curl http://127.0.0.1:8000/articles
 ### Typical Failures
 
 - No uploaded content returns an empty list.
-- ChromaDB dependencies or local database files are unavailable.
+- PostgreSQL is unavailable or migrations have not been applied.
 
 ## GET /articles/status
 
-Returns whether a single URL already exists in the local ChromaDB knowledge base.
+Returns whether a single URL exists in the authenticated user's PostgreSQL article records.
 
 This is intended for Android share/open flows that need to decide whether a URL
 has already been ingested before uploading again.
@@ -397,7 +397,7 @@ curl "http://127.0.0.1:8000/articles/status?url=https%3A%2F%2Fexample.com%2Farti
 
 - Missing `url` query parameter returns FastAPI validation error.
 - URL has never been uploaded or has been deleted: `exists` is `false`.
-- ChromaDB dependencies or local database files are unavailable.
+- PostgreSQL is unavailable or migrations have not been applied.
 
 ## GET /insights
 
@@ -436,11 +436,11 @@ curl http://127.0.0.1:8000/insights
 
 - No uploaded content returns a fallback summary and empty highlights.
 - If `DEEPSEEK_API_KEY` is not configured or the LLM request fails, the API returns a rule-based fallback summary with `source: "fallback"`.
-- ChromaDB dependencies or local database files are unavailable.
+- PostgreSQL is unavailable or migrations have not been applied.
 
 ## DELETE /articles
 
-Deletes all chunks for a saved article URL.
+Deletes the authenticated user's PostgreSQL article record and matching ChromaDB chunks.
 
 ### Request JSON
 

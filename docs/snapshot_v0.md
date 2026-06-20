@@ -19,8 +19,8 @@
 - `GET /articles`
   - 定义位置：`app/routes/articles.py`
   - 当前流程：
-    - 调用 `VectorStoreService.list_articles()`。
-    - 基于 ChromaDB chunks metadata 聚合已保存文章。
+    - 调用 `ArticleService.list()`。
+    - 从 PostgreSQL `articles` 表按当前 owner 查询文章元数据。
   - 返回字段：
     - `articles`
     - `total`
@@ -85,6 +85,7 @@
     - 将 `topic`、`topic_source`、`topic_confidence`、`topic_reason` 写入网页 metadata。
     - 调用 `VectorStoreService.delete_by_url(url)` 删除同 URL 旧 chunks。
     - 调用 `VectorStoreService.add_chunks(chunks, metadata, chunk_metadata)` 写入 ChromaDB。
+    - 调用 `ArticleService.upsert()` 将 title、topic、summary 和 chunk_count 写入 PostgreSQL。
   - 返回字段：
     - `status`
     - `data`
@@ -630,7 +631,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
 - Android 当前没有登录、WebSocket 或 session。
-- PostgreSQL schema 已建立，但现有 API 仍运行在单用户存储路径，尚未执行 JWT 鉴权或 `user_id` 隔离。
+- PostgreSQL schema、JWT 鉴权、文章 metadata repository 和 Chroma `user_id` 隔离已接入；conversation/message 云同步 API 尚未实现。
 - Android 分享入口当前只处理 `text/plain` 中的第一个 `http` / `https` URL。
 - Android Profile 当前只是占位页，没有真实用户功能。
 
