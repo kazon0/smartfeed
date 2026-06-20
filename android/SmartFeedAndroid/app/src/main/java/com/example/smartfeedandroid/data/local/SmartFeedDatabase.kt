@@ -35,29 +35,39 @@ abstract class SmartFeedDatabase : RoomDatabase() {
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS messages (
-                        id TEXT NOT NULL PRIMARY KEY,
-                        conversationId TEXT NOT NULL,
-                        messageIndex INTEGER NOT NULL,
-                        type TEXT NOT NULL,
-                        text TEXT NOT NULL,
-                        responseJson TEXT NOT NULL
-                    )
-                    """.trimIndent()
-                )
+                MIGRATION_1_2_STATEMENTS.forEach { statement ->
+                    db.execSQL(statement)
+                }
             }
         }
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE conversations ADD COLUMN sourceUrl TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE conversations ADD COLUMN topic TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE conversations ADD COLUMN createdAtMillis INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("UPDATE conversations SET sourceUrl = url WHERE sourceUrl = ''")
-                db.execSQL("UPDATE conversations SET createdAtMillis = updatedAtMillis WHERE createdAtMillis = 0")
+                MIGRATION_2_3_STATEMENTS.forEach { statement ->
+                    db.execSQL(statement)
+                }
             }
         }
+
+        internal val MIGRATION_1_2_STATEMENTS = listOf(
+            """
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT NOT NULL PRIMARY KEY,
+                conversationId TEXT NOT NULL,
+                messageIndex INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                text TEXT NOT NULL,
+                responseJson TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
+
+        internal val MIGRATION_2_3_STATEMENTS = listOf(
+            "ALTER TABLE conversations ADD COLUMN sourceUrl TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE conversations ADD COLUMN topic TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE conversations ADD COLUMN createdAtMillis INTEGER NOT NULL DEFAULT 0",
+            "UPDATE conversations SET sourceUrl = url WHERE sourceUrl = ''",
+            "UPDATE conversations SET createdAtMillis = updatedAtMillis WHERE createdAtMillis = 0"
+        )
     }
 }
