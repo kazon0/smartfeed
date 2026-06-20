@@ -320,6 +320,7 @@
   - Android UI 已按 feature 拆分到 `ui/home`、`ui/chat`、`ui/analysis`、`ui/articles`、`ui/navigation`、`ui/common`、`ui/profile`。
   - 根页面共享状态已拆到 `ui/state/HomeUiState.kt`。
   - Home tab 展示 URL 输入、上传入口和内存级历史对话列表。
+  - Home 最近对话列表 UI 已拆到 `ui/home/HomeConversationList.kt`。
   - Home tab 不再在右上角展示新聊天按钮，新聊天入口已移动到底部栏中间的加号动作。
   - Home 页面实现位置：`ui/home/HomeScreen.kt`。
   - 点击 Home 中的 conversation 会进入聊天详情页。

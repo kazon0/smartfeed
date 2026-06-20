@@ -30,6 +30,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Bottom navigation：当前包含 `首页`、`文章`、中间 `新聊天` 加号动作、`分析`、`我的`。
 - Feature UI：
   - `ui/home/HomeScreen.kt`
+  - `ui/home/HomeConversationList.kt`
   - `ui/chat/ChatDetailScreen.kt`
   - `ui/chat/ChatBubbles.kt`
   - `ui/chat/ChatSourceCard.kt`
@@ -57,6 +58,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`
 - Local conversation filters：`ui/home/ConversationFilters.kt`，保存 Home 最近对话筛选、搜索和 topic fallback 规则。
+- Home conversation list UI：`ui/home/HomeConversationList.kt` 保存最近对话列表、筛选菜单、左滑删除和 topic 角标。
 - Local persistence mapper：`ui/home/ConversationMappers.kt`
 - Local persistence coordinator：`ui/home/ConversationPersistence.kt`，封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
 - Repository：`data/repository/*`
