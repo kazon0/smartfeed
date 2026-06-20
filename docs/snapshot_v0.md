@@ -534,6 +534,7 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - Android Analysis Topic share 已改为按文章数量统计 topic。
 - Android 文章管理页已使用 topic tabs 展示已保存文章。
 - Android 文章管理页已支持点击文章后新建文章聊天。
+- Android 文章页已支持本地搜索、topic 筛选以及标题和片段数排序。
 - Android 文章管理页已支持左滑显示删除按钮。
 
 ## 5. 当前系统边界

@@ -61,6 +61,13 @@
     <string name="source_domains">来源网站</string>
     <string name="no_source_domains">还没有来源网站统计。</string>
     <string name="saved_articles">已保存文章</string>
+    <string name="search_articles">搜索标题、主题、来源或网址...</string>
+    <string name="article_result_count">%1$d 篇文章</string>
+    <string name="article_sort_default">默认顺序</string>
+    <string name="article_sort_title">按标题排序</string>
+    <string name="article_sort_chunks">按片段数排序</string>
+    <string name="no_matching_articles">没有匹配的文章</string>
+    <string name="adjust_article_filters">请调整搜索词或主题筛选。</string>
     <string name="articles_error">文章列表错误</string>
     <string name="no_saved_articles">暂无已保存文章</string>
     <string name="upload_articles_first">请先保存或分享文章。</string>

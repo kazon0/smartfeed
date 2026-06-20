@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,25 +71,18 @@ fun ArticleManagerScreen(
     onDeleteArticle: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val groupedArticles = articles.groupBy { it.topic.ifBlank { "其他" } }
-    val topicOrder = listOf("科技", "学习", "健康", "职业", "财经", "生活", "新闻", "其他")
-    val orderedTopics = groupedArticles.keys.sortedWith(
-        compareBy<String> { topic ->
-            topicOrder.indexOf(topic).takeIf { it >= 0 } ?: topicOrder.size
-        }.thenBy { it }
-    )
-
-    val tabs = listOf("全部") + orderedTopics
-
+    val tabs = articleTopics(articles)
     var selectedTopic by remember(tabs) {
         mutableStateOf(tabs.first())
     }
-
-    val visibleArticles = if (selectedTopic == "全部") {
-        articles
-    } else {
-        groupedArticles[selectedTopic].orEmpty()
-    }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var articleSort by rememberSaveable { mutableStateOf(ArticleSort.Default) }
+    val filteredArticles = visibleArticles(
+        articles = articles,
+        selectedTopic = selectedTopic,
+        searchQuery = searchQuery,
+        sort = articleSort
+    )
 
     Column(
         modifier = modifier
@@ -138,6 +132,13 @@ fun ArticleManagerScreen(
         }
 
         if (!isLoadingArticles && articles.isNotEmpty()) {
+            ArticleSearchAndSort(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                articleSort = articleSort,
+                onSelectSort = { articleSort = it },
+                visibleArticleCount = filteredArticles.size
+            )
             TopicTabs(
                 topics = tabs,
                 selectedTopic = selectedTopic,
@@ -167,6 +168,15 @@ fun ArticleManagerScreen(
                 }
             }
 
+            filteredArticles.isEmpty() -> {
+                ResultCard(title = stringResource(R.string.no_matching_articles)) {
+                    Text(
+                        text = stringResource(R.string.adjust_article_filters),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             else -> {
                 LazyColumn(
                     modifier = Modifier
@@ -174,7 +184,7 @@ fun ArticleManagerScreen(
                         .weight(1f)
                 ) {
                     items(
-                        items = visibleArticles,
+                        items = filteredArticles,
                         key = { article -> article.url }
                     ) { article ->
                         SwipeDeleteArticleRow(

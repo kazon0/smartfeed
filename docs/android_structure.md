@@ -78,6 +78,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - 如果后端已有该 URL 且 `chunk_count > 0`，Android 会跳过重复 `/upload`，直接新建一条文章聊天。
 - 如果后端没有该 URL，Android 才调用 `/upload` 解析并入库。
 - 文章管理页点击已保存文章也会新建一条文章聊天，不复用旧会话。
+- 文章页支持按标题、主题、来源和 URL 本地搜索，支持 topic 筛选以及默认、标题、片段数排序。
 - 文章聊天会把后端返回的 topic 保存到本地 conversation，Home 过滤和角标优先使用该字段，旧数据再回退到本地关键词推断。
 - 已保存文章列表现在是底部 `文章` tab 的一级页面，不再作为 Analysis 页的二级入口。
 
@@ -110,6 +111,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - `SmartFeedDatabaseMigrationTest` 使用 SQLite JDBC 内存数据库执行 Room 共用的 migration SQL，验证 `1 -> 2 -> 3`、messages 表创建以及旧 conversation metadata 回填。
 - `ConversationFiltersTest` 覆盖 topic 优先级和 fallback、筛选项排序、筛选匹配以及最近消息搜索范围。
 - `ChatCoordinatorTest` 覆盖 `/chat` history 的消息类型映射、错误过滤、助手消息 fallback 和最近 8 条限制。
+- `ArticleFiltersTest` 覆盖文章主题顺序、搜索字段组合、主题叠加筛选和排序规则。
 - 这些规则使用本地 JVM 单元测试运行，不依赖 Android 设备或后端服务。
 
 ## 后续建议
