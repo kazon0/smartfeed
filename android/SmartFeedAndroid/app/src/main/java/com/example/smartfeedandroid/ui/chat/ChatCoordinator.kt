@@ -1,10 +1,9 @@
 package com.example.smartfeedandroid.ui.chat
 
 import com.example.smartfeedandroid.data.remote.ChatHistoryItem
-import com.example.smartfeedandroid.data.remote.ChatResponse
 import com.example.smartfeedandroid.data.repository.ChatRepository
-
 import com.example.smartfeedandroid.ui.model.ChatMessage
+
 class ChatCoordinator(
     private val chatRepository: ChatRepository
 ) {
@@ -41,9 +40,4 @@ class ChatCoordinator(
             }
             .takeLast(8)
     }
-}
-
-sealed interface ChatResult {
-    data class Answer(val response: ChatResponse) : ChatResult
-    data class Failed(val message: String) : ChatResult
 }

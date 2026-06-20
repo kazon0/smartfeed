@@ -40,13 +40,14 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `ui/articles/ArticleManagerViewModel.kt`：文章管理页文章列表和删除文章。
 - State：
   - `ui/home/HomeUiState.kt`
-  - `ui/chat/ChatViewModel.kt` 中的 `ChatUiState`
+  - `ui/chat/ChatUiState.kt`
   - `ui/analysis/AnalysisViewModel.kt` 中的 `AnalysisUiState`
   - `ui/articles/ArticleManagerViewModel.kt` 中的 `ArticleManagerUiState`
 - Coordinators：
   - `ui/home/ConversationCoordinator.kt`：选择、删除、创建、打开 conversation，并处理消息追加后的本地状态。
   - `ui/home/ArticleUploadCoordinator.kt`：文章状态查询、已入库跳过上传、新文章上传。
   - `ui/chat/ChatCoordinator.kt`：构造最近聊天 history 并调用 `/chat`。
+- Chat local models：`ui/chat/ChatModels.kt` 保存 `ChatSendContext` 和 `ChatResult`，避免继续堆在 ViewModel 或 coordinator 文件中。
 - Model：`ui/model/Conversation.kt`、`ui/model/ChatMessage.kt`
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`

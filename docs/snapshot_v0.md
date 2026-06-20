@@ -345,6 +345,7 @@
   - `ConversationCoordinator` 负责选择、删除、创建、打开 conversation，以及消息追加后的本地状态计算。
   - `ArticleUploadCoordinator` 负责文章状态查询、已入库跳过上传、新文章上传。
   - `ChatCoordinator` 位于 `ui/chat`，负责构造最近聊天 history 并调用 `/chat`。
+  - `ChatUiState`、`ChatSendContext` 和 `ChatResult` 已从 `ChatViewModel` / `ChatCoordinator` 拆到独立 chat 文件。
   - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
   - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。

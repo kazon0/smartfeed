@@ -6,9 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.repository.ChatRepository
+import com.example.smartfeedandroid.ui.model.ChatMessage
 import kotlinx.coroutines.launch
 
-import com.example.smartfeedandroid.ui.model.ChatMessage
 class ChatViewModel : ViewModel() {
     private val chatCoordinator = ChatCoordinator(ChatRepository())
 
@@ -62,14 +62,3 @@ class ChatViewModel : ViewModel() {
         }
     }
 }
-
-data class ChatUiState(
-    val query: String = "",
-    val isAsking: Boolean = false
-)
-
-data class ChatSendContext(
-    val conversationId: String,
-    val activeUrl: String,
-    val historyMessages: List<ChatMessage>
-)
