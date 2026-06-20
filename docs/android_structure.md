@@ -53,6 +53,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`
 - Local persistence mapper：`ui/home/ConversationMappers.kt`
+- Local persistence coordinator：`ui/home/ConversationPersistence.kt`，封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
 - Repository：`data/repository/*`
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Local persistence：
@@ -79,6 +80,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 - `HomeViewModel` 目前仍是根页面状态协调者，负责 Home、分享入口、会话打开和持久化触发。
 - `ConversationManager` 承载本地会话规则，`ConversationCoordinator` 承载 UI state 切换，两者降低了 `HomeViewModel` 的直接复杂度。
+- `ConversationPersistence` 封装 `ConversationStore` 和 UI/storage mapper，避免 `HomeViewModel` 直接依赖 Room 持久化细节。
 - Room database、DAO、entity、migration 已从 `ConversationStore` 拆出，`ConversationStore` 只保留本地会话读写和 legacy SharedPreferences 迁移编排。
 - `ui/model` 文件少是正常的；只有跨页面共享且稳定的 UI model 才放这里，不需要为了“看起来分层”拆空模型。
 

@@ -349,6 +349,7 @@
   - `ChatUiState`、`ChatSendContext` 和 `ChatResult` 已从 `ChatViewModel` / `ChatCoordinator` 拆到独立 chat 文件。
   - 本地 conversation 规则已拆到 `ui/home/ConversationManager.kt`，包括创建全局聊天、创建文章聊天、追加消息、更新消息、上传 URL 后创建或更新上传结果对话。
   - Room 存储对象和 UI conversation/message 对象的转换已拆到 `ui/home/ConversationMappers.kt`。
+  - `ConversationPersistence` 封装 UI conversation 与 `ConversationStore` 之间的加载、保存和 mapper 调用。
   - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。
   - `Conversation` 当前明确保存 `sourceUrl`、`topic`、`title`、`createdAtMillis` 和 `updatedAtMillis`，用于稳定支持首页分类、文章入口和历史恢复。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。

@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smartfeedandroid.data.local.ConversationStore
 import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
@@ -24,7 +23,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         articleRepository = articleRepository,
         uploadRepository = uploadRepository
     )
-    private val conversationStore = ConversationStore(application.applicationContext)
+    private val conversationPersistence = ConversationPersistence(application.applicationContext)
     private val conversationManager = ConversationManager()
     private val conversationCoordinator = ConversationCoordinator(conversationManager)
 
@@ -33,7 +32,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            val conversations = conversationStore.load().map { it.toConversation() }
+            val conversations = conversationPersistence.load()
             uiState = uiState.copy(conversations = conversations)
         }
     }
@@ -210,7 +209,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun persistConversations(conversations: List<Conversation>) {
         viewModelScope.launch {
-            conversationStore.save(conversations.map { it.toStoredConversation() })
+            conversationPersistence.save(conversations)
         }
     }
 
