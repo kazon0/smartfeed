@@ -103,6 +103,11 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 在 Android Studio 中打开对应文件，切换到 `Split` 或 `Design` 即可查看预览。
 
+## Unit Tests
+
+- `ConversationManagerTest` 覆盖文章 conversation 元数据、URL 归一化去重、重复上传时摘要替换、新 conversation 排序和消息追加规则。
+- 这些规则使用本地 JVM 单元测试运行，不依赖 Android 设备或后端服务。
+
 ## 后续建议
 
 当前为了降低风险，会话模型仍保留在 `ui/home`。本地对话规则已从 `HomeViewModel` 拆到 `ConversationManager` 和 `ConversationCoordinator`，Room 映射已拆到 `ConversationMappers`，上传和聊天请求流程已拆到 coordinator，聊天输入和发送状态已拆到 `ChatViewModel`。后续如果继续规范化，可以再拆：
