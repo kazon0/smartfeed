@@ -553,6 +553,84 @@ Using an id already owned by another user returns HTTP `409`.
 Deletes one conversation and its messages only when it belongs to the current
 user. Returns `status: "not_found"` for missing or foreign conversations.
 
+## WebSocket /ws/chat
+
+Runs authenticated chat over WebSocket while keeping `POST /chat` as the stable
+fallback. The first version emits stage events plus the final full `/chat`
+response; it does not yet stream token-by-token answer deltas.
+
+### Connect
+
+Pass the JWT access token as a query parameter:
+
+```text
+wss://your-api.example.com/ws/chat?token=$ACCESS_TOKEN
+```
+
+The server also accepts an `Authorization: Bearer $ACCESS_TOKEN` header when the
+client can provide one.
+
+### Client Message
+
+Send the same payload shape as `POST /chat`:
+
+```json
+{
+  "query": "这篇文章讲了什么？",
+  "url": "https://example.com/article",
+  "mode": "page",
+  "history": [
+    {"role": "user", "content": "先总结一下"}
+  ]
+}
+```
+
+### Server Events
+
+Connection and auth status:
+
+```json
+{"type":"status","stage":"connected"}
+{"type":"status","stage":"authenticated"}
+```
+
+Per-message status:
+
+```json
+{"type":"status","stage":"retrieving"}
+{"type":"status","stage":"answering"}
+```
+
+Final response:
+
+```json
+{
+  "type": "completed",
+  "stage": "completed",
+  "response": {
+    "status": "ok",
+    "answer": "...",
+    "sources": []
+  }
+}
+```
+
+Typical error event:
+
+```json
+{
+  "type": "error",
+  "error_code": "UNAUTHORIZED",
+  "message": "Invalid or missing access token."
+}
+```
+
+Current `error_code` values:
+
+- `UNAUTHORIZED`
+- `INVALID_REQUEST`
+- `CHAT_FAILED`
+
 ## POST /chat
 
 Runs retrieval and sends retrieved context to DeepSeek to generate an answer.

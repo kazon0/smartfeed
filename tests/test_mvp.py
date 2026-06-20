@@ -135,6 +135,87 @@ def test_auth_register_login_and_current_user(monkeypatch):
         engine.dispose()
 
 
+def test_websocket_chat_requires_token():
+    with client.websocket_connect("/ws/chat") as websocket:
+        assert websocket.receive_json()["stage"] == "connected"
+        error = websocket.receive_json()
+
+    assert error["type"] == "error"
+    assert error["error_code"] == "UNAUTHORIZED"
+
+
+def test_websocket_chat_streams_status_and_final_response(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.db.base import Base
+
+    class FakeVectorStoreService:
+        def __init__(self):
+            self.user_id = None
+
+        def query(self, text, top_k=5, metadata_filter=None):
+            assert self.user_id
+            return []
+
+    class FakeLLMService:
+        def answer_without_context(self, question, reason):
+            return f"{reason}。websocket answer"
+
+    monkeypatch.setenv("JWT_SECRET", "test-secret-with-at-least-32-characters")
+    monkeypatch.setattr("app.routes.ws.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.ws.LLMService", FakeLLMService)
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_get_db():
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "email": "ws@example.com",
+                "password": "strong-password",
+                "display_name": "WebSocket User",
+            },
+        )
+        access_token = register_response.json()["access_token"]
+
+        with client.websocket_connect(f"/ws/chat?token={access_token}") as websocket:
+            assert websocket.receive_json()["stage"] == "connected"
+            assert websocket.receive_json()["stage"] == "authenticated"
+
+            websocket.send_json({"query": "unknown websocket question"})
+
+            assert websocket.receive_json()["stage"] == "retrieving"
+            assert websocket.receive_json()["stage"] == "answering"
+            completed = websocket.receive_json()
+
+        assert completed["type"] == "completed"
+        assert completed["stage"] == "completed"
+        assert completed["response"]["status"] == "ok"
+        assert completed["response"]["answer"].endswith("websocket answer")
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+        app.dependency_overrides[get_db] = empty_db_override
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
 def test_article_service_isolates_same_url_by_owner():
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker

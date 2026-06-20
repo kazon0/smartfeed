@@ -136,6 +136,7 @@ The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messag
 - `GET /conversations` restore the authenticated user's cloud conversations
 - `PUT /conversations/{id}` replace one conversation and its messages
 - `DELETE /conversations/{id}` delete one owned conversation
+- `WebSocket /ws/chat` authenticated chat status events and final answer
 
 All business endpoints require `Authorization: Bearer $ACCESS_TOKEN` and operate
 only on the authenticated user's data. Articles stored before user isolation must

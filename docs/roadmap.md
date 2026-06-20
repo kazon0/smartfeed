@@ -117,13 +117,15 @@
 
 ## 6. WebSocket 流式交互
 
+状态：后端 `/ws/chat` 第一版已完成，支持 JWT 鉴权、用户隔离、阶段事件和最终完整回答；Android WebSocket 接入和 token-by-token delta 仍待完成。
+
 目标：提供简历可展示的实时回答和长任务状态推送。
 
 范围：
 
 - FastAPI WebSocket chat endpoint。
 - WebSocket 握手鉴权和用户隔离。
-- 定义稳定事件协议，例如 `chat.started`、`retrieval.progress`、`answer.delta`、`chat.completed`、`chat.error`。
+- 定义稳定事件协议，例如 `status: connected/authenticated/retrieving/answering`、`completed` 和 `error`。
 - Android 使用 OkHttp WebSocket 展示流式回答和阶段状态。
 - 断线、超时和协议错误时回退现有 `POST /chat`。
 - 不在这一阶段引入通用 Agent 或任意工具调用。

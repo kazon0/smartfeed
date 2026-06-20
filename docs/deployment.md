@@ -141,4 +141,6 @@ config is explicitly changed.
 4. `/chat` answers against the uploaded article.
 5. `/conversations` restores Android chat history after reinstall or login on a
    second device.
-6. Restarting the service does not erase PostgreSQL rows or ChromaDB vectors.
+6. `/ws/chat?token=$ACCESS_TOKEN` emits `connected`, `authenticated`,
+   `retrieving`, `answering`, and `completed` events.
+7. Restarting the service does not erase PostgreSQL rows or ChromaDB vectors.

@@ -70,6 +70,7 @@ Backend 已实现：
 * ChromaDB chunks 按认证用户强制隔离
 * PostgreSQL article metadata upsert、列表、状态和删除
 * PostgreSQL conversation/message 云同步 API
+* `WebSocket /ws/chat` 后端第一版，支持 JWT token、阶段事件和最终完整回答
 * Android 注册、登录、Keystore 加密 token、Bearer 自动注入和退出登录
 * Android Room conversations 按认证 owner 分区
 * Android Room 与云端 conversation/message 自动同步
@@ -106,7 +107,7 @@ Backend 已实现：
 
 当前未实现：
 
-* WebSocket
+* Android WebSocket 接入
 * 密钥和数据库密码轮换后的部署复测
 * 实时搜索、天气、股价、汇率等外部实时工具
 
@@ -327,6 +328,6 @@ Android MVP 阶段：
 建议下一步：
 
 1. 轮换已暴露过的 DeepSeek key 和 PostgreSQL 密码，更新 Sealos 环境变量并复测 `/health`、注册和 Android 登录。
-2. 实现 WebSocket 流式回答和任务状态事件，并保留 `POST /chat` fallback。
-3. Android 接入 WebSocket，失败时回退 POST `/chat`。
+2. Android 接入 WebSocket，失败时回退 POST `/chat`。
+3. 后续将 `/ws/chat` 从阶段事件 + 完整回答升级为 token-by-token delta。
 4. 最后完成真机验收、README、架构图、APK、截图和演示视频。

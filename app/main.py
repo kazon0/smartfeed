@@ -11,6 +11,7 @@ from app.routes.insights import router as insights_router
 from app.routes.search import router as search_router
 from app.routes.stats import router as stats_router
 from app.routes.upload import router as upload_router
+from app.routes.ws import router as ws_router
 
 app = FastAPI()
 
@@ -33,6 +34,7 @@ app.include_router(insights_router)
 app.include_router(search_router)
 app.include_router(stats_router)
 app.include_router(upload_router)
+app.include_router(ws_router)
 
 
 @app.get("/")
