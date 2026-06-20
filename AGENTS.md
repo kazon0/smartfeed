@@ -211,8 +211,8 @@ Runtime/generated files that should not be committed:
 * 每次只做一个小闭环：实现、测试、文档、说明如何验证。
 * LangChain 当前只作为可选 RAG pipeline 包装层，启用方式是设置 `SMARTFEED_RAG_PIPELINE=langchain`。
 * 未设置 `SMARTFEED_RAG_PIPELINE` 时继续使用 classic pipeline。
-* 不提前引入 WebSocket；只有进入流式回答、长任务进度或实时交互阶段时再加入。
-* 不新增用户系统，除非明确要求。
+* WebSocket 已进入明确路线图，但应在认证、用户隔离和部署基础完成后接入，并保留 `POST /chat` fallback。
+* 用户系统已明确要求加入；使用 PostgreSQL、密码哈希、JWT 和服务端强制数据隔离，小步实现 migration、认证和业务接入。
 * 不修改 DeepSeek API key 管理方式，继续使用 `.env` + `python-dotenv`。
 * 不提交运行产物，例如 `chroma_db`、`__pycache__`、`.pyc`。
 * 修改 `/chat` 回答策略、fallback、sources 展示时优先修改 `app/services/chat_service.py`，保持 `app/routes/chat.py` 只做请求入口。
@@ -319,6 +319,8 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 验证 Android 分享入口、本地 Room 历史恢复、Analysis 主题占比和文章管理页。
-2. 继续优化 RAG 检索和回答质量，优先考虑 rerank、context compression。
-3. 后续再处理更复杂的本地数据结构，例如拆分 messages 表。
+1. 统一 classic/LangChain pipeline `run()` 边界并完成真实 Runnable chain。
+2. 引入 PostgreSQL schema、migration、JWT 注册登录和 `user_id` 数据隔离。
+3. 接入 Android 账号、云端 conversation/message 同步和正式 HTTPS 服务。
+4. 在认证与部署边界稳定后实现 WebSocket 流式回答，并保留 `POST /chat` fallback。
+5. 最后完成真机验收、README、架构图、APK、截图和演示视频。

@@ -137,7 +137,7 @@ SmartFeed is beyond a minimal MVP and now has a working RAG loop:
 URL -> article parsing -> sections/chunks -> embeddings -> ChromaDB -> retrieval -> DeepSeek answer
 ```
 
-The next major backend direction is to introduce a more formal RAG pipeline layer, with LangChain considered as an optional orchestration layer after the current retrieval, reranking, context compression, and chat history behavior is stable.
+The current delivery roadmap is: complete the LangChain Runnable RAG pipeline, add PostgreSQL-backed users and cloud metadata, enforce JWT-based multi-user isolation across APIs and ChromaDB, connect Android authentication and conversation sync, deploy the HTTPS backend with persistent storage, and add authenticated WebSocket streaming while retaining `POST /chat` as a fallback. See `docs/roadmap.md` for the execution order.
 
 ## Notes
 

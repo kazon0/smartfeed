@@ -1,256 +1,166 @@
 # SmartFeed Roadmap
 
-本文档只记录项目后续阶段安排，不记录当前实现细节。当前真实实现请看 `docs/snapshot_v0.md`。
+本文档记录从当前单机 MVP 到可部署、多用户、可演示版本的后续顺序。当前真实实现以 `docs/snapshot_v0.md` 为准。
 
-## 1. 当前阶段：Android MVP 闭环
+## 目标版本
 
-目标：让用户可以在 Android App 内完成最核心体验。
+交付版本需要同时具备：
 
-范围：
+- Android 分享网页、文章管理、本地历史和知识分析。
+- 稳定的 FastAPI `/upload`、`/chat`、文章与统计 API。
+- 可切换、可回退的 LangChain RAG 编排。
+- PostgreSQL 用户与业务 metadata。
+- 注册、登录和 JWT 鉴权。
+- ChromaDB 按 `user_id` 强制隔离。
+- Android 登录态、账号页和基础云端同步。
+- 可访问的 HTTPS 后端部署。
+- WebSocket 流式回答和任务状态事件，同时保留 `POST /chat` fallback。
+- README、架构图、APK、截图和演示流程。
 
-- 输入 URL。
-- 调用后端 `/upload`。
-- 展示网页 summary、status、stored chunks。
-- 调用后端 `/chat`。
-- 用聊天气泡展示用户问题和 AI 回答。
-- 展示基础 sources。
-- 使用本地 Room 保存 conversations 和 messages。
-- Home / Analysis / Profile 底部 tab。
-- Home 展示历史对话列表。
-- 点击历史对话进入聊天详情页。
-- 支持从浏览器系统分享菜单接收网页 URL。
-- 分享 URL 后自动创建新对话并展示 summary。
-- 重复分享或上传同 URL 时打开已有对话，不创建重复历史项。
-- Analysis 展示基于已保存文章 topic 的主题占比。
-- 后端上传时使用 DeepSeek 对文章做 topic 分类，低置信度或不可用时回退到规则分类。
-- Analysis 使用饼图展示主题分布。
-- 后端提供已保存文章列表和按 URL 删除文章 chunks 的接口。
-- Android Analysis 右上角提供文章管理入口。
-- Android 文章管理页按 topic 分组展示历史文章。
-- Android 文章管理页点击文章可跳转原网页。
-- Android 文章管理页支持左滑显示删除按钮。
+## 1. LangChain RAG 编排
 
-暂不做：
+目标：把当前可选包装层升级为真实、可观测、可回退的 RAG pipeline。
 
-- 复杂 Room schema，例如单独 message 表和 migration schema 管理。
-- 更完整的知识库管理页面，例如搜索、筛选、批量操作。
-- Profile 真实用户能力。
-- 用户登录。
-- 云端同步。
-- WebSocket。
-- LangChain。
+实施顺序：
 
-进入下一阶段的条件：
+1. 为 classic 和 LangChain pipeline 提供统一 `run()` 边界。
+2. 使用 LangChain Runnable 串联 rewrite、multi-query、retrieval、rank 和 rerank。
+3. 将 context compression 和 answer 纳入 LangChain 编排。
+4. 保留 classic pipeline 和原始 context fallback。
+5. 在 `/chat.debug` 中记录 pipeline、阶段和 fallback 原因。
 
-- Android App 能稳定上传网页。
-- Android App 能稳定围绕当前网页问答。
-- 后端 `/upload` 和 `/chat` 对 Android 返回字段稳定。
+完成标准：
 
-## 2. 下一阶段：对话结构与分享入口
+- `SMARTFEED_RAG_PIPELINE=langchain` 执行真实 Runnable chain。
+- classic 和 LangChain 对 Android 保持同一 `/chat` 稳定协议。
+- LangChain 初始化或阶段执行失败时请求仍可完成。
 
-目标：形成“分享网页即创建新对话”的产品形态。
+## 2. 云端数据基础
 
-当前实现：
-
-- 设计 Android 本地 `Conversation` 和 `Message` 模型。
-- 首页从单页面改为历史对话入口的雏形。
-- 单个对话页展示聊天气泡。
-- 支持从浏览器分享 URL 到 App。
-- App 接收 URL 后创建新对话。
-- App 接收已存在 URL 时打开已有对话。
-- 自动调用 `/upload`。
-- 将网页 summary 作为第一条 AI 消息展示。
-
-暂不做：
-
-- 多设备同步。
-- 用户账号。
-- 后端 session。
-- WebSocket 流式输出。
-
-进入下一阶段的条件：
-
-- 用户从浏览器分享网页后，App 能自动进入一个新对话。
-- 新对话能展示网页 summary。
-- 用户能继续围绕该网页提问。
-
-## 3. 本地记忆阶段
-
-目标：App 重启后仍保留历史对话和消息。
-
-当前实现：
-
-- 已使用 Room 保存本地 conversations。
-- 已使用 kotlinx serialization 将 messages 序列化为 Room 字段 `messagesJson`。
-- 已支持从旧 SharedPreferences conversations 自动迁移到 Room。
-- App 启动后可以恢复本地历史对话。
+目标：为多用户数据归属、同步和部署建立持久化模型。
 
 范围：
 
-- 后续可将 messages 从 JSON 字段拆为独立 Room 表。
-- 持久化文章 URL、title、summary、created_at。
-- 首页展示历史对话列表。
-- 对话页按 conversation 读取本地 messages。
+- 引入 PostgreSQL 和数据库 migration。
+- 建立 `users`、`articles`、`conversations`、`messages` 表。
+- 文章表保存 URL、title、topic、summary、created_at、updated_at 和 owner_id。
+- conversation/message 云端模型与 Android 当前本地模型对齐。
+- Room 继续作为 Android 离线缓存，不直接替代云端数据源。
 
-暂不做：
+完成标准：
 
-- 云端同步。
-- 用户账号。
-- 多端冲突处理。
-- 复杂推荐系统。
+- 新环境可以通过 migration 创建数据库。
+- 业务记录具有明确 owner 和时间字段。
+- 不依赖 Chroma metadata 聚合承担全部业务数据库职责。
 
-进入下一阶段的条件：
+## 3. 注册登录与用户隔离
 
-- App 重启后历史对话仍存在。
-- 每个对话能正确绑定文章 URL。
-- 本地消息不会影响后端 RAG 数据结构。
-
-## 4. 知识库统计阶段
-
-目标：让用户知道自己保存了哪些内容，知识库大概分布如何。
-
-当前实现：
-
-- 后端已提供 `/stats`。
-- `/stats` 基于 ChromaDB chunks 统计主题、来源域名、文章占比。
-- 文章 topic 当前优先使用上传时保存的 DeepSeek 分类结果。
-- 规则分类当前作为 DeepSeek 不可用、低置信度或旧数据 fallback。
-- Android Analysis 页已展示主题饼图和分布列表。
-- 后端已提供 `/articles` 列出 ChromaDB 中已保存文章。
-- 后端已提供 `DELETE /articles` 按 URL 删除该文章对应 chunks。
-- Android Analysis 页已提供文章管理入口。
-- Android 文章管理页已按 topic 展示已保存文章。
-- Android 文章管理页已支持点击打开原网页。
-- Android 文章管理页已支持左滑显示删除按钮。
+目标：实现可实际使用的多用户知识库。
 
 范围：
 
-- 后续可将文章管理页升级为更完整的知识库管理入口。
-- 后续可升级为 LLM 分类、embedding 聚类或用户自定义标签。
-- 后续可统计保存时间、阅读/提问频率和主题趋势。
-- 后续可从后端返回更稳定的分类标签体系。
+- `POST /auth/register`、`POST /auth/login` 和当前用户接口。
+- 密码哈希、JWT access token、FastAPI auth dependency。
+- `/upload`、`/search`、`/chat`、`/articles`、`/stats`、`/insights` 绑定当前用户。
+- Chroma chunks 写入 `user_id`，所有查询和删除强制附加用户过滤条件。
+- 补充跨用户读取、删除和检索隔离验证。
 
-暂不做：
+完成标准：
 
-- 复杂知识图谱。
-- 自动标签体系。
-- 推荐流。
-- 用户画像。
+- 两个账号无法看到或检索对方文章。
+- 未认证请求返回稳定错误结构。
+- 认证和数据隔离不依赖 Android 自觉传入 `user_id`。
 
-进入下一阶段的条件：
+## 4. Android 账号与云同步
 
-- 用户能看到知识库总量。
-- 用户能看到主要来源网站。
-- 用户能打开或继续某篇已保存文章的对话。
-
-## 5. RAG 质量升级阶段
-
-目标：提高检索命中率、上下文完整性和回答质量。
-
-当前实现：
-
-- `/chat` 已接入 query rewrite。
-- query rewrite 使用 DeepSeek 将用户问题改写为更适合检索的 query。
-- query rewrite 不可用时回退原始 query。
-- 检索使用 rewritten query，最终回答仍使用用户原始问题。
-- `/chat` 已接入 multi-query retrieval，基于原始 query、rewritten query 和 LLM 生成的查询变体合并召回。
-- multi-query 不可用时回退到 rewritten query + 原始 query。
-- `/chat` 已接入 LLM rerank，对向量召回和关键词召回后的候选 chunks 做语义重排。
-- LLM rerank 不可用时回退到原有排序。
-- `/chat` 已接入 context compression，在回答前压缩候选上下文，保留来源、步骤、代码、清单和结论。
-- context compression 不可用时回退到原始 chunks。
+目标：Android 能使用云端账号并恢复用户数据。
 
 范围：
 
-- 优化 chunk 策略。
-- 优化 section-aware retrieval。
-- 改善代码类文章、列表类文章、长文总结的回答质量。
-- 将 `/chat` 中逐渐变复杂的 retrieval / rerank / compression / fallback 流程抽到 service 层。
-- 保持 Android API 尽量稳定。
+- 注册、登录、退出登录页面。
+- 安全保存 token，Retrofit 自动添加 `Authorization` header。
+- token 失效统一处理。
+- Profile 展示账号、同步状态和退出登录。
+- 云端 conversation/message API 接入。
+- 第一版同步采用清晰的 server-authoritative 或时间戳合并策略，不做复杂冲突解决。
 
-暂不做：
+完成标准：
 
-- Agent system。
-- 多工具自动调用。
-- 复杂工作流编排。
+- 登录后可上传、聊天和读取自己的文章。
+- 重装或另一设备登录后可恢复云端会话。
+- Room 缓存与云端同步失败不会导致本地历史静默丢失。
 
-进入下一阶段的条件：
+## 5. 服务器部署
 
-- 当前规则型 RAG 逻辑已经明显不够用。
-- 检索链路需要统一编排。
-- prompt、retrieval、compression、fallback 的组合开始变复杂。
-
-## 6. LangChain 阶段
-
-目标：在不破坏现有 API 的前提下，引入更标准的 RAG pipeline 编排。
+目标：提供可供 Android 和简历演示使用的公网 HTTPS 服务。
 
 范围：
 
-- 在 service 层内部引入 LangChain。
-- 封装 retriever。
-- 封装 prompt chain。
-- 可选引入 context compression。
-- 可选引入 multi-query retriever。
-- 可选引入 memory chain。
+- 部署 FastAPI 和 PostgreSQL。
+- 为 ChromaDB 配置持久卷，或迁移到支持持久化和用户过滤的向量服务。
+- 配置 DeepSeek key、JWT secret、数据库地址和生产环境变量。
+- 增加 health check、结构化日志、CORS 和基础错误监控。
+- Android 使用正式 HTTPS base URL，并保留开发环境切换方式。
+- 验证服务重启后文章、用户和向量数据仍存在。
 
-暂不做：
+完成标准：
 
-- 因为使用 LangChain 而重写所有后端。
-- 让 Android 直接感知 LangChain。
-- 过早引入 Agent。
+- 新账号可以通过公网完成注册、上传和聊天。
+- 服务重启不会清空 PostgreSQL 或向量数据。
+- 敏感配置不进入 Git。
 
-进入下一阶段的条件：
+## 6. WebSocket 流式交互
 
-- LangChain 版本的 RAG pipeline 比当前手写逻辑更容易维护。
-- 测试能证明回答质量或代码维护性有提升。
-
-## 7. 云端存储与用户管理阶段
-
-目标：从本地个人工具升级为多用户云端产品。
+目标：提供简历可展示的实时回答和长任务状态推送。
 
 范围：
 
-- 用户注册和登录。
-- JWT 或同类认证机制。
-- PostgreSQL 保存用户、文章、会话、消息 metadata。
-- ChromaDB 按 user_id 做数据隔离。
-- Android 保存登录态。
-- 支持跨设备同步。
-- 后端部署。
+- FastAPI WebSocket chat endpoint。
+- WebSocket 握手鉴权和用户隔离。
+- 定义稳定事件协议，例如 `chat.started`、`retrieval.progress`、`answer.delta`、`chat.completed`、`chat.error`。
+- Android 使用 OkHttp WebSocket 展示流式回答和阶段状态。
+- 断线、超时和协议错误时回退现有 `POST /chat`。
+- 不在这一阶段引入通用 Agent 或任意工具调用。
 
-暂不做：
+完成标准：
 
-- 团队协作。
-- 复杂权限系统。
-- 付费系统。
+- Android 能逐步展示回答内容。
+- WebSocket 断开不会丢失最终消息或破坏本地 conversation。
+- WebSocket 与 `POST /chat` 使用同一 RAG 和权限边界。
 
-进入下一阶段的条件：
-
-- 单机版核心体验已经稳定。
-- 本地历史、分享入口、知识库统计已经可用。
-- 明确需要跨设备或多用户能力。
-
-## 8. 高级记忆与个性化阶段
-
-目标：让系统逐渐理解用户长期知识库和偏好。
+## 7. 产品收尾
 
 范围：
 
-- 对话摘要记忆。
-- 用户长期偏好。
-- 用户知识画像。
-- 基于历史保存内容辅助回答。
-- 基于知识库分布做主动整理建议。
+- 文章保存时间和“最新保存”排序。
+- Profile、错误状态、空状态、重试和主要文案收尾。
+- 真机验证分享、重复上传、聊天、历史恢复、删除、同步和流式回答。
+- 只修复崩溃、数据丢失、越权和明显回答错误等高优先级问题。
 
-暂不做：
+## 8. 简历交付
 
-- 在用户系统前实现复杂长期记忆。
-- 在检索质量不稳定前做主动推荐。
+范围：
 
-## 当前推荐顺序
+- README 项目介绍、运行方式、部署地址和技术亮点。
+- 系统架构图、RAG pipeline 图、认证/数据隔离和 WebSocket 时序图。
+- APK、核心截图、1 到 2 分钟演示视频。
+- 固定演示文章、账号和提问脚本。
+- 清理 `.env`、数据库、缓存、APK 和其他运行产物。
 
-1. 验证当前 Android MVP 闭环：上传、分享、聊天、本地历史、Analysis、文章管理页。
-2. 升级 RAG 检索质量。
-3. 在确实需要编排能力时引入 LangChain。
-4. 做云端存储和用户管理。
-5. 做高级记忆和个性化。
+## 测试策略
+
+- 测试伴随功能，不再单独连续扩充测试阶段。
+- 每个新能力只补关键成功路径、失败回退和权限边界。
+- 每个阶段结束运行现有后端与 Android 测试集。
+- 部署、WebSocket 和多用户隔离必须增加集成验证，普通 UI 调整不追求高覆盖率。
+
+## 当前执行顺序
+
+1. 统一 classic/LangChain pipeline `run()` 边界。
+2. 完成 LangChain Runnable RAG chain。
+3. 建立 PostgreSQL schema 和 migration。
+4. 实现 JWT 注册登录和全 API 用户隔离。
+5. 接入 Android 账号和云端会话同步。
+6. 部署 HTTPS 后端、PostgreSQL 和持久化向量存储。
+7. 实现 WebSocket 流式回答与 Android 接入。
+8. 完成产品收尾、真机验收和简历材料。
