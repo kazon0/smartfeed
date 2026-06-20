@@ -53,7 +53,12 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Local persistence mapper：`ui/home/ConversationMappers.kt`
 - Repository：`data/repository/*`
 - Network DTO：`data/remote/SmartFeedApi.kt`
-- Local persistence：`data/local/ConversationStore.kt`
+- Local persistence：
+  - `data/local/ConversationStore.kt`：本地 conversation 加载、保存和 legacy SharedPreferences 迁移。
+  - `data/local/StoredConversation.kt`：本地持久化 DTO。
+  - `data/local/ConversationEntity.kt`：Room entity。
+  - `data/local/ConversationDao.kt`、`data/local/MessageDao.kt`：Room DAO。
+  - `data/local/SmartFeedDatabase.kt`：Room database 和 migrations。
 
 ## Share And Article Status Flow
 
@@ -72,7 +77,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 - `HomeViewModel` 目前仍是根页面状态协调者，负责 Home、分享入口、会话打开和持久化触发。
 - `ConversationManager` 承载本地会话规则，`ConversationCoordinator` 承载 UI state 切换，两者降低了 `HomeViewModel` 的直接复杂度。
-- `ConversationStore` 当前把 Room database、DAO、entity、migration 和 legacy SharedPreferences 迁移放在一个文件里，后续可以单独拆成 `SmartFeedDatabase.kt`、`ConversationDao.kt`、`MessageDao.kt` 和 entity 文件。
+- Room database、DAO、entity、migration 已从 `ConversationStore` 拆出，`ConversationStore` 只保留本地会话读写和 legacy SharedPreferences 迁移编排。
 - `ui/model` 文件少是正常的；只有跨页面共享且稳定的 UI model 才放这里，不需要为了“看起来分层”拆空模型。
 
 ## Preview
@@ -93,4 +98,3 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 - `ui/state/HomeUiState.kt`
 - `ui/home/HomeViewModel.kt` 后续可进一步改名为根导航 ViewModel。
-- `data/local/ConversationStore.kt` 后续可拆出 database、DAO、entity 和 migration。

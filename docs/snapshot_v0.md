@@ -350,6 +350,7 @@
   - 已定义跨页面 UI model：`ui/model/Conversation.kt` 和 `ui/model/ChatMessage.kt`。
   - `Conversation` 当前明确保存 `sourceUrl`、`topic`、`title`、`createdAtMillis` 和 `updatedAtMillis`，用于稳定支持首页分类、文章入口和历史恢复。
   - 已实现 `ConversationStore`，使用 Android Room 保存 conversations。
+  - Android Room database、DAO、entity、migration 已从 `ConversationStore` 拆到 `data/local` 独立文件，降低本地持久化耦合。
   - Room 当前表：`conversations` 和 `messages`。
   - Room 当前版本为 3，`MIGRATION_2_3` 会为旧 conversations 补齐 `sourceUrl`、`topic` 和 `createdAtMillis`。
   - messages 已从 conversation 的 `messagesJson` 拆到独立 Room 表。
