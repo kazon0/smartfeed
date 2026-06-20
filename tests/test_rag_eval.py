@@ -273,6 +273,34 @@ def test_rag_eval_cross_section_context_keeps_each_matched_section():
     assert second_section[1] in selected
 
 
+def test_rag_eval_page_wide_context_covers_multiple_article_sections():
+    service = make_service()
+    sections = [
+        [
+            chunk(
+                ALG_URL,
+                "长文章",
+                f"第{section_index + 1}章正文 {chunk_index}。" + "这一段包含需要总结的重要内容。" * 8,
+                section_index * 6 + chunk_index,
+                f"第{section_index + 1}章",
+                section_index,
+            )
+            for chunk_index in range(6)
+        ]
+        for section_index in range(3)
+    ]
+    all_chunks = [item for section in sections for item in section]
+
+    selected = service._select_page_context(
+        all_chunks,
+        [sections[0][2], sections[0][3]],
+    )
+
+    assert len(selected) == service.PAGE_WIDE_CONTEXT_CHUNK_LIMIT
+    assert {item["metadata"]["section_index"] for item in selected} == {0, 1, 2}
+    assert sections[0][2] in selected
+
+
 def test_rag_eval_page_wide_algorithm_list_uses_clean_current_page_sources():
     response = make_service().chat("十大算法是什么", url=ALG_URL)
     preview = response["sources"][0]["content_preview"]

@@ -455,20 +455,17 @@ class ChatService:
         if not quality_chunks:
             quality_chunks = chunks
 
-        target_section = self._primary_section(relevant_chunks or quality_chunks)
-        if target_section is not None:
-            section_chunks = [
-                chunk
-                for chunk in quality_chunks
-                if chunk.get("metadata", {}).get("section_index") == target_section
-            ]
-            if section_chunks:
-                quality_chunks = section_chunks
-
         quality_chunks = self._trim_to_article_region(
             quality_chunks,
             relevant_chunks or quality_chunks,
         )
+        balanced_chunks = self._balance_section_chunks(
+            quality_chunks,
+            relevant_chunks or quality_chunks,
+            self.PAGE_WIDE_CONTEXT_CHUNK_LIMIT,
+        )
+        if balanced_chunks:
+            return balanced_chunks
 
         return sorted(
             quality_chunks,
@@ -623,22 +620,60 @@ class ChatService:
             return []
 
         selected_sections = selected_sections[:limit]
-        section_chunks = {}
-        section_anchor_indexes = {}
+        candidate_chunks = []
         for section_index in selected_sections:
             chunks = [
                 chunk
                 for chunk in all_page_chunks
                 if chunk.get("metadata", {}).get("section_index") == section_index
             ]
-            section_chunks[section_index] = self._filter_context_quality(chunks) or chunks
-            section_anchor_indexes[section_index] = [
+            candidate_chunks.extend(self._filter_context_quality(chunks) or chunks)
+
+        return self._balance_section_chunks(
+            candidate_chunks,
+            relevant_chunks,
+            limit,
+            selected_sections,
+        )
+
+    def _balance_section_chunks(
+        self,
+        chunks: list[dict],
+        anchors: list[dict],
+        limit: int,
+        selected_sections: list[int] | None = None,
+    ) -> list[dict]:
+        section_chunks = {}
+        for chunk in sorted(
+            chunks,
+            key=lambda item: item.get("metadata", {}).get("chunk_index", 0),
+        ):
+            section_index = chunk.get("metadata", {}).get("section_index")
+            if section_index is None:
+                continue
+            section_chunks.setdefault(section_index, []).append(chunk)
+
+        if selected_sections is None:
+            selected_sections = list(section_chunks)
+        else:
+            selected_sections = [
+                section_index
+                for section_index in selected_sections
+                if section_index in section_chunks
+            ]
+        selected_sections = selected_sections[:limit]
+        if not selected_sections:
+            return []
+
+        section_anchor_indexes = {
+            section_index: [
                 chunk.get("metadata", {}).get("chunk_index")
-                for chunk in relevant_chunks
+                for chunk in anchors
                 if chunk.get("metadata", {}).get("section_index") == section_index
                 and isinstance(chunk.get("metadata", {}).get("chunk_index"), int)
             ]
-
+            for section_index in selected_sections
+        }
         section_limit = max(1, limit // len(selected_sections))
         balanced_chunks = []
         for section_index in selected_sections:
@@ -712,27 +747,6 @@ class ChatService:
 
         selected_indexes = sorted(selected_indexes)[:limit]
         return [by_index[index] for index in selected_indexes]
-
-    def _primary_section(self, chunks: list[dict]) -> int | None:
-        section_scores = {}
-        section_counts = {}
-        for chunk in chunks:
-            metadata = chunk.get("metadata", {})
-            section_index = metadata.get("section_index")
-            if section_index is None:
-                continue
-            section_scores[section_index] = section_scores.get(section_index, 0) + max(
-                0.1,
-                self._chunk_quality_score(chunk),
-            )
-            section_counts[section_index] = section_counts.get(section_index, 0) + 1
-
-        if not section_scores:
-            return None
-        section_index, score = max(section_scores.items(), key=lambda item: item[1])
-        if score < 0.7 and section_counts.get(section_index, 0) <= 1:
-            return None
-        return section_index
 
     def _chunk_quality_score(self, chunk: dict) -> float:
         content = re.sub(r"\s+", " ", chunk.get("content", "").strip())
