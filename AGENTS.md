@@ -73,7 +73,7 @@ Backend 已实现：
 * Android 注册、登录、Keystore 加密 token、Bearer 自动注入和退出登录
 * Android Room conversations 按认证 owner 分区
 * Android Room 与云端 conversation/message 自动同步
-* 部署用 `/health`、`CHROMA_PERSIST_DIR`、`CORS_ALLOW_ORIGINS` 和 Android base URL 构建参数
+* 部署用 Dockerfile、`scripts/start_server.sh`、`/health`、`CHROMA_PERSIST_DIR`、`CORS_ALLOW_ORIGINS` 和 Android base URL 构建参数
 * Android `/chat` 请求发送当前对话最近 messages 作为 history
 * Android SharedPreferences 旧历史自动迁移到 Room
 * `GET /stats`
@@ -107,7 +107,7 @@ Backend 已实现：
 当前未实现：
 
 * WebSocket
-* 公网 HTTPS 部署
+* 公网 HTTPS 部署实际落地和持久化验证
 * 实时搜索、天气、股价、汇率等外部实时工具
 
 后续计划加入：
@@ -326,7 +326,7 @@ Android MVP 阶段：
 
 建议下一步：
 
-1. 部署 FastAPI、PostgreSQL 和持久化 ChromaDB 到公网 HTTPS 环境。
+1. 用 `Dockerfile` 和 `scripts/start_server.sh` 部署 FastAPI、PostgreSQL 和持久化 ChromaDB 到公网 HTTPS 环境。
 2. 增加 Android 开发/生产 base URL 切换，并用公网服务验证注册、上传、聊天和云端会话恢复。
 3. 在认证与部署边界稳定后实现 WebSocket 流式回答和任务状态事件，并保留 `POST /chat` fallback。
 4. 最后完成真机验收、README、架构图、APK、截图和演示视频。

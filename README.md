@@ -83,6 +83,16 @@ Start the backend:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+For container deployment, build from `Dockerfile` and use the default command:
+
+```bash
+sh scripts/start_server.sh
+```
+
+The deployment entrypoint runs Alembic migrations by default and starts Uvicorn
+on `$PORT`. See `docs/deployment.md` for required environment variables,
+ChromaDB persistent volume setup, and Android production build verification.
+
 Health check:
 
 ```bash
