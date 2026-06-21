@@ -67,7 +67,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Repository：`data/repository/*`，其中 `ConversationSyncRepository.kt` 对接 `GET/PUT/DELETE /conversations`，并按 `updatedAtMillis` 合并本地与云端会话。
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Authentication：`data/auth/AuthSession.kt` 保存认证状态，`SecureTokenStore.kt` 使用 Android Keystore AES-GCM 加密 access token，OkHttp 自动附加 Bearer header。
-- WebSocket：`ChatRepository` 和 `UploadRepository` 使用 OkHttp WebSocket 接入 `/ws/chat` 与 `/ws/upload`，实时展示回答 delta、上传阶段和文章总结 delta；失败时回退 Retrofit 的 `POST /chat` / `POST /upload`。
+- WebSocket：`ChatRepository` 和 `UploadRepository` 使用 OkHttp WebSocket 接入 `/ws/chat` 与 `/ws/upload`，共享 20 秒 ping 心跳并实时展示回答 delta、上传阶段和文章总结 delta。聊天在尚未收到 delta 的传输故障下最多重连一次；已收到部分回答或上传断线时不盲目重放请求，失败后回退 Retrofit 的 `POST /chat` / `POST /upload`。
 - Chat UX：WebSocket delta 到达后立即渲染，Channel 排空后才将临时气泡替换为最终消息，消息增长时自动跟随到底部；回答只展示排名第一的主来源，后端仍保留多来源检索结果。
 - Keyboard and back navigation：聊天和认证页面支持点击空白区域收起键盘、IME 布局避让；聊天详情和非 Home tab 的系统返回手势优先执行应用内返回。
 - Local persistence：
@@ -118,6 +118,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - `SmartFeedDatabaseMigrationTest` 使用 SQLite JDBC 内存数据库执行 Room 共用的 migration SQL，验证 `1 -> 2 -> 3 -> 4`、messages 表创建、owner 分区字段以及旧 conversation metadata 回填。
 - `ConversationFiltersTest` 覆盖 topic 优先级和 fallback、筛选项排序、筛选匹配以及最近消息搜索范围。
 - `ChatCoordinatorTest` 覆盖 `/chat` history 的消息类型映射、错误过滤、助手消息 fallback 和最近 8 条限制。
+- `WebSocketRetryPolicyTest` 覆盖首个 delta 前传输失败可重连、收到 delta 后禁止重放、服务端错误不重连和一次重连上限。
 - `ArticleFiltersTest` 覆盖文章主题顺序、搜索字段组合、主题叠加筛选和排序规则。
 - 这些规则使用本地 JVM 单元测试运行，不依赖 Android 设备或后端服务。
 
@@ -128,5 +129,5 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - `ui/state/HomeUiState.kt`
 - `ui/home/HomeViewModel.kt` 后续可进一步改名为根导航 ViewModel。
 
-产品交付前仍需补充 WebSocket 心跳与有限重连。当前实现提供 WebSocket
-失败后的 HTTP fallback，但这不能等同于断线重连。
+产品交付前仍需在真机弱网环境验证 WebSocket 心跳、有限重连和 HTTP
+fallback，记录网络切换时是否存在重复文本或重复上传。

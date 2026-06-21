@@ -26,6 +26,7 @@ object SmartFeedNetwork {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val original = chain.request()
             val token = AuthSession.accessToken()

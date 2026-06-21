@@ -20,6 +20,7 @@ import okhttp3.WebSocketListener
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 class ChatRepository(
@@ -55,8 +56,45 @@ class ChatRepository(
             return Result.failure(IOException("请先登录。"))
         }
 
-        return runCatching {
-            suspendCancellableCoroutine { continuation ->
+        var lastFailure: Throwable = IOException("WebSocket chat failed.")
+        repeat(MAX_CHAT_STREAM_ATTEMPTS) { attempt ->
+            var receivedDelta = false
+            val result = runCatching {
+                askStreamingAttempt(
+                    token = token,
+                    query = query,
+                    url = url,
+                    history = history,
+                    onStatus = onStatus,
+                    onDelta = { delta ->
+                        receivedDelta = true
+                        onDelta(delta)
+                    }
+                )
+            }
+            if (result.isSuccess) {
+                return result
+            }
+
+            lastFailure = result.exceptionOrNull() ?: lastFailure
+            if (!shouldRetryChatStream(attempt, receivedDelta, lastFailure)) {
+                return Result.failure(lastFailure)
+            }
+            onStatus(ChatStreamStatus.Reconnecting)
+            delay(CHAT_RECONNECT_DELAY_MILLIS)
+        }
+        return Result.failure(lastFailure)
+    }
+
+    private suspend fun askStreamingAttempt(
+        token: String,
+        query: String,
+        url: String?,
+        history: List<ChatHistoryItem>,
+        onStatus: (ChatStreamStatus) -> Unit,
+        onDelta: (String) -> Unit
+    ): ChatResponse {
+        return suspendCancellableCoroutine { continuation ->
                 var webSocket: WebSocket? = null
                 val request = Request.Builder()
                     .url(SmartFeedNetwork.chatWebSocketUrl(token))
@@ -93,7 +131,9 @@ class ChatRepository(
                                 val responseElement = event["response"]
                                 if (responseElement == null) {
                                     if (continuation.isActive) {
-                                        continuation.resumeWithException(IOException("WebSocket response missing."))
+                                        continuation.resumeWithException(
+                                            NonRetryableWebSocketException("WebSocket response missing.")
+                                        )
                                     }
                                     webSocket.close(1000, null)
                                     return
@@ -111,7 +151,9 @@ class ChatRepository(
                                 val message = event["message"]?.jsonPrimitive?.contentOrNull
                                     ?: "WebSocket chat failed."
                                 if (continuation.isActive) {
-                                    continuation.resumeWithException(IOException(message))
+                                    continuation.resumeWithException(
+                                        NonRetryableWebSocketException(message)
+                                    )
                                 }
                                 webSocket.close(1000, null)
                             }
@@ -136,17 +178,33 @@ class ChatRepository(
                     webSocket?.cancel()
                 }
             }
-        }
     }
 }
 
 enum class ChatStreamStatus {
     Connecting,
+    Reconnecting,
     Authenticated,
     Retrieving,
     Answering,
     Fallback
 }
+
+internal class NonRetryableWebSocketException(message: String) : IOException(message)
+
+internal fun shouldRetryChatStream(
+    attempt: Int,
+    receivedDelta: Boolean,
+    failure: Throwable
+): Boolean {
+    return attempt + 1 < MAX_CHAT_STREAM_ATTEMPTS &&
+        !receivedDelta &&
+        failure is IOException &&
+        failure !is NonRetryableWebSocketException
+}
+
+private const val MAX_CHAT_STREAM_ATTEMPTS = 2
+private const val CHAT_RECONNECT_DELAY_MILLIS = 350L
 
 @Serializable
 private data class WebSocketChatRequest(

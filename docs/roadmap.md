@@ -117,7 +117,7 @@
 
 ## 6. WebSocket 流式交互
 
-状态：后端 `/ws/chat` 已支持 JWT 鉴权、用户隔离、阶段事件、答案 delta 和最终完整回答；后端 `/ws/upload` 已支持上传阶段事件和文章总结 delta；Android 已接入聊天和上传 WebSocket，并保留 HTTP fallback。
+状态：后端 `/ws/chat` 已支持 JWT 鉴权、用户隔离、阶段事件、答案 delta 和最终完整回答；后端 `/ws/upload` 已支持上传阶段事件和文章总结 delta；Android 已接入聊天和上传 WebSocket、20 秒 ping 心跳以及聊天首个 delta 前的一次有限重连，并保留 HTTP fallback。上传任务不自动重放，避免重复解析和模型调用。
 WebSocket 聊天默认可以使用低延迟检索路径，优先减少首字等待；简历演示和线上质量验证建议配置 `SMARTFEED_RAG_PIPELINE=langchain` 与 `SMARTFEED_WS_FAST_PATH=0`，让 `/chat` 和 `/ws/chat` 都走完整 rewrite、multi-query retrieval、rerank、compression 和 answer 编排。
 Android 端按 WebSocket delta 到达节奏立即渲染，不额外增加逐字动画延迟；
 Channel 仅用于保证 delta 顺序和最终消息稳定切换。
@@ -174,6 +174,7 @@ Channel 仅用于保证 delta 顺序和最终消息稳定切换。
 1. 将线上环境切换为 `SMARTFEED_RAG_PIPELINE=langchain` 并通过 `/chat.debug` 验证。
 2. 发布中文网页标题编码修复，重新导入受影响文章。
 3. 真机验收来源降噪、流式消息、自动滚动、键盘避让和返回手势。
-4. 增加 WebSocket ping 心跳、有限重连和弱网验证，继续保留 HTTP fallback。
-5. 增加可复现的 TTFT、检索耗时和知识库规模基准；没有数据前不写 `500ms` 或“百万字秒级”。
-6. 完成 README、架构图、APK、截图、演示视频和固定演示脚本。
+4. 在真机进行 WebSocket 弱网、网络切换和 HTTP fallback 验证。
+5. 评估聊天流式回调改为 Flow，并补充 Markdown 基础渲染。
+6. 增加可复现的 TTFT、检索耗时和知识库规模基准；没有数据前不写 `500ms` 或“百万字秒级”。
+7. 完成 README、架构图、APK、截图、演示视频和固定演示脚本。

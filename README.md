@@ -16,6 +16,8 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - Show saved articles grouped by topic.
 - Display Android knowledge analysis, including topic distribution, content depth, source domains, and AI-generated insights.
 - Persist Android conversation history locally with Room.
+- Stream authenticated chat answers and article summaries over WebSocket, with
+  native ping heartbeat, one bounded pre-delta chat reconnect, and HTTP fallback.
 
 ## Tech Stack
 
@@ -42,6 +44,8 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - Material 3
 - Retrofit
 - OkHttp
+- WebSocket
+- Coroutines
 - kotlinx.serialization
 - Room
 

@@ -102,6 +102,7 @@ class ChatViewModel : ViewModel() {
 private fun ChatStreamStatus.displayText(): String {
     return when (this) {
         ChatStreamStatus.Connecting -> "正在连接实时回答..."
+        ChatStreamStatus.Reconnecting -> "连接中断，正在重连..."
         ChatStreamStatus.Authenticated -> "连接成功，正在准备问题..."
         ChatStreamStatus.Retrieving -> "正在快速检索知识库..."
         ChatStreamStatus.Answering -> "正在生成回答..."
