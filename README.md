@@ -234,7 +234,19 @@ SMARTFEED_BENCH_PASSWORD='replace-with-password' \
 venv/bin/python scripts/benchmark_chat.py --runs 3
 ```
 
-See `docs/performance.md` for metric definitions and reporting constraints.
+Run a local million-character corpus benchmark:
+
+```bash
+venv/bin/python scripts/benchmark_large_corpus.py \
+  --target-chars 1000000 \
+  --article-count 40 \
+  --runs 5 \
+  --chroma-dir /tmp/smartfeed-large-corpus-1m \
+  --output /tmp/smartfeed-large-corpus-1m.json
+```
+
+Add `--mock-embeddings` for a fast ChromaDB/RAG plumbing smoke test. See
+`docs/performance.md` for metric definitions and reporting constraints.
 
 ## Project Status
 
