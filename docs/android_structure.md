@@ -57,6 +57,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Chat local models：`ui/chat/ChatModels.kt` 保存 `ChatSendContext` 和 `ChatResult`，避免继续堆在 ViewModel 或 coordinator 文件中。
 - Chat source UI：`ui/chat/ChatSourceCard.kt` 保存回答依据卡片展开和打开原文逻辑。
 - Chat bubble UI：`ui/chat/ChatBubbles.kt` 保存用户消息、助手消息、thinking 和气泡绘制组件。
+- Markdown：最终聊天回答和文章摘要使用 `multiplatform-markdown-renderer-m3` 渲染标题、列表、强调、链接和代码块；流式临时文本保持纯文本，避免每个 delta 触发 Markdown 重解析。
 - Model：`ui/model/Conversation.kt`、`ui/model/ChatMessage.kt`
   - `Conversation` 是当前跨页面 UI 会话模型，保存 `sourceUrl`、`topic`、`title`、`createdAtMillis`、`updatedAtMillis` 和 messages。
 - Local conversation rules：`ui/home/ConversationManager.kt`

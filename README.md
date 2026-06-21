@@ -49,6 +49,7 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - WebSocket
 - Coroutines
 - Flow
+- multiplatform-markdown-renderer (Material 3)
 - kotlinx.serialization
 - Room
 

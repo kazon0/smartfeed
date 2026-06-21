@@ -27,12 +27,17 @@ import com.example.smartfeedandroid.data.remote.ChatResponse
 import com.example.smartfeedandroid.ui.common.ResultCard
 import com.example.smartfeedandroid.ui.common.SoftBlueLight
 import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.mikepenz.markdown.m3.Markdown
 
 @Composable
 internal fun ChatBubble(message: ChatMessage) {
     when (message) {
         is ChatMessage.User -> UserBubble(text = message.text)
-        is ChatMessage.Summary -> AssistantBubble(title = stringResource(R.string.summary), text = message.text)
+        is ChatMessage.Summary -> AssistantBubble(
+            title = stringResource(R.string.summary),
+            text = message.text,
+            renderMarkdown = true
+        )
         is ChatMessage.Assistant -> AssistantMessage(response = message.response)
         is ChatMessage.Error -> {
             ResultCard(title = stringResource(R.string.chat_error)) {
@@ -61,7 +66,8 @@ private fun AssistantMessage(response: ChatResponse) {
             text = response.answer.ifBlank {
                 response.message.ifBlank { stringResource(R.string.no_answer_returned) }
             },
-            footer = response.sourceType.ifBlank { response.status.ifBlank { "N/A" } }
+            footer = response.sourceType.ifBlank { response.status.ifBlank { "N/A" } },
+            renderMarkdown = true
         )
 
         if (response.sources.isNotEmpty()) {
@@ -102,7 +108,8 @@ private fun UserBubble(text: String) {
 private fun AssistantBubble(
     title: String,
     text: String,
-    footer: String = ""
+    footer: String = "",
+    renderMarkdown: Boolean = false
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -120,7 +127,11 @@ private fun AssistantBubble(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(text = title, fontWeight = FontWeight.SemiBold)
-                Text(text = text)
+                if (renderMarkdown) {
+                    Markdown(content = text)
+                } else {
+                    Text(text = text)
+                }
                 if (footer.isNotBlank()) {
                     Text(
                         text = footer,
