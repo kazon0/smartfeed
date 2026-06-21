@@ -84,6 +84,7 @@ async def benchmark_websocket(
     timeout: int,
 ) -> dict:
     connect_started = time.perf_counter()
+    first_event_ms = None
     first_delta_ms = None
     delta_count = 0
     completed_response = {}
@@ -109,6 +110,8 @@ async def benchmark_websocket(
 
         while True:
             event = json.loads(await asyncio.wait_for(websocket.recv(), timeout=timeout))
+            if first_event_ms is None:
+                first_event_ms = (time.perf_counter() - request_started) * 1000
             event_type = event.get("type")
             if event_type == "delta":
                 delta_count += 1
@@ -125,6 +128,7 @@ async def benchmark_websocket(
     debug = completed_response.get("debug", {})
     return {
         "connect_ms": round(connected_ms, 2),
+        "first_event_ms": round(first_event_ms, 2) if first_event_ms is not None else None,
         "ttft_ms": round(first_delta_ms, 2) if first_delta_ms is not None else None,
         "total_ms": round(total_ms, 2),
         "delta_count": delta_count,
@@ -203,6 +207,9 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
             "http_total_ms": metric_summary([run["total_ms"] for run in http_runs]),
             "websocket_connect_ms": metric_summary(
                 [run["connect_ms"] for run in websocket_runs]
+            ),
+            "websocket_first_event_ms": metric_summary(
+                [run["first_event_ms"] for run in websocket_runs]
             ),
             "websocket_ttft_ms": metric_summary([run["ttft_ms"] for run in websocket_runs]),
             "websocket_total_ms": metric_summary([run["total_ms"] for run in websocket_runs]),

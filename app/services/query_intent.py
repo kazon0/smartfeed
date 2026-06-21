@@ -14,7 +14,19 @@ class QueryIntentService:
                 "reason": "用户请求当前系统不支持的管理操作。",
             }
 
-        if self._is_page_reference(normalized):
+        is_page_reference = self._is_page_reference(normalized)
+        is_search_history = self._is_search_history(normalized)
+
+        if is_search_history and not (has_url and is_page_reference):
+            return {
+                "intent": "search_history",
+                "retrieval_scope": "global",
+                "requires_page_context": False,
+                "fallback_policy": "no_llm_general_answer",
+                "reason": "用户明确想查找已保存或已收藏的知识库内容。",
+            }
+
+        if is_page_reference:
             if has_url:
                 return {
                     "intent": "page_reference",
@@ -30,15 +42,6 @@ class QueryIntentService:
                 "requires_page_context": True,
                 "fallback_policy": "ask_for_page",
                 "reason": "用户问题依赖文章指代，但请求中没有 url。",
-            }
-
-        if self._is_search_history(normalized):
-            return {
-                "intent": "search_history",
-                "retrieval_scope": "global",
-                "requires_page_context": False,
-                "fallback_policy": "no_llm_general_answer",
-                "reason": "用户明确想查找已保存或已收藏的知识库内容。",
             }
 
         if self._is_realtime_or_current(normalized):
@@ -102,6 +105,10 @@ class QueryIntentService:
             "我之前看过",
             "之前看过",
             "我保存过",
+            "我保存的",
+            "保存的文章",
+            "已保存文章",
+            "已保存的文章",
             "保存过",
             "我收藏",
             "收藏的",

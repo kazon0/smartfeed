@@ -71,7 +71,7 @@ DATABASE_URL=postgresql+psycopg://smartfeed:smartfeed@localhost:5432/smartfeed
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_ACCESS_TOKEN_MINUTES=60
 SMARTFEED_RAG_PIPELINE=langchain
-SMARTFEED_WS_FAST_PATH=0
+SMARTFEED_WS_FAST_PATH=1
 CHROMA_PERSIST_DIR=chroma_db
 CORS_ALLOW_ORIGINS=
 ```
@@ -81,9 +81,10 @@ For production, set `CHROMA_PERSIST_DIR` to a mounted persistent volume and set
 served from a different domain.
 
 `SMARTFEED_RAG_PIPELINE=langchain` enables the LangChain Core Runnable RAG
-pipeline. `SMARTFEED_WS_FAST_PATH=0` makes WebSocket chat use the same full
-rewrite, multi-query retrieval, rerank, compression, and answer path instead of
-the lower-latency streaming shortcut.
+pipeline. Keep `SMARTFEED_WS_FAST_PATH=1` for demo builds that prioritize first
+answer latency. Set it to `0` only when you want WebSocket chat to use the same
+full rewrite, multi-query retrieval, rerank, compression, and answer path as
+`POST /chat`.
 
 Create or upgrade the cloud metadata schema:
 

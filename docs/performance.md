@@ -25,6 +25,8 @@ global knowledge query.
 - `knowledge_base.total_chunks`: authenticated user's vector chunk count.
 - `http_total_ms`: client-observed `POST /chat` duration.
 - `websocket_connect_ms`: WebSocket connection and authentication duration.
+- `websocket_first_event_ms`: time from sending the chat request to the first
+  WebSocket event for that request, usually a status event.
 - `websocket_ttft_ms`: time from sending the chat request to the first answer
   delta. Status events are not counted as a first token.
 - `websocket_total_ms`: time from sending the request to `completed`.
@@ -38,6 +40,10 @@ pipeline configuration, and query when publishing results.
 
 Do not claim `TTFT < 500ms`, million-character scale, or second-level retrieval
 until a saved benchmark result from the deployed configuration demonstrates it.
+If `SMARTFEED_WS_FAST_PATH=0`, WebSocket TTFT includes the full LangChain
+rewrite, multi-query, rerank, and compression stages before answer streaming.
+Use `SMARTFEED_WS_FAST_PATH=1` for first-token latency demos, and report that
+configuration with the benchmark result.
 
 The benchmark account must contain representative saved articles. A run with
 zero articles/chunks measures general LLM fallback latency, not RAG retrieval

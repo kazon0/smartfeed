@@ -1783,6 +1783,28 @@ def test_chat_search_history_without_results_no_general_answer(monkeypatch):
     assert data["answer"] == "没有在知识库中找到相关内容。"
 
 
+def test_chat_saved_articles_summary_uses_global_search(monkeypatch):
+    class FakeVectorStoreService:
+        def query(self, text, top_k=5, metadata_filter=None):
+            return []
+
+    class FakeLLMService:
+        def answer_without_context(self, *args, **kwargs):
+            raise AssertionError("saved article summary should not call general LLM")
+
+    monkeypatch.setattr("app.routes.chat.VectorStoreService", FakeVectorStoreService)
+    monkeypatch.setattr("app.routes.chat.LLMService", FakeLLMService)
+
+    response = client.post("/chat", json={"query": "总结一下我保存的文章"})
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["intent"] == "search_history"
+    assert data["retrieval_scope"] == "global"
+    assert data["error_code"] == "NO_KNOWLEDGE_FOUND"
+    assert data["source_type"] == "no_knowledge_found"
+
+
 def test_chat_unsupported_action_returns_directly(monkeypatch):
     class FakeVectorStoreService:
         def query(self, *args, **kwargs):
