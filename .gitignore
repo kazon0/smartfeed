@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 chroma_db/
+docs_internal/
 venv/
 android/**/.gradle/
 android/**/.gradle-home/

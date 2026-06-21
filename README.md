@@ -1,61 +1,81 @@
-# SmartFeed
+# SmartFeed 智享资讯
 
-SmartFeed is a personal AI knowledge base for saving web articles, turning them into searchable knowledge, and asking questions about saved content.
+SmartFeed 是一个面向个人知识管理的 AI 资讯收藏助手。它支持将网页文章保存为私有知识库，通过 RAG 检索和大模型生成摘要、问答与知识库洞察，并提供 Android 客户端完成文章剪藏、流式聊天、历史同步和内容分析。
 
-The project currently includes a FastAPI backend and an Android Jetpack Compose client. The backend ingests web pages, extracts readable article content, chunks and embeds the text, stores it in ChromaDB, and uses DeepSeek to generate summaries and answers. The Android app provides article saving, article-based chat, global knowledge chat, local conversation history, and knowledge analysis.
+项目由 FastAPI 后端和 Android Jetpack Compose 客户端组成。后端负责网页解析、正文切分、向量入库、用户隔离、LangChain RAG 编排、WebSocket 流式响应和云端数据同步；Android 端负责登录、分享入口、文章管理、聊天会话、Room 本地缓存、Markdown 展示和 WebSocket Flow 消费。
 
-## Features
+## 核心功能
 
-- Save web articles by URL.
-- Parse article content with Jina Reader first, then HTML fallback.
-- Extract structured sections and chunks for RAG ingestion.
-- Store embeddings in ChromaDB.
-- Ask questions against the current article or the global knowledge base.
-- Generate article summaries and knowledge base insights with DeepSeek.
-- Support lightweight chat history context for follow-up questions.
-- Show saved articles grouped by topic.
-- Display Android knowledge analysis, including topic distribution, content depth, source domains, and AI-generated insights.
-- Persist Android conversation history locally with Room.
-- Stream authenticated chat answers and article summaries over WebSocket, with
-  native ping heartbeat, one bounded pre-delta chat reconnect, and HTTP fallback.
-- Deliver chat status, delta, and completion events through a Kotlin Coroutines
-  Flow pipeline from the OkHttp listener to Compose state.
+- 网页文章收藏：输入或分享 URL 后自动解析网页正文。
+- 结构化入库：按章节提取 sections，再切分为 chunks 并写入 ChromaDB。
+- 私有知识库问答：支持当前文章问答和全局知识库问答。
+- LangChain RAG：支持 query rewrite、multi-query retrieval、rerank、context compression 和 answer 编排。
+- WebSocket 流式输出：聊天回答和文章摘要支持状态事件、delta 事件与完成事件。
+- Android Flow 管道：OkHttp WebSocket 事件通过 Kotlin Coroutines Flow 进入 ViewModel 和 Compose UI。
+- 用户系统：注册、登录、JWT、PostgreSQL 用户与 metadata 存储。
+- 数据隔离：ChromaDB chunks 和 PostgreSQL conversations/messages 按认证用户隔离。
+- 云端同步：Android 本地 Room 会话和云端 conversation/message 同步。
+- 文章管理：文章列表、主题分类、删除、按 topic 分组。
+- 数据分析：知识库主题分布、来源域名、内容厚度和智能总结。
+- 移动端体验：Markdown 富文本渲染、来源卡片聚合、HTTP fallback、心跳与有限重连。
+- 压测闭环：提供公网聊天 benchmark 和本地百万字级知识库压测脚本。
 
-## Tech Stack
+## 技术栈
 
-### Backend
+**后端**
 
 - Python
 - FastAPI
+- PostgreSQL / SQLAlchemy / Alembic
 - ChromaDB
-- PostgreSQL
-- SQLAlchemy 2
-- Alembic
-- psycopg
 - sentence-transformers
-- requests
-- BeautifulSoup
-- python-dotenv
-- pytest
+- LangChain Core
 - DeepSeek API
+- BeautifulSoup / Jina Reader
+- WebSocket
+- pytest
 
-### Android
+**Android**
 
 - Kotlin
 - Jetpack Compose
 - Material 3
-- Retrofit
-- OkHttp
-- WebSocket
-- Coroutines
-- Flow
-- multiplatform-markdown-renderer (Material 3)
-- kotlinx.serialization
+- Retrofit / OkHttp / WebSocket
+- Coroutines / Flow
 - Room
+- kotlinx.serialization
+- Android Keystore
+- multiplatform-markdown-renderer
 
-## Backend Setup
+## 系统架构
 
-Create a Python environment and install dependencies:
+```text
+网页 URL
+  -> Jina Reader / HTML fallback
+  -> 正文清洗与章节提取
+  -> chunks + metadata
+  -> embeddings
+  -> ChromaDB 向量库
+  -> LangChain / RAGPipeline
+  -> DeepSeek answer
+  -> HTTP / WebSocket
+  -> Android Compose UI
+```
+
+Android 端核心数据流：
+
+```text
+OkHttp WebSocket
+  -> callbackFlow
+  -> Repository
+  -> ViewModel
+  -> Compose state
+  -> 流式消息渲染
+```
+
+## 后端运行
+
+创建 Python 环境并安装依赖：
 
 ```bash
 python -m venv venv
@@ -63,7 +83,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+创建 `.env`：
 
 ```env
 DEEPSEEK_API_KEY=your_api_key_here
@@ -76,157 +96,132 @@ CHROMA_PERSIST_DIR=chroma_db
 CORS_ALLOW_ORIGINS=
 ```
 
-For production, set `CHROMA_PERSIST_DIR` to a mounted persistent volume and set
-`CORS_ALLOW_ORIGINS` to comma-separated HTTPS origins if a browser client is
-served from a different domain.
-
-`SMARTFEED_RAG_PIPELINE=langchain` enables the LangChain Core Runnable RAG
-pipeline. Keep `SMARTFEED_WS_FAST_PATH=1` for demo builds that prioritize first
-answer latency. Set it to `0` only when you want WebSocket chat to use the same
-full rewrite, multi-query retrieval, rerank, compression, and answer path as
-`POST /chat`.
-
-Create or upgrade the cloud metadata schema:
+初始化或升级数据库：
 
 ```bash
 alembic upgrade head
 ```
 
-Start the backend:
+启动服务：
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-For container deployment, build from `Dockerfile` and use the default command:
+健康检查：
 
 ```bash
-sh scripts/start_server.sh
+curl http://127.0.0.1:8000/health
 ```
 
-The deployment entrypoint runs Alembic migrations by default and starts Uvicorn
-on `$PORT`. See `docs/deployment.md` for required environment variables,
-ChromaDB persistent volume setup, and Android production build verification.
-GitHub Actions publishes the backend image to:
+## Docker 部署
+
+项目内置 `Dockerfile` 和启动脚本：
+
+```bash
+docker build -t smartfeed-api .
+docker run --env-file .env -p 8000:8000 smartfeed-api
+```
+
+容器入口会执行 Alembic migration 并启动 Uvicorn。部署到云平台时建议为 ChromaDB 配置持久化目录：
+
+```env
+CHROMA_PERSIST_DIR=/data/chroma_db
+RUN_MIGRATIONS=1
+```
+
+GitHub Actions 可构建并发布 GHCR 镜像：
 
 ```text
 ghcr.io/kazon0/smartfeed-api:latest
 ```
 
-The first public deployment is running on Sealos:
+详细部署说明见 [docs/deployment.md](docs/deployment.md)。
+
+## API 概览
+
+主要接口：
+
+- `GET /health`：服务健康检查
+- `POST /auth/register`：注册并返回 JWT
+- `POST /auth/login`：登录并返回 JWT
+- `GET /auth/me`：获取当前用户
+- `POST /upload`：解析并保存网页文章
+- `POST /search`：语义检索知识库 chunks
+- `POST /chat`：基于当前文章或全局知识库问答
+- `GET /stats`：知识库统计
+- `GET /insights`：知识库智能洞察
+- `GET /articles`：文章列表
+- `DELETE /articles`：删除文章及对应 chunks
+- `GET /conversations`：云端会话列表
+- `PUT /conversations/{id}`：同步会话和消息
+- `DELETE /conversations/{id}`：删除会话
+- `WebSocket /ws/chat`：流式聊天
+- `WebSocket /ws/upload`：流式文章导入
+
+业务接口需要携带：
 
 ```text
-https://lxfxyunzhlxi.sealoshzh.site
+Authorization: Bearer $ACCESS_TOKEN
 ```
 
-Verify it with:
-
-```bash
-curl https://lxfxyunzhlxi.sealoshzh.site/health
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:8000/
-```
-
-The PostgreSQL schema provides `users`, `articles`, `conversations`, and `messages`. Authentication, article metadata, conversation sync, and message sync now use PostgreSQL; ChromaDB stores user-scoped chunks for retrieval.
-
-## Main API Endpoints
-
-- `GET /` health check
-- `GET /health` deployment health check
-- `POST /auth/register` create an account and return a bearer token
-- `POST /auth/login` authenticate and return a bearer token
-- `GET /auth/me` return the authenticated user
-- `GET /debug` browser-based debug page
-- `POST /upload` upload and parse a web article
-- `POST /search` semantic search over saved chunks
-- `POST /chat` ask questions with optional `url` and chat `history`
-- `GET /stats` knowledge base statistics
-- `GET /insights` AI-generated knowledge base summary
-- `GET /articles` saved articles
-- `DELETE /articles` delete an article from the knowledge base by URL
-- `GET /conversations` restore the authenticated user's cloud conversations
-- `PUT /conversations/{id}` replace one conversation and its messages
-- `DELETE /conversations/{id}` delete one owned conversation
-- `WebSocket /ws/chat` authenticated chat status events and final answer
-
-All business endpoints require `Authorization: Bearer $ACCESS_TOKEN` and operate
-only on the authenticated user's data. Articles stored before user isolation must
-be uploaded again because their Chroma metadata has no owner.
-
-Example upload:
-
-```bash
-curl -X POST http://127.0.0.1:8000/upload \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com"}'
-```
-
-Example chat:
+示例：
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query":"What is this article about?","url":"https://example.com"}'
+  -d '{"query":"总结一下这篇文章","url":"https://example.com"}'
 ```
 
-## Android App
+完整字段说明见 [docs/api.md](docs/api.md)。
 
-Android project path:
+## Android 运行
+
+Android 项目位于：
 
 ```text
 android/SmartFeedAndroid
 ```
 
-The Android app now provides registration, login, encrypted token persistence,
-automatic Bearer authentication, a real Profile screen, owner-scoped Room
-conversation storage, and cloud conversation/message sync with timestamp-based
-merge.
-
-The Android client uses the deployed Sealos backend by default:
-
-```text
-https://lxfxyunzhlxi.sealoshzh.site
-```
-
-Android Studio can therefore run the app directly without an extra Gradle
-property. From the repository root, build, install, and launch on the first
-connected real device with:
+直接安装到已连接设备：
 
 ```bash
 ./scripts/install_android.sh
 ```
 
-To target a specific device, pass its ADB serial. To use a local emulator
-backend, override the URL only for that invocation:
+指定模拟器或设备：
 
 ```bash
 ./scripts/install_android.sh emulator-5554
+```
+
+使用本地后端调试模拟器：
+
+```bash
 SMARTFEED_BASE_URL=http://10.0.2.2:8000/ ./scripts/install_android.sh emulator-5554
 ```
 
-Build check:
+Android 编译检查：
 
 ```bash
 cd android/SmartFeedAndroid
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:compileDebugKotlin --offline
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest assembleDebug
 ```
 
-## Tests
+Android 结构说明见 [docs/android_structure.md](docs/android_structure.md)。
 
-Run backend tests:
+## 测试与压测
+
+后端测试：
 
 ```bash
-venv/bin/python -m compileall app tests
+venv/bin/python -m compileall app tests scripts
 venv/bin/python -m pytest tests/test_mvp.py -q
+venv/bin/python -m pytest tests/test_rag_eval.py -q
 ```
 
-Run a deployed HTTP/WebSocket performance benchmark with a dedicated account:
+公网 HTTP / WebSocket benchmark：
 
 ```bash
 SMARTFEED_BENCH_EMAIL='benchmark@example.com' \
@@ -234,7 +229,7 @@ SMARTFEED_BENCH_PASSWORD='replace-with-password' \
 venv/bin/python scripts/benchmark_chat.py --runs 3
 ```
 
-Run a local million-character corpus benchmark:
+本地百万字级知识库压测：
 
 ```bash
 venv/bin/python scripts/benchmark_large_corpus.py \
@@ -245,32 +240,35 @@ venv/bin/python scripts/benchmark_large_corpus.py \
   --output /tmp/smartfeed-large-corpus-1m.json
 ```
 
-Add `--mock-embeddings` for a fast ChromaDB/RAG plumbing smoke test. See
-`docs/performance.md` for metric definitions and reporting constraints.
+快速验证 ChromaDB / RAG 编排闭环：
 
-## Project Status
-
-SmartFeed is beyond a minimal MVP and now has a working RAG loop:
-
-```text
-URL -> article parsing -> sections/chunks -> embeddings -> ChromaDB -> retrieval -> DeepSeek answer
+```bash
+venv/bin/python scripts/benchmark_large_corpus.py \
+  --target-chars 1000000 \
+  --article-count 40 \
+  --runs 5 \
+  --mock-embeddings \
+  --chroma-dir /tmp/smartfeed-large-corpus-1m-mock
 ```
 
-The completed delivery work includes the LangChain Runnable RAG pipeline,
-PostgreSQL-backed users and metadata, JWT-based user isolation across APIs and
-ChromaDB, Android authentication, cloud conversation sync, a Sealos HTTPS
-deployment, and authenticated WebSocket chat/upload streaming with HTTP
-fallback. Remaining work is product hardening: verify the LangChain production
-environment, add WebSocket heartbeat and bounded reconnect behavior, complete
-real-device acceptance, measure performance before publishing latency or scale
-claims, and finish the demo assets. See `docs/roadmap.md` for the execution order.
+性能指标说明见 [docs/performance.md](docs/performance.md)。
 
-## Notes
+## 文档
 
-Runtime data and secrets should not be committed:
+- [API 文档](docs/api.md)
+- [Android 结构说明](docs/android_structure.md)
+- [部署说明](docs/deployment.md)
+- [性能与压测](docs/performance.md)
+- [RAG 评测说明](docs/rag_eval.md)
+- [系统设计说明](docs/system_spec.md)
+
+## 运行数据与密钥
+
+以下内容不应提交到 Git：
 
 - `.env`
 - `venv/`
 - `chroma_db/`
+- `docs_internal/`
 - `__pycache__/`
 - `*.pyc`

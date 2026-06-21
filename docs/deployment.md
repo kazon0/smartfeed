@@ -18,7 +18,7 @@ GitHub Actions builds and publishes the backend image on every push to `main`:
 ghcr.io/kazon0/smartfeed-api:latest
 ```
 
-Use this image in Sealos or any container platform when deploying from a
+Use this image in Sealos, Render, Railway, Fly.io, or any container platform when deploying from a
 prebuilt image instead of building from the Git repository.
 
 ## Environment Variables
@@ -75,15 +75,15 @@ Expected response:
 {"status":"ok"}
 ```
 
-## Sealos Deployment
+## Sealos Deployment Example
 
-The first public deployment is available at:
+Example public endpoint:
 
 ```text
-https://lxfxyunzhlxi.sealoshzh.site
+https://your-smartfeed-api.example.com
 ```
 
-Current deployed components:
+Recommended deployed components:
 
 - Sealos app `smartfeed-api`
 - GHCR image `ghcr.io/kazon0/smartfeed-api:latest`
@@ -95,7 +95,7 @@ Current deployed components:
 Verify the deployed service:
 
 ```bash
-curl https://lxfxyunzhlxi.sealoshzh.site/health
+curl https://your-smartfeed-api.example.com/health
 ```
 
 Expected response:
@@ -104,9 +104,9 @@ Expected response:
 {"status":"ok"}
 ```
 
-Security note: rotate any API keys or database passwords that were exposed
-during manual deployment, then update the Sealos environment variables and
-restart the app.
+Security note: store API keys, database passwords, and JWT secrets only in the
+hosting platform's environment-variable manager. Rotate them if they were ever
+shared outside the deployment environment.
 
 ## Local Docker Smoke Test
 

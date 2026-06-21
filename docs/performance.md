@@ -16,9 +16,8 @@ venv/bin/python scripts/benchmark_chat.py --runs 3 \
   --output benchmark-result.json
 ```
 
-The default target is the deployed Sealos API. Use `--base-url` for a local or
-different environment. Use `--url` to benchmark current-page chat instead of a
-global knowledge query.
+The default target can be overridden with `--base-url`. Use `--url` to benchmark
+current-page chat instead of a global knowledge query.
 
 ## Metrics
 
@@ -39,8 +38,8 @@ Each aggregate reports count, median, p95, minimum, and maximum. Run at least
 three measured requests and state the knowledge-base size, deployment region,
 pipeline configuration, and query when publishing results.
 
-Do not claim `TTFT < 500ms`, million-character scale, or second-level retrieval
-until a saved benchmark result from the deployed configuration demonstrates it.
+When reporting benchmark numbers, include the knowledge-base size, deployment
+region, pipeline configuration, and query so results are reproducible.
 If `SMARTFEED_WS_FAST_PATH=0`, WebSocket TTFT includes the full LangChain
 rewrite, multi-query, rerank, and compression stages before answer streaming.
 Use `SMARTFEED_WS_FAST_PATH=1` for first-token latency demos, and report that
