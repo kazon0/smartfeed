@@ -68,7 +68,8 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Authentication：`data/auth/AuthSession.kt` 保存认证状态，`SecureTokenStore.kt` 使用 Android Keystore AES-GCM 加密 access token，OkHttp 自动附加 Bearer header。
 - WebSocket：`ChatRepository` 和 `UploadRepository` 使用 OkHttp WebSocket 接入 `/ws/chat` 与 `/ws/upload`，共享 20 秒 ping 心跳并实时展示回答 delta、上传阶段和文章总结 delta。聊天在尚未收到 delta 的传输故障下最多重连一次；已收到部分回答或上传断线时不盲目重放请求，失败后回退 Retrofit 的 `POST /chat` / `POST /upload`。
-- Chat UX：WebSocket delta 到达后立即渲染，Channel 排空后才将临时气泡替换为最终消息，消息增长时自动跟随到底部；回答只展示排名第一的主来源，后端仍保留多来源检索结果。
+- Chat Flow：`ChatRepository` 使用 `callbackFlow` 将 OkHttp listener 转为 `Flow<ChatStreamEvent>`，`ChatCoordinator` 在同一 Flow 中接入 HTTP fallback，`ChatViewModel` collect 状态、delta 和最终结果，不再维护额外回调队列。
+- Chat UX：WebSocket delta 到达后立即渲染，完成事件到达后才将临时气泡替换为最终消息，消息增长时自动跟随到底部；回答只展示排名第一的主来源，后端仍保留多来源检索结果。
 - Keyboard and back navigation：聊天和认证页面支持点击空白区域收起键盘、IME 布局避让；聊天详情和非 Home tab 的系统返回手势优先执行应用内返回。
 - Local persistence：
   - `data/local/ConversationStore.kt`：本地 conversation 加载、保存和 legacy SharedPreferences 迁移。

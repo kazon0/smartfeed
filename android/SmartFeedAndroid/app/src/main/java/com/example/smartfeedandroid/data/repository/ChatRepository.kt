@@ -18,10 +18,12 @@ import okhttp3.Response as OkHttpResponse
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.io.IOException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 
 class ChatRepository(
     private val api: SmartFeedApi = SmartFeedNetwork.api,
@@ -44,71 +46,64 @@ class ChatRepository(
         }
     }
 
-    suspend fun askStreaming(
+    fun streamChat(
         query: String,
         url: String?,
-        history: List<ChatHistoryItem> = emptyList(),
-        onStatus: (ChatStreamStatus) -> Unit = {},
-        onDelta: (String) -> Unit = {}
-    ): Result<ChatResponse> {
+        history: List<ChatHistoryItem> = emptyList()
+    ): Flow<ChatStreamEvent> = flow {
         val token = AuthSession.accessToken()
         if (token.isNullOrBlank()) {
-            return Result.failure(IOException("请先登录。"))
+            throw IOException("请先登录。")
         }
 
         var lastFailure: Throwable = IOException("WebSocket chat failed.")
         repeat(MAX_CHAT_STREAM_ATTEMPTS) { attempt ->
             var receivedDelta = false
-            val result = runCatching {
-                askStreamingAttempt(
+            try {
+                streamChatAttempt(
                     token = token,
                     query = query,
                     url = url,
-                    history = history,
-                    onStatus = onStatus,
-                    onDelta = { delta ->
+                    history = history
+                ).collect { event ->
+                    if (event is ChatStreamEvent.Delta) {
                         receivedDelta = true
-                        onDelta(delta)
                     }
-                )
-            }
-            if (result.isSuccess) {
-                return result
+                    emit(event)
+                }
+                return@flow
+            } catch (failure: Throwable) {
+                lastFailure = failure
             }
 
-            lastFailure = result.exceptionOrNull() ?: lastFailure
             if (!shouldRetryChatStream(attempt, receivedDelta, lastFailure)) {
-                return Result.failure(lastFailure)
+                throw lastFailure
             }
-            onStatus(ChatStreamStatus.Reconnecting)
+            emit(ChatStreamEvent.Status(ChatStreamStatus.Reconnecting))
             delay(CHAT_RECONNECT_DELAY_MILLIS)
         }
-        return Result.failure(lastFailure)
+        throw lastFailure
     }
 
-    private suspend fun askStreamingAttempt(
+    private fun streamChatAttempt(
         token: String,
         query: String,
         url: String?,
-        history: List<ChatHistoryItem>,
-        onStatus: (ChatStreamStatus) -> Unit,
-        onDelta: (String) -> Unit
-    ): ChatResponse {
-        return suspendCancellableCoroutine { continuation ->
-                var webSocket: WebSocket? = null
-                val request = Request.Builder()
-                    .url(SmartFeedNetwork.chatWebSocketUrl(token))
-                    .build()
-                val payload = WebSocketChatRequest(
-                    query = query,
-                    url = url?.takeIf { it.isNotBlank() },
-                    mode = if (url.isNullOrBlank()) "global" else "page",
-                    history = history
-                )
+        history: List<ChatHistoryItem>
+    ): Flow<ChatStreamEvent> = callbackFlow {
+        val request = Request.Builder()
+            .url(SmartFeedNetwork.chatWebSocketUrl(token))
+            .build()
+        val payload = WebSocketChatRequest(
+            query = query,
+            url = url?.takeIf { it.isNotBlank() },
+            mode = if (url.isNullOrBlank()) "global" else "page",
+            history = history
+        )
 
-                val listener = object : WebSocketListener() {
+        val listener = object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: OkHttpResponse) {
-                        onStatus(ChatStreamStatus.Connecting)
+                        trySend(ChatStreamEvent.Status(ChatStreamStatus.Connecting))
                         webSocket.send(json.encodeToString(payload))
                     }
 
@@ -120,64 +115,54 @@ class ChatRepository(
                         when (event["type"]?.jsonPrimitive?.contentOrNull) {
                             "status" -> {
                                 chatStreamStatusFrom(event["stage"]?.jsonPrimitive?.contentOrNull)
-                                    ?.let(onStatus)
+                                    ?.let { trySend(ChatStreamEvent.Status(it)) }
                             }
                             "delta" -> {
                                 event["text"]?.jsonPrimitive?.contentOrNull
                                     ?.takeIf { it.isNotBlank() }
-                                    ?.let(onDelta)
+                                    ?.let { trySend(ChatStreamEvent.Delta(it)) }
                             }
                             "completed" -> {
                                 val responseElement = event["response"]
                                 if (responseElement == null) {
-                                    if (continuation.isActive) {
-                                        continuation.resumeWithException(
-                                            NonRetryableWebSocketException("WebSocket response missing.")
-                                        )
-                                    }
+                                    close(NonRetryableWebSocketException("WebSocket response missing."))
                                     webSocket.close(1000, null)
                                     return
                                 }
-                                val chatResponse = json.decodeFromJsonElement(
-                                    ChatResponse.serializer(),
-                                    responseElement
-                                )
-                                if (continuation.isActive) {
-                                    continuation.resume(chatResponse)
+                                val chatResponse = runCatching {
+                                    json.decodeFromJsonElement(
+                                        ChatResponse.serializer(),
+                                        responseElement
+                                    )
+                                }.getOrElse {
+                                    close(NonRetryableWebSocketException("Invalid WebSocket response."))
+                                    webSocket.close(1000, null)
+                                    return
                                 }
+                                trySend(ChatStreamEvent.Completed(chatResponse))
+                                close()
                                 webSocket.close(1000, null)
                             }
                             "error" -> {
                                 val message = event["message"]?.jsonPrimitive?.contentOrNull
                                     ?: "WebSocket chat failed."
-                                if (continuation.isActive) {
-                                    continuation.resumeWithException(
-                                        NonRetryableWebSocketException(message)
-                                    )
-                                }
+                                close(NonRetryableWebSocketException(message))
                                 webSocket.close(1000, null)
                             }
                         }
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: OkHttpResponse?) {
-                        if (continuation.isActive) {
-                            continuation.resumeWithException(t)
-                        }
+                        close(t)
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                        if (continuation.isActive) {
-                            continuation.resumeWithException(IOException("WebSocket closed before response."))
-                        }
+                        close(IOException("WebSocket closed before response."))
                     }
                 }
 
-                webSocket = webSocketClient.newWebSocket(request, listener)
-                continuation.invokeOnCancellation {
-                    webSocket?.cancel()
-                }
-            }
+        val webSocket = webSocketClient.newWebSocket(request, listener)
+        awaitClose { webSocket.cancel() }
     }
 }
 
@@ -188,6 +173,12 @@ enum class ChatStreamStatus {
     Retrieving,
     Answering,
     Fallback
+}
+
+sealed interface ChatStreamEvent {
+    data class Status(val status: ChatStreamStatus) : ChatStreamEvent
+    data class Delta(val text: String) : ChatStreamEvent
+    data class Completed(val response: ChatResponse) : ChatStreamEvent
 }
 
 internal class NonRetryableWebSocketException(message: String) : IOException(message)

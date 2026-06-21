@@ -18,6 +18,8 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - Persist Android conversation history locally with Room.
 - Stream authenticated chat answers and article summaries over WebSocket, with
   native ping heartbeat, one bounded pre-delta chat reconnect, and HTTP fallback.
+- Deliver chat status, delta, and completion events through a Kotlin Coroutines
+  Flow pipeline from the OkHttp listener to Compose state.
 
 ## Tech Stack
 
@@ -46,6 +48,7 @@ The project currently includes a FastAPI backend and an Android Jetpack Compose 
 - OkHttp
 - WebSocket
 - Coroutines
+- Flow
 - kotlinx.serialization
 - Room
 
