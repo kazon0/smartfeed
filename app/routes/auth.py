@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.auth import AuthResponse
 from app.schemas.auth import LoginRequest
 from app.schemas.auth import RegisterRequest
+from app.schemas.auth import UpdateUserRequest
 from app.schemas.auth import UserResponse
 from app.security.tokens import create_access_token
 from app.security.tokens import decode_access_token
@@ -72,6 +73,20 @@ def get_current_user(
 @router.get("/me", response_model=UserResponse)
 def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    request: UpdateUserRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return AuthService().update_profile(
+        db,
+        user,
+        display_name=request.display_name,
+        bio=request.bio,
+    )
 
 
 def _auth_response(user: User) -> AuthResponse:

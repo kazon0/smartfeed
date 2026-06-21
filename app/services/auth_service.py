@@ -49,5 +49,20 @@ class AuthService:
     def get_user(self, db: Session, user_id: str) -> User | None:
         return db.get(User, user_id)
 
+    def update_profile(
+        self,
+        db: Session,
+        user: User,
+        *,
+        display_name: str,
+        bio: str,
+    ) -> User:
+        user.display_name = display_name.strip()
+        user.bio = bio.strip()
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
     def normalize_email(self, email: str) -> str:
         return email.strip().lower()

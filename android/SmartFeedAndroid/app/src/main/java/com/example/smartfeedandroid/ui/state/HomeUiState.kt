@@ -15,6 +15,7 @@ data class HomeUiState(
     val uploadProgress: UploadProgress? = null,
     val uploadStatusText: String = "",
     val uploadSummaryText: String = "",
+    val uploadSummaryUrl: String = "",
     val uploadResponse: UploadResponse? = null,
     val errorMessage: String? = null,
     val lastSharedUrl: String? = null,

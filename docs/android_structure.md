@@ -113,6 +113,10 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 
 在 Android Studio 中打开对应文件，切换到 `Split` 或 `Design` 即可查看预览。
 
+## UI Style
+
+- `docs/android_ui_style.md` 记录 Android Cozy Journal 手账风约束：首页优化时保留纸张底色、莫兰迪色、顶部搜索、贴纸上传卡片、长卡片最近收录和悬浮底部导航，但不展示当前没有的“评论”“划线”等功能字段。
+
 ## Unit Tests
 
 - `ConversationManagerTest` 覆盖文章 conversation 元数据、URL 归一化去重、重复上传时摘要替换、新 conversation 排序和消息追加规则。

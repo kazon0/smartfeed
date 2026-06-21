@@ -1,6 +1,7 @@
 package com.example.smartfeedandroid.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -9,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -77,6 +79,7 @@ fun SmartFeedScreen(
             when (tab) {
                 AppTab.Analysis -> analysisViewModel.refresh()
                 AppTab.Articles -> articleManagerViewModel.refreshArticles()
+                AppTab.Profile -> articleManagerViewModel.refreshArticles()
                 else -> Unit
             }
         },
@@ -87,6 +90,10 @@ fun SmartFeedScreen(
         onOpenArticleChat = viewModel::startArticleConversation,
         onDeleteArticle = articleManagerViewModel::deleteArticle,
         profileUser = user,
+        isUpdatingProfile = authState.isSubmitting,
+        profileErrorMessage = authState.errorMessage,
+        onUpdateProfile = authViewModel::updateProfile,
+        onClearProfileError = authViewModel::clearError,
         onLogout = authViewModel::logout,
         onDismissError = viewModel::clearError,
         modifier = modifier
@@ -111,6 +118,10 @@ private fun SmartFeedContent(
     onOpenArticleChat: (SavedArticle) -> Unit,
     onDeleteArticle: (String) -> Unit,
     profileUser: AuthUser,
+    isUpdatingProfile: Boolean,
+    profileErrorMessage: String?,
+    onUpdateProfile: (String, String) -> Unit,
+    onClearProfileError: () -> Unit,
     onLogout: () -> Unit,
     onDismissError: () -> Unit,
     modifier: Modifier = Modifier
@@ -126,17 +137,8 @@ private fun SmartFeedContent(
     }
 
     Surface(modifier = modifier.fillMaxSize()) {
-        Scaffold(
-            bottomBar = {
-                if (!(uiState.selectedTab == AppTab.Home && uiState.isChatOpen)) {
-                    AppBottomBar(
-                        selectedTab = uiState.selectedTab,
-                        onSelectTab = onSelectTab,
-                        onNewChat = onStartGlobalConversation
-                    )
-                }
-            }
-        ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold { innerPadding ->
             uiState.errorMessage?.let { errorMessage ->
                 AlertDialog(
                     onDismissRequest = onDismissError,
@@ -202,17 +204,38 @@ private fun SmartFeedContent(
                         errorMessage = analysisUiState.statsErrorMessage
                             ?: analysisUiState.insightsErrorMessage
                             ?: analysisUiState.articlesErrorMessage,
+                        onOpenArticles = { onSelectTab(AppTab.Articles) },
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
 
                 AppTab.Profile -> {
+                    val profileArticles = articleManagerUiState.articlesResponse?.articles.orEmpty()
                     ProfileScreen(
                         user = profileUser,
+                        articleCount = articleManagerUiState.articlesResponse?.total
+                            ?: profileArticles.size,
+                        conversationCount = uiState.conversations.size,
+                        isUpdatingProfile = isUpdatingProfile,
+                        profileErrorMessage = profileErrorMessage,
+                        onUpdateProfile = onUpdateProfile,
+                        onClearProfileError = onClearProfileError,
+                        onOpenArticles = { onSelectTab(AppTab.Articles) },
+                        onOpenAnalysis = { onSelectTab(AppTab.Analysis) },
+                        onNewChat = onStartGlobalConversation,
                         onLogout = onLogout,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
+            }
+        }
+            if (!(uiState.selectedTab == AppTab.Home && uiState.isChatOpen)) {
+                AppBottomBar(
+                    selectedTab = uiState.selectedTab,
+                    onSelectTab = onSelectTab,
+                    onNewChat = onStartGlobalConversation,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
         }
     }

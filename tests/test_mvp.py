@@ -128,6 +128,25 @@ def test_auth_register_login_and_current_user(monkeypatch):
         )
         assert me_response.status_code == 200
         assert me_response.json()["display_name"] == "SmartFeed User"
+
+        update_response = client.patch(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "display_name": "  Journal Reader  ",
+                "bio": "  保持好奇，持续收集灵感。  ",
+            },
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["display_name"] == "Journal Reader"
+        assert update_response.json()["bio"] == "保持好奇，持续收集灵感。"
+
+        invalid_update = client.patch(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"display_name": "   "},
+        )
+        assert invalid_update.status_code == 422
         assert client.get("/auth/me").status_code == 401
     finally:
         app.dependency_overrides.pop(get_db, None)

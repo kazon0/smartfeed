@@ -1,8 +1,10 @@
 package com.example.smartfeedandroid.ui.chat
 
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,16 +17,22 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,28 +41,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.res.painterResource
 import com.example.smartfeedandroid.R
-import com.example.smartfeedandroid.ui.common.SoftBlue
-
+import com.example.smartfeedandroid.ui.common.JournalInk
+import com.example.smartfeedandroid.ui.common.JournalInkLight
+import com.example.smartfeedandroid.ui.common.JournalLine
+import com.example.smartfeedandroid.ui.common.JournalPaper
+import com.example.smartfeedandroid.ui.common.JournalTerra
 import com.example.smartfeedandroid.ui.model.ChatMessage
+import com.example.smartfeedandroid.ui.theme.KalamFontFamily
+
 @Composable
 fun ChatDetailScreen(
     query: String,
@@ -72,30 +79,23 @@ fun ChatDetailScreen(
 ) {
     val focusManager = LocalFocusManager.current
     val interactionSource = remember { MutableInteractionSource() }
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) { focusManager.clearFocus() }
+            .background(JournalPaper)
+            .clickable(interactionSource = interactionSource, indication = null) {
+                focusManager.clearFocus()
+            }
     ) {
-        ChatHeader(
-            activeUrl = activeUrl,
-            activeTitle = activeTitle,
-            onBack = onBack
-        )
-
+        ChatHeader(activeUrl = activeUrl, activeTitle = activeTitle, onBack = onBack)
         MessageList(
             messages = messages,
             isAsking = showStreamingResponse,
             streamStatusText = streamStatusText,
             streamAnswerText = streamAnswerText,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.weight(1f)
         )
-
         ChatInputBar(
             query = query,
             onQueryChange = onQueryChange,
@@ -106,36 +106,44 @@ fun ChatDetailScreen(
 }
 
 @Composable
-private fun ChatHeader(
-    activeUrl: String,
-    activeTitle: String,
-    onBack: () -> Unit
-) {
+private fun ChatHeader(activeUrl: String, activeTitle: String, onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     var menuExpanded by remember { mutableStateOf(false) }
+    val sourceLabel = remember(activeUrl) {
+        runCatching { Uri.parse(activeUrl).host.orEmpty() }.getOrDefault("")
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp)
-            .background(Color.LightGray.copy(0.1f))
-            .padding(horizontal = 0.dp),
-        verticalAlignment = Alignment.CenterVertically,
-
-
+            .height(72.dp)
+            .background(JournalPaper.copy(alpha = 0.96f))
+            .drawBehind {
+                val y = size.height - 1.dp.toPx()
+                val segment = 8.dp.toPx()
+                val gap = 6.dp.toPx()
+                var x = 0f
+                while (x < size.width) {
+                    drawLine(
+                        color = JournalLine,
+                        start = androidx.compose.ui.geometry.Offset(x, y),
+                        end = androidx.compose.ui.geometry.Offset((x + segment).coerceAtMost(size.width), y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    x += segment + gap
+                }
+            }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.size(48.dp)
-        ) {
+        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = stringResource(R.string.back),
-                tint = Color.Black,
-                modifier = Modifier.size(28.dp)
+                tint = JournalInk,
+                modifier = Modifier.size(27.dp)
             )
         }
-
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -143,43 +151,45 @@ private fun ChatHeader(
             Text(
                 text = activeTitle.ifBlank { stringResource(R.string.new_chat) },
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                color = JournalInk,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = sourceLabel.ifBlank { stringResource(R.string.app_name) },
+                modifier = Modifier.padding(top = 1.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = JournalInkLight,
+                fontFamily = KalamFontFamily,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-
         Box {
-            IconButton(onClick = { menuExpanded = true }) {
+            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(48.dp)) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
+                    imageVector = Icons.Filled.MoreVert,
                     contentDescription = stringResource(R.string.more_options),
-                    tint = Color.Black
+                    tint = JournalInk
                 )
             }
-
             DropdownMenu(
                 expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
+                onDismissRequest = { menuExpanded = false },
+                containerColor = JournalPaper
             ) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.open_original_page)) },
                     enabled = activeUrl.isNotBlank(),
                     onClick = {
                         menuExpanded = false
-                        if (activeUrl.isNotBlank()) {
-                            uriHandler.openUri(activeUrl)
-                        }
+                        if (activeUrl.isNotBlank()) uriHandler.openUri(activeUrl)
                     }
                 )
             }
         }
     }
-    HorizontalDivider(
-        modifier = Modifier.fillMaxWidth(),
-        thickness = 0.5.dp,
-        color = Color.LightGray.copy(alpha = 0.6f)
-    )
 }
 
 @Composable
@@ -194,39 +204,36 @@ private fun MessageList(
     val itemCount = messages.size + if (isAsking) 1 else 0
 
     LaunchedEffect(messages.size, isAsking, streamAnswerText.length / 8) {
-        if (itemCount > 0) {
-            listState.scrollToItem(itemCount - 1)
-        }
+        if (itemCount > 0) listState.scrollToItem(itemCount - 1)
     }
 
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        contentPadding = PaddingValues(top = 20.dp, bottom = 20.dp)
     ) {
         if (messages.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 48.dp),
+                        .padding(top = 52.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = stringResource(R.string.ask_question_to_start),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = JournalInkLight,
+                        fontFamily = KalamFontFamily
                     )
                 }
             }
         } else {
-            items(messages) { message ->
-                ChatBubble(message = message)
-            }
+            items(messages) { ChatBubble(message = it) }
             if (isAsking) {
-                item {
-                    ThinkingBubble(text = streamAnswerText.ifBlank { streamStatusText })
-                }
+                item { ThinkingBubble(text = streamAnswerText.ifBlank { streamStatusText }) }
             }
         }
     }
@@ -241,61 +248,62 @@ private fun ChatInputBar(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    Card(
+    val isSendEnabled = !isAsking && query.isNotBlank()
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .imePadding(),
-        shape = RoundedCornerShape(2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.LightGray.copy(alpha = 0.1f))
+            .imePadding()
+            .shadow(12.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), clip = false)
+            .background(JournalPaper.copy(alpha = 0.96f))
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Bottom
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.ask_anything)) },
-                shape = RoundedCornerShape(18.dp),
-                minLines = 1,
-                maxLines = 3,
-                singleLine = false,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,     // 聚焦纯白
-                    unfocusedContainerColor = Color.White,   // 未聚焦纯白
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
-                )
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, JournalLine, RoundedCornerShape(24.dp)),
+            placeholder = {
+                Text(stringResource(R.string.ask_anything), color = JournalInkLight.copy(alpha = 0.72f))
+            },
+            shape = RoundedCornerShape(24.dp),
+            minLines = 1,
+            maxLines = 3,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedTextColor = JournalInk,
+                unfocusedTextColor = JournalInk,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
             )
-
-// 动态判断当前按钮是否可用（既没在思考，输入框也有字）
-            val isSendEnabled = !isAsking && query.isNotBlank()
-
-            IconButton(
-                onClick = {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    onAsk()
-                },
-                enabled = isSendEnabled,
-                modifier = Modifier
-                    .padding(bottom = 4.dp, start = 8.dp, end = 4.dp)
-                    .size(35.dp)
-                    .background(
-                        color = if (isSendEnabled) SoftBlue else Color(0xFFE0E0E0),
-                        shape = CircleShape // 裁剪成正圆
-                    )
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_send_message),
-                    contentDescription = stringResource(R.string.send),
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
+        )
+        IconButton(
+            onClick = {
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                onAsk()
+            },
+            enabled = isSendEnabled,
+            modifier = Modifier
+                .size(48.dp)
+                .rotate(if (isSendEnabled) -7f else 0f)
+                .shadow(if (isSendEnabled) 4.dp else 0.dp, CircleShape, clip = false)
+                .background(
+                    if (isSendEnabled) JournalTerra else JournalLine,
+                    CircleShape
                 )
-            }
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Send,
+                contentDescription = stringResource(R.string.send),
+                tint = if (isSendEnabled) JournalPaper else JournalInkLight,
+                modifier = Modifier.size(21.dp)
+            )
         }
     }
 }
@@ -307,8 +315,8 @@ private fun ChatDetailScreenPreview() {
         query = "十种算法有哪些",
         onQueryChange = {},
         messages = listOf(
-            ChatMessage.User("这篇文章讲了什么"),
-            ChatMessage.Summary("这是一篇文章摘要。"),
+            ChatMessage.Summary("## 核心思路\n使用 **滑动窗口** 解决问题，时间复杂度为 `O(m+n)`。"),
+            ChatMessage.User("这篇文章讲了什么")
         ),
         activeUrl = "https://example.com/article",
         activeTitle = "程序员应该知道的十个基础算法",

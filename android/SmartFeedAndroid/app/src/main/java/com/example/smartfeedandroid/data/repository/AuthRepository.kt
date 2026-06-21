@@ -6,6 +6,7 @@ import com.example.smartfeedandroid.data.remote.LoginRequest
 import com.example.smartfeedandroid.data.remote.RegisterRequest
 import com.example.smartfeedandroid.data.remote.SmartFeedApi
 import com.example.smartfeedandroid.data.remote.SmartFeedNetwork
+import com.example.smartfeedandroid.data.remote.UpdateProfileRequest
 
 class AuthRepository(
     private val api: SmartFeedApi = SmartFeedNetwork.api
@@ -30,6 +31,12 @@ class AuthRepository(
 
     suspend fun currentUser(): Result<AuthUser> = runCatching {
         api.me().also(AuthSession::updateUser)
+    }
+
+    suspend fun updateProfile(displayName: String, bio: String): Result<AuthUser> = runCatching {
+        api.updateMe(
+            UpdateProfileRequest(displayName.trim(), bio.trim())
+        ).also(AuthSession::updateUser)
     }
 
     fun logout() {

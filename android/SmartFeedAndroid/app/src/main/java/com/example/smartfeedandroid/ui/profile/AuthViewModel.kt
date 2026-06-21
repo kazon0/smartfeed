@@ -51,6 +51,35 @@ class AuthViewModel : ViewModel() {
         repository.logout()
     }
 
+    fun updateProfile(displayName: String, bio: String) {
+        val cleanName = displayName.trim()
+        if (cleanName.isBlank()) {
+            uiState = uiState.copy(errorMessage = "昵称不能为空。")
+            return
+        }
+        uiState = uiState.copy(isSubmitting = true, errorMessage = null)
+        viewModelScope.launch {
+            repository.updateProfile(cleanName, bio)
+                .onSuccess { user ->
+                    uiState = uiState.copy(
+                        user = user,
+                        isSubmitting = false,
+                        errorMessage = null
+                    )
+                }
+                .onFailure { error ->
+                    uiState = uiState.copy(
+                        isSubmitting = false,
+                        errorMessage = if ((error as? HttpException)?.code() == 422) {
+                            "昵称需要包含 1 到 120 个字符。"
+                        } else {
+                            authErrorMessage(error)
+                        }
+                    )
+                }
+        }
+    }
+
     fun clearError() {
         uiState = uiState.copy(errorMessage = null)
     }

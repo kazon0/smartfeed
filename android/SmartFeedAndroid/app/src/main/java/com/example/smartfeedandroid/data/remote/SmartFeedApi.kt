@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
+import retrofit2.http.PATCH
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.POST
@@ -20,6 +21,9 @@ interface SmartFeedApi {
 
     @GET("auth/me")
     suspend fun me(): AuthUser
+
+    @PATCH("auth/me")
+    suspend fun updateMe(@Body request: UpdateProfileRequest): AuthUser
 
     @GET("articles")
     suspend fun articles(): ArticlesResponse
@@ -70,6 +74,13 @@ data class LoginRequest(
 )
 
 @Serializable
+data class UpdateProfileRequest(
+    @SerialName("display_name")
+    val displayName: String,
+    val bio: String = ""
+)
+
+@Serializable
 data class AuthResponse(
     @SerialName("access_token")
     val accessToken: String,
@@ -84,6 +95,7 @@ data class AuthUser(
     val email: String,
     @SerialName("display_name")
     val displayName: String = "",
+    val bio: String = "",
     @SerialName("created_at")
     val createdAt: String = "",
     @SerialName("updated_at")

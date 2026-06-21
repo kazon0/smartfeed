@@ -48,7 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onUrlChange(value: String) {
-        uiState = uiState.copy(url = value)
+        uiState = uiState.withUploadUrl(value)
     }
 
     fun clearError() {
@@ -129,6 +129,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             uploadProgress = UploadProgress.CheckingStatus,
             uploadStatusText = "",
             uploadSummaryText = "",
+            uploadSummaryUrl = cleanUrl,
             errorMessage = null,
             uploadResponse = null
         )
@@ -147,9 +148,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     },
                     onSummaryDelta = { delta ->
                         viewModelScope.launch {
-                            uiState = uiState.copy(
-                                uploadSummaryText = uiState.uploadSummaryText + delta
-                            )
+                            if (uiState.uploadSummaryUrl == cleanUrl) {
+                                uiState = uiState.copy(
+                                    uploadSummaryText = uiState.uploadSummaryText + delta
+                                )
+                            }
                         }
                     }
                 )
@@ -167,6 +170,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         uploadProgress = null,
                         uploadStatusText = "",
                         uploadSummaryText = "",
+                        uploadSummaryUrl = "",
                         isUploading = false
                     )
                     persistConversations(uiState.conversations)
@@ -186,6 +190,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         topic = topic,
                         storedChunks = response.storedChunks
                     )
+                    val stillShowingUploadedUrl = uiState.url.trim() == cleanUrl
+                    uiState = uiState.copy(
+                        uploadSummaryText = if (stillShowingUploadedUrl) {
+                            response.summary.ifBlank { uiState.uploadSummaryText }
+                        } else {
+                            ""
+                        },
+                        uploadSummaryUrl = if (stillShowingUploadedUrl) cleanUrl else ""
+                    )
                     persistConversations(uiState.conversations)
                 }
                 is ArticleUploadResult.Failed -> {
@@ -193,7 +206,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         errorMessage = result.message,
                         uploadProgress = null,
                         uploadStatusText = "",
-                        uploadSummaryText = ""
+                        uploadSummaryText = "",
+                        uploadSummaryUrl = ""
                     )
                 }
             }
@@ -201,8 +215,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             uiState = uiState.copy(
                 isUploading = false,
                 uploadProgress = null,
-                uploadStatusText = "",
-                uploadSummaryText = ""
+                uploadStatusText = ""
             )
         }
     }
@@ -257,6 +270,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+}
+
+internal fun HomeUiState.withUploadUrl(value: String): HomeUiState {
+    val keepsCurrentSummary = uploadSummaryUrl.isNotBlank() &&
+        value.trim() == uploadSummaryUrl
+    return copy(
+        url = value,
+        uploadSummaryText = if (keepsCurrentSummary) uploadSummaryText else "",
+        uploadSummaryUrl = if (keepsCurrentSummary) uploadSummaryUrl else ""
+    )
 }
 
 private fun UploadStreamStatus.displayText(): String {

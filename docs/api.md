@@ -108,6 +108,19 @@ curl http://127.0.0.1:8000/auth/me \
 
 Missing, invalid, expired, or deleted-user tokens return HTTP `401`.
 
+## PATCH /auth/me
+
+Updates the current user's display name and profile bio. Values are trimmed; the display name must contain 1 to 120 characters and the bio may contain up to 200 characters.
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/auth/me \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"display_name":"Journal Reader","bio":"Keep collecting useful ideas."}'
+```
+
+The response uses the same user object as `GET /auth/me`. Invalid display names return HTTP `422`.
+
 Authentication requires `DATABASE_URL` and a `JWT_SECRET` containing at least 32 characters. Missing, invalid, or expired credentials on protected business endpoints return HTTP `401`.
 
 Chroma chunks created before user isolation do not contain `user_id` and are not
