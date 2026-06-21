@@ -45,7 +45,22 @@ class LangChainRAGPipeline(RAGPipeline):
         scope: str = "global",
         relevance_threshold: float = 0.25,
         debug: dict | None = None,
+        use_llm_preprocessing: bool = True,
     ) -> dict:
+        if not use_llm_preprocessing:
+            return super().run(
+                query,
+                vector_store,
+                rerank_query=rerank_query,
+                url=url,
+                metadata_filter=metadata_filter,
+                all_chunks=all_chunks,
+                scope=scope,
+                relevance_threshold=relevance_threshold,
+                debug=debug,
+                use_llm_preprocessing=False,
+            )
+
         payload = {
             "query": query,
             "rerank_query": rerank_query or query,
@@ -75,6 +90,7 @@ class LangChainRAGPipeline(RAGPipeline):
                 scope=scope,
                 relevance_threshold=relevance_threshold,
                 debug=debug,
+                use_llm_preprocessing=use_llm_preprocessing,
             )
 
     def answer_with_context(
@@ -83,7 +99,17 @@ class LangChainRAGPipeline(RAGPipeline):
         context_chunks: list[str],
         llm_service: LLMService,
         debug: dict | None = None,
+        compress_context: bool = True,
     ) -> str:
+        if not compress_context:
+            return super().answer_with_context(
+                query,
+                context_chunks,
+                llm_service,
+                debug,
+                compress_context=False,
+            )
+
         payload = {
             "query": query,
             "context_chunks": context_chunks,
@@ -103,6 +129,7 @@ class LangChainRAGPipeline(RAGPipeline):
                 context_chunks,
                 llm_service,
                 debug,
+                compress_context=compress_context,
             )
 
     def answer_with_context_stream(
@@ -111,12 +138,14 @@ class LangChainRAGPipeline(RAGPipeline):
         context_chunks: list[str],
         llm_service: LLMService,
         debug: dict | None = None,
+        compress_context: bool = True,
     ):
         yield from super().answer_with_context_stream(
             query,
             context_chunks,
             llm_service,
             debug,
+            compress_context=compress_context,
         )
 
     def _rewrite_step(self, payload: dict) -> dict:

@@ -557,7 +557,10 @@ user. Returns `status: "not_found"` for missing or foreign conversations.
 
 Runs authenticated chat over WebSocket while keeping `POST /chat` as the stable
 fallback. It emits stage events, answer delta events, and the final full
-`/chat` response.
+`/chat` response. To reduce first-token latency, WebSocket chat uses a
+low-latency retrieval path that skips LLM query expansion, LLM rerank, and
+context compression before the final streaming answer. `POST /chat` keeps the
+full quality-oriented RAG path.
 
 ### Connect
 

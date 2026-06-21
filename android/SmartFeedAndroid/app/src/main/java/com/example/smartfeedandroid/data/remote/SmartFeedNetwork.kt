@@ -69,12 +69,15 @@ object SmartFeedNetwork {
 
     private fun webSocketUrl(path: String, token: String): String {
         val httpUrl = BuildConfig.SMARTFEED_BASE_URL.toHttpUrl()
-        val scheme = if (httpUrl.isHttps) "wss" else "ws"
-        return httpUrl.newBuilder()
-            .scheme(scheme)
+        val httpsUrl = httpUrl.newBuilder()
             .encodedPath("/$path")
             .addQueryParameter("token", token)
             .build()
             .toString()
+        return when {
+            httpsUrl.startsWith("https://") -> "wss://" + httpsUrl.removePrefix("https://")
+            httpsUrl.startsWith("http://") -> "ws://" + httpsUrl.removePrefix("http://")
+            else -> httpsUrl
+        }
     }
 }

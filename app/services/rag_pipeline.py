@@ -26,9 +26,16 @@ class RAGPipeline:
         scope: str = "global",
         relevance_threshold: float = 0.25,
         debug: dict | None = None,
+        use_llm_preprocessing: bool = True,
     ) -> dict:
-        rewritten_query = self.rewrite_query(query, url)
-        search_queries = self.search_queries(query, rewritten_query, url)
+        if use_llm_preprocessing:
+            rewritten_query = self.rewrite_query(query, url)
+            search_queries = self.search_queries(query, rewritten_query, url)
+        else:
+            rewritten_query = query
+            search_queries = [query]
+            if debug is not None:
+                debug["fast_path"] = True
         ranking_query = " ".join(search_queries)
         retrieved_chunks = self.retrieve_chunks(
             vector_store,
@@ -45,11 +52,14 @@ class RAGPipeline:
             debug["ranking_query"] = ranking_query
             debug["ranked_chunks"] = self.debug_chunk_refs(ranked_chunks)
 
-        reranked_chunks = self.llm_rerank_chunks(
-            rerank_query or query,
-            ranked_chunks,
-            debug,
-        )
+        if use_llm_preprocessing:
+            reranked_chunks = self.llm_rerank_chunks(
+                rerank_query or query,
+                ranked_chunks,
+                debug,
+            )
+        else:
+            reranked_chunks = ranked_chunks
         relevant_chunks = self.high_relevance_chunks(
             reranked_chunks,
             relevance_threshold,
@@ -72,12 +82,14 @@ class RAGPipeline:
         context_chunks: list[str],
         llm_service: LLMService,
         debug: dict | None = None,
+        compress_context: bool = True,
     ) -> str:
         answer_context = self.prepare_answer_context(
             query,
             context_chunks,
             llm_service,
             debug,
+            compress_context=compress_context,
         )
         return llm_service.answer(question=query, context_chunks=answer_context)
 
@@ -87,12 +99,14 @@ class RAGPipeline:
         context_chunks: list[str],
         llm_service: LLMService,
         debug: dict | None = None,
+        compress_context: bool = True,
     ):
         answer_context = self.prepare_answer_context(
             query,
             context_chunks,
             llm_service,
             debug,
+            compress_context=compress_context,
         )
         yield from llm_service.answer_stream(
             question=query,
@@ -105,7 +119,19 @@ class RAGPipeline:
         context_chunks: list[str],
         llm_service: LLMService,
         debug: dict | None = None,
+        compress_context: bool = True,
     ) -> list[str]:
+        if not compress_context:
+            if debug is not None:
+                debug["context"] = {
+                    "chunk_count": len(context_chunks),
+                    "compressed": False,
+                    "compression_skipped": True,
+                    "compressed_length": 0,
+                    "raw_length": sum(len(chunk) for chunk in context_chunks),
+                }
+            return context_chunks
+
         compressed_context = ""
         try:
             candidate = llm_service.compress_context(query, context_chunks)

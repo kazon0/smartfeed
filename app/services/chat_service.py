@@ -40,6 +40,10 @@ class ChatService:
             else create_rag_pipeline(llm_service_factory=llm_service_factory)
         )
 
+    @property
+    def fast_streaming_enabled(self) -> bool:
+        return self.answer_delta_callback is not None
+
     def chat(
         self,
         query: str,
@@ -80,6 +84,7 @@ class ChatService:
             scope="global",
             relevance_threshold=self.RELEVANCE_THRESHOLD,
             debug=debug,
+            use_llm_preprocessing=not self.fast_streaming_enabled,
         )
         global_chunks = pipeline_result["retrieved_chunks"]
         relevant_chunks = pipeline_result["relevant_chunks"]
@@ -123,6 +128,7 @@ class ChatService:
             scope="page",
             relevance_threshold=self.RELEVANCE_THRESHOLD,
             debug=debug,
+            use_llm_preprocessing=not self.fast_streaming_enabled,
         )
         relevant_page_chunks = pipeline_result["relevant_chunks"]
 
@@ -889,6 +895,7 @@ class ChatService:
                     context_chunks,
                     llm_service,
                     debug,
+                    compress_context=not self.fast_streaming_enabled,
                 ):
                     parts.append(delta)
                     self._emit_answer_delta(delta)
@@ -899,6 +906,7 @@ class ChatService:
                     context_chunks,
                     llm_service,
                     debug,
+                    compress_context=not self.fast_streaming_enabled,
                 )
             if answer.startswith("LLM unavailable"):
                 return "LLM unavailable"
