@@ -40,3 +40,8 @@ def cors_allow_origins() -> list[str]:
     if not raw_value:
         return []
     return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+
+def websocket_fast_path_enabled() -> bool:
+    raw_value = os.getenv("SMARTFEED_WS_FAST_PATH", "1").strip().lower()
+    return raw_value not in {"0", "false", "no", "off"}

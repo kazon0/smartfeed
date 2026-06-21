@@ -8,10 +8,14 @@ import androidx.lifecycle.viewModelScope
 import com.example.smartfeedandroid.data.repository.ChatStreamStatus
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.ui.model.ChatMessage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class ChatViewModel : ViewModel() {
     private val chatCoordinator = ChatCoordinator(ChatRepository())
+    private var streamDrainJob: Job? = null
 
     var uiState by mutableStateOf(ChatUiState())
         private set
@@ -40,6 +44,12 @@ class ChatViewModel : ViewModel() {
         )
 
         viewModelScope.launch {
+            val deltaChannel = Channel<String>(Channel.UNLIMITED)
+            streamDrainJob?.cancel()
+            streamDrainJob = launch {
+                drainDeltas(deltaChannel)
+            }
+
             when (
                 val result = chatCoordinator.ask(
                     query = cleanQuery,
@@ -51,11 +61,7 @@ class ChatViewModel : ViewModel() {
                         }
                     },
                     onDelta = { delta ->
-                        viewModelScope.launch {
-                            uiState = uiState.copy(
-                                streamAnswerText = uiState.streamAnswerText + delta
-                            )
-                        }
+                        deltaChannel.trySend(delta)
                     }
                 )
             ) {
@@ -73,11 +79,33 @@ class ChatViewModel : ViewModel() {
                 }
             }
 
+            deltaChannel.close()
+            streamDrainJob?.join()
+            streamDrainJob = null
+
             uiState = uiState.copy(
                 isAsking = false,
                 streamStatusText = "",
                 streamAnswerText = ""
             )
+        }
+    }
+
+    private suspend fun drainDeltas(deltaChannel: Channel<String>) {
+        val pending = StringBuilder()
+        for (delta in deltaChannel) {
+            pending.append(delta)
+            while (pending.isNotEmpty()) {
+                val takeCount = when {
+                    pending.length >= 6 -> 3
+                    pending.length >= 3 -> 2
+                    else -> 1
+                }
+                val piece = pending.substring(0, takeCount)
+                pending.delete(0, takeCount)
+                uiState = uiState.copy(streamAnswerText = uiState.streamAnswerText + piece)
+                delay(28)
+            }
         }
     }
 }
@@ -86,7 +114,7 @@ private fun ChatStreamStatus.displayText(): String {
     return when (this) {
         ChatStreamStatus.Connecting -> "正在连接实时回答..."
         ChatStreamStatus.Authenticated -> "连接成功，正在准备问题..."
-        ChatStreamStatus.Retrieving -> "正在检索相关文章..."
+        ChatStreamStatus.Retrieving -> "正在快速检索知识库..."
         ChatStreamStatus.Answering -> "正在生成回答..."
         ChatStreamStatus.Fallback -> "实时连接失败，正在切换普通回答..."
     }

@@ -561,6 +561,10 @@ fallback. It emits stage events, answer delta events, and the final full
 low-latency retrieval path that skips LLM query expansion, LLM rerank, and
 context compression before the final streaming answer. `POST /chat` keeps the
 full quality-oriented RAG path.
+Set `SMARTFEED_WS_FAST_PATH=0` to make WebSocket chat use the same full
+preprocessing path as `POST /chat`. Android buffers incoming answer deltas and
+renders them at a steady typing cadence, so fast model chunks do not appear as
+one sudden block of text.
 
 ### Connect
 

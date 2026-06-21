@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
 
+from app.core.config import websocket_fast_path_enabled
 from app.services.llm_service import LLMService
 from app.services.query_intent import QueryIntentService
 from app.services.rag_pipeline import RAGPipeline
@@ -42,7 +43,7 @@ class ChatService:
 
     @property
     def fast_streaming_enabled(self) -> bool:
-        return self.answer_delta_callback is not None
+        return self.answer_delta_callback is not None and websocket_fast_path_enabled()
 
     def chat(
         self,
