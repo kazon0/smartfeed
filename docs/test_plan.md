@@ -90,6 +90,18 @@ Expected result:
 - Chunks should not be dominated by CSS, JSON, footer, hot search, or navigation text.
 - `data.sections` should group readable text by article heading when headings are available.
 
+### 3.1 Test Chinese Title Encoding
+
+Also verify a Chinese page whose HTTP header omits a charset but
+whose HTML declares UTF-8, such as a Baidu Zhidao question page.
+
+Expected result:
+
+- The returned `data.title` contains readable Chinese instead of mojibake such as
+  `Ã`, `Â`, or `ç` sequences.
+- Re-uploading an article with a previously corrupted title updates its stored
+  article metadata.
+
 ## 4. Test /chat With URL
 
 ```bash

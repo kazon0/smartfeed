@@ -10,7 +10,6 @@ import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.ui.model.ChatMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class ChatViewModel : ViewModel() {
@@ -39,6 +38,7 @@ class ChatViewModel : ViewModel() {
         uiState = uiState.copy(
             query = "",
             isAsking = true,
+            streamingConversationId = context.conversationId,
             streamStatusText = "正在连接实时回答...",
             streamAnswerText = ""
         )
@@ -47,24 +47,28 @@ class ChatViewModel : ViewModel() {
             val deltaChannel = Channel<String>(Channel.UNLIMITED)
             streamDrainJob?.cancel()
             streamDrainJob = launch {
-                drainDeltas(deltaChannel)
+                collectDeltas(deltaChannel)
             }
 
-            when (
-                val result = chatCoordinator.ask(
-                    query = cleanQuery,
-                    activeUrl = context.activeUrl,
-                    messages = context.historyMessages,
-                    onStatus = { status ->
-                        viewModelScope.launch {
-                            uiState = uiState.copy(streamStatusText = status.displayText())
-                        }
-                    },
-                    onDelta = { delta ->
-                        deltaChannel.trySend(delta)
+            val result = chatCoordinator.ask(
+                query = cleanQuery,
+                activeUrl = context.activeUrl,
+                messages = context.historyMessages,
+                onStatus = { status ->
+                    viewModelScope.launch {
+                        uiState = uiState.copy(streamStatusText = status.displayText())
                     }
-                )
-            ) {
+                },
+                onDelta = { delta ->
+                    deltaChannel.trySend(delta)
+                }
+            )
+
+            deltaChannel.close()
+            streamDrainJob?.join()
+            streamDrainJob = null
+
+            when (result) {
                 is ChatResult.Answer -> {
                     appendResultMessage(
                         context.conversationId,
@@ -79,33 +83,18 @@ class ChatViewModel : ViewModel() {
                 }
             }
 
-            deltaChannel.close()
-            streamDrainJob?.join()
-            streamDrainJob = null
-
             uiState = uiState.copy(
                 isAsking = false,
+                streamingConversationId = null,
                 streamStatusText = "",
                 streamAnswerText = ""
             )
         }
     }
 
-    private suspend fun drainDeltas(deltaChannel: Channel<String>) {
-        val pending = StringBuilder()
+    private suspend fun collectDeltas(deltaChannel: Channel<String>) {
         for (delta in deltaChannel) {
-            pending.append(delta)
-            while (pending.isNotEmpty()) {
-                val takeCount = when {
-                    pending.length >= 6 -> 3
-                    pending.length >= 3 -> 2
-                    else -> 1
-                }
-                val piece = pending.substring(0, takeCount)
-                pending.delete(0, takeCount)
-                uiState = uiState.copy(streamAnswerText = uiState.streamAnswerText + piece)
-                delay(28)
-            }
+            uiState = uiState.copy(streamAnswerText = uiState.streamAnswerText + delta)
         }
     }
 }

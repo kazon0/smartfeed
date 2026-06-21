@@ -65,12 +65,12 @@ class WebParserService:
     def _prepare_with_jina(self, url: str) -> dict | None:
         try:
             response = self.session.get(self._jina_url(url), timeout=20)
-            response.encoding = response.apparent_encoding or "utf-8"
 
             if response.status_code >= 400:
                 return None
 
-            title, raw_content = self._parse_jina_text(response.text)
+            title, raw_content = self._parse_jina_text(self._response_text(response))
+            title = self._normalize_title(title)
             sections = self._extract_markdown_sections(raw_content, title)
             content = self._sections_to_text(sections)
             chunks, chunk_metadata = self._chunk_sections(sections)
@@ -94,7 +94,6 @@ class WebParserService:
     def _prepare_with_html(self, url: str) -> dict:
         try:
             response = self.session.get(url, timeout=10)
-            response.encoding = response.apparent_encoding or "utf-8"
 
             if response.status_code >= 400:
                 return {
@@ -102,7 +101,7 @@ class WebParserService:
                     "url": url,
                 }
 
-            soup = BeautifulSoup(response.text, "html.parser")
+            soup = BeautifulSoup(self._response_text(response), "html.parser")
 
             title = self._extract_title(soup)
             sections = self._extract_html_sections(soup, title)
@@ -169,6 +168,49 @@ class WebParserService:
 
         return title, "\n".join(content_lines)
 
+    def _response_text(self, response) -> str:
+        content = getattr(response, "content", None)
+        if not isinstance(content, bytes):
+            return response.text
+
+        declared_encoding = self._declared_encoding(response, content)
+        encodings = [declared_encoding, response.apparent_encoding, "utf-8", response.encoding]
+        for encoding in encodings:
+            if not encoding:
+                continue
+            try:
+                return content.decode(encoding)
+            except (LookupError, UnicodeDecodeError):
+                continue
+        return content.decode("utf-8", errors="replace")
+
+    def _declared_encoding(self, response, content: bytes) -> str | None:
+        content_type = getattr(response, "headers", {}).get("content-type", "")
+        header_match = re.search(r"charset\s*=\s*['\"]?([\w.-]+)", content_type, re.I)
+        if header_match:
+            return header_match.group(1)
+
+        head = content[:16384]
+        meta_match = re.search(br"charset\s*=\s*['\"]?([\w.-]+)", head, re.I)
+        if meta_match:
+            return meta_match.group(1).decode("ascii", errors="ignore")
+        return None
+
+    def _normalize_title(self, title: str) -> str:
+        title = title.strip()
+        repaired_candidates = [title]
+        for encoding in ("latin-1", "cp1252"):
+            try:
+                repaired_candidates.append(title.encode(encoding).decode("utf-8"))
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+        return min(repaired_candidates, key=self._mojibake_score)
+
+    def _mojibake_score(self, text: str) -> tuple[int, int]:
+        suspicious = sum(text.count(marker) for marker in ("Ã", "Â", "å", "ä", "æ", "ç", "é", "è", "�"))
+        cjk_count = len(re.findall(r"[\u3400-\u9fff]", text))
+        return suspicious, -cjk_count
+
     def _clean_markdown_text(self, text: str) -> str:
         text = re.sub(r"!\[[^\]]*]\([^)]*\)", "", text)
         text = re.sub(r"\[([^\]]+)]\([^)]*\)", r"\1", text)
@@ -211,7 +253,7 @@ class WebParserService:
 
     def _extract_title(self, soup: BeautifulSoup) -> str:
         if soup.title and soup.title.string:
-            return soup.title.string.strip()
+            return self._normalize_title(soup.title.string)
         return ""
 
     def _extract_html_sections(self, soup: BeautifulSoup, title: str) -> list[dict]:

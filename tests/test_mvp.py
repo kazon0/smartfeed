@@ -515,6 +515,33 @@ Markdown Content:
     assert "冒泡排序" in result["content"]
 
 
+def test_web_parser_uses_html_meta_charset_for_title(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+        content = (
+            '<html><head><meta charset="UTF-8"><title>百度安全验证</title></head>'
+            '<body><article><p>测试正文内容。</p></article></body></html>'
+        ).encode("utf-8")
+        headers = {"content-type": "text/html"}
+        apparent_encoding = None
+        encoding = "ISO-8859-1"
+
+    parser = WebParserService()
+    monkeypatch.setattr(parser, "_prepare_with_jina", lambda url: None)
+    monkeypatch.setattr(parser.session, "get", lambda url, timeout: FakeResponse())
+
+    result = parser.prepare("https://zhidao.baidu.com/question/1.html")
+
+    assert result["title"] == "百度安全验证"
+
+
+def test_web_parser_repairs_utf8_title_decoded_as_latin1():
+    parser = WebParserService()
+    mojibake_title = "百度知道".encode("utf-8").decode("latin-1")
+
+    assert parser._normalize_title(mojibake_title) == "百度知道"
+
+
 def test_llm_classify_topic_parses_json_response(monkeypatch):
     service = LLMService()
     monkeypatch.setattr(

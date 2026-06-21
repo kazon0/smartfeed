@@ -216,7 +216,14 @@ SmartFeed is beyond a minimal MVP and now has a working RAG loop:
 URL -> article parsing -> sections/chunks -> embeddings -> ChromaDB -> retrieval -> DeepSeek answer
 ```
 
-The completed delivery work now includes the LangChain Runnable RAG pipeline, PostgreSQL-backed users and metadata, JWT-based user isolation across APIs and ChromaDB, Android authentication, and cloud conversation sync. The remaining delivery roadmap is: deploy the HTTPS backend with persistent storage, switch Android to a production backend configuration, add authenticated WebSocket streaming while retaining `POST /chat` as a fallback, and finish the demo assets. See `docs/roadmap.md` for the execution order.
+The completed delivery work includes the LangChain Runnable RAG pipeline,
+PostgreSQL-backed users and metadata, JWT-based user isolation across APIs and
+ChromaDB, Android authentication, cloud conversation sync, a Sealos HTTPS
+deployment, and authenticated WebSocket chat/upload streaming with HTTP
+fallback. Remaining work is product hardening: verify the LangChain production
+environment, add WebSocket heartbeat and bounded reconnect behavior, complete
+real-device acceptance, measure performance before publishing latency or scale
+claims, and finish the demo assets. See `docs/roadmap.md` for the execution order.
 
 ## Notes
 

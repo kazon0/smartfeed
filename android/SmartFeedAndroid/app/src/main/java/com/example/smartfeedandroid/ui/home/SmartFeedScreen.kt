@@ -1,5 +1,6 @@
 package com.example.smartfeedandroid.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -117,6 +118,13 @@ private fun SmartFeedContent(
     val activeConversation = uiState.conversations
         .firstOrNull { it.id == uiState.activeConversationId }
 
+    BackHandler(enabled = uiState.selectedTab == AppTab.Home && uiState.isChatOpen) {
+        onBackToConversations()
+    }
+    BackHandler(enabled = uiState.selectedTab != AppTab.Home) {
+        onSelectTab(AppTab.Home)
+    }
+
     Surface(modifier = modifier.fillMaxSize()) {
         Scaffold(
             bottomBar = {
@@ -152,6 +160,8 @@ private fun SmartFeedContent(
                             activeUrl = uiState.activeUrl,
                             activeTitle = activeConversation?.title.orEmpty(),
                             isAsking = chatUiState.isAsking,
+                            showStreamingResponse = chatUiState.isAsking &&
+                                chatUiState.streamingConversationId == activeConversation?.id,
                             streamStatusText = chatUiState.streamStatusText,
                             streamAnswerText = chatUiState.streamAnswerText,
                             onAsk = onAsk,

@@ -1,5 +1,7 @@
 package com.example.smartfeedandroid.ui.chat
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,9 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,15 +63,22 @@ fun ChatDetailScreen(
     activeUrl: String,
     activeTitle: String,
     isAsking: Boolean,
+    showStreamingResponse: Boolean = isAsking,
     streamStatusText: String,
     streamAnswerText: String,
     onAsk: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
+    val interactionSource = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
             .fillMaxSize()
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { focusManager.clearFocus() }
     ) {
         ChatHeader(
             activeUrl = activeUrl,
@@ -74,7 +88,7 @@ fun ChatDetailScreen(
 
         MessageList(
             messages = messages,
-            isAsking = isAsking,
+            isAsking = showStreamingResponse,
             streamStatusText = streamStatusText,
             streamAnswerText = streamAnswerText,
             modifier = Modifier
@@ -176,7 +190,17 @@ private fun MessageList(
     streamAnswerText: String,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val itemCount = messages.size + if (isAsking) 1 else 0
+
+    LaunchedEffect(messages.size, isAsking, streamAnswerText.length / 8) {
+        if (itemCount > 0) {
+            listState.scrollToItem(itemCount - 1)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp)
@@ -215,8 +239,12 @@ private fun ChatInputBar(
     isAsking: Boolean,
     onAsk: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding(),
         shape = RoundedCornerShape(2.dp),
         colors = CardDefaults.cardColors(containerColor = Color.LightGray.copy(alpha = 0.1f))
     ) {
@@ -247,7 +275,11 @@ private fun ChatInputBar(
             val isSendEnabled = !isAsking && query.isNotBlank()
 
             IconButton(
-                onClick = onAsk,
+                onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    onAsk()
+                },
                 enabled = isSendEnabled,
                 modifier = Modifier
                     .padding(bottom = 4.dp, start = 8.dp, end = 4.dp)
@@ -281,6 +313,7 @@ private fun ChatDetailScreenPreview() {
         activeUrl = "https://example.com/article",
         activeTitle = "程序员应该知道的十个基础算法",
         isAsking = true,
+        showStreamingResponse = true,
         streamStatusText = "正在检索相关文章...",
         streamAnswerText = "",
         onAsk = {},

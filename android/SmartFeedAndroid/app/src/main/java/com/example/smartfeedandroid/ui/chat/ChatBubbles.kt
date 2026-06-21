@@ -70,9 +70,7 @@ private fun AssistantMessage(response: ChatResponse) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            response.sources.take(3).forEach { source ->
-                SourceCard(source = source)
-            }
+            SourceCard(source = response.sources.first())
         }
     }
 }
