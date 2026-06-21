@@ -914,6 +914,7 @@ When `url` is not provided, SmartFeed searches the global knowledge base with li
 Diagnostics:
 
 - `/chat` returns a `debug` object with the active RAG pipeline name, rewritten query, multi-query search variants, retrieval hit counts, selected chunk previews, and context compression status.
+- `debug.timings_ms` records server-side intent and total request duration. In LangChain mode, `debug.langchain_timings_ms` records rewrite, multi-query, retrieval, rank, rerank, compression, and answer stage durations. These diagnostics are not stable Android business fields.
 - Default `debug.rag_pipeline` is `RAGPipeline`.
 - To run the LangChain Core Runnable retrieval chain, start the backend with:
 

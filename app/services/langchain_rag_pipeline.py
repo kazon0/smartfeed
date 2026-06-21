@@ -1,5 +1,7 @@
 import importlib
 from collections.abc import Callable
+from contextlib import contextmanager
+from time import perf_counter
 
 from app.services.llm_service import LLMService
 from app.services.rag_pipeline import RAGPipeline
@@ -149,95 +151,109 @@ class LangChainRAGPipeline(RAGPipeline):
         )
 
     def _rewrite_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "rewrite")
-        return {
-            **payload,
-            "rewritten_query": super().rewrite_query(
-                payload["query"],
-                url=payload.get("url"),
-            ),
-        }
+        with self._measure_stage(payload, "rewrite"):
+            return {
+                **payload,
+                "rewritten_query": super().rewrite_query(
+                    payload["query"],
+                    url=payload.get("url"),
+                ),
+            }
 
     def _search_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "multi_query")
-        search_queries = super().search_queries(
-            payload["query"],
-            payload["rewritten_query"],
-            url=payload.get("url"),
-        )
-        return {
-            **payload,
-            "search_queries": search_queries,
-            "ranking_query": " ".join(search_queries),
-        }
+        with self._measure_stage(payload, "multi_query"):
+            search_queries = super().search_queries(
+                payload["query"],
+                payload["rewritten_query"],
+                url=payload.get("url"),
+            )
+            return {
+                **payload,
+                "search_queries": search_queries,
+                "ranking_query": " ".join(search_queries),
+            }
 
     def _retrieve_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "retrieve")
-        retrieved_chunks = super().retrieve_chunks(
-            payload["vector_store"],
-            payload["search_queries"],
-            metadata_filter=payload.get("metadata_filter"),
-            all_chunks=payload.get("all_chunks"),
-            scope=payload.get("scope", "global"),
-            debug=payload.get("debug"),
-        )
-        return {**payload, "retrieved_chunks": retrieved_chunks}
+        with self._measure_stage(payload, "retrieve"):
+            retrieved_chunks = super().retrieve_chunks(
+                payload["vector_store"],
+                payload["search_queries"],
+                metadata_filter=payload.get("metadata_filter"),
+                all_chunks=payload.get("all_chunks"),
+                scope=payload.get("scope", "global"),
+                debug=payload.get("debug"),
+            )
+            return {**payload, "retrieved_chunks": retrieved_chunks}
 
     def _rank_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "rank")
-        ranked_chunks = super().rank_chunks(
-            payload["ranking_query"],
-            payload["retrieved_chunks"],
-        )
-        debug = payload.get("debug")
-        if debug is not None:
-            debug["rewritten_query"] = payload["rewritten_query"]
-            debug["search_queries"] = payload["search_queries"]
-            debug["ranking_query"] = payload["ranking_query"]
-            debug["ranked_chunks"] = self.debug_chunk_refs(ranked_chunks)
-        return {**payload, "ranked_chunks": ranked_chunks}
+        with self._measure_stage(payload, "rank"):
+            ranked_chunks = super().rank_chunks(
+                payload["ranking_query"],
+                payload["retrieved_chunks"],
+            )
+            debug = payload.get("debug")
+            if debug is not None:
+                debug["rewritten_query"] = payload["rewritten_query"]
+                debug["search_queries"] = payload["search_queries"]
+                debug["ranking_query"] = payload["ranking_query"]
+                debug["ranked_chunks"] = self.debug_chunk_refs(ranked_chunks)
+            return {**payload, "ranked_chunks": ranked_chunks}
 
     def _rerank_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "rerank")
-        reranked_chunks = super().llm_rerank_chunks(
-            payload["rerank_query"],
-            payload["ranked_chunks"],
-            payload.get("debug"),
-        )
-        relevant_chunks = self.high_relevance_chunks(
-            reranked_chunks,
-            payload["relevance_threshold"],
-        )
-        debug = payload.get("debug")
-        if debug is not None:
-            debug["relevant_chunks"] = self.debug_chunk_refs(relevant_chunks)
-        return {
-            "rewritten_query": payload["rewritten_query"],
-            "search_queries": payload["search_queries"],
-            "ranking_query": payload["ranking_query"],
-            "retrieved_chunks": payload["retrieved_chunks"],
-            "ranked_chunks": reranked_chunks,
-            "relevant_chunks": relevant_chunks,
-        }
+        with self._measure_stage(payload, "rerank"):
+            reranked_chunks = super().llm_rerank_chunks(
+                payload["rerank_query"],
+                payload["ranked_chunks"],
+                payload.get("debug"),
+            )
+            relevant_chunks = self.high_relevance_chunks(
+                reranked_chunks,
+                payload["relevance_threshold"],
+            )
+            debug = payload.get("debug")
+            if debug is not None:
+                debug["relevant_chunks"] = self.debug_chunk_refs(relevant_chunks)
+            return {
+                "rewritten_query": payload["rewritten_query"],
+                "search_queries": payload["search_queries"],
+                "ranking_query": payload["ranking_query"],
+                "retrieved_chunks": payload["retrieved_chunks"],
+                "ranked_chunks": reranked_chunks,
+                "relevant_chunks": relevant_chunks,
+            }
 
     def _compress_step(self, payload: dict) -> dict:
-        self._record_stage(payload, "compress")
-        answer_context = super().prepare_answer_context(
-            payload["query"],
-            payload["context_chunks"],
-            payload["llm_service"],
-            payload.get("debug"),
-        )
-        return {**payload, "answer_context": answer_context}
+        with self._measure_stage(payload, "compress"):
+            answer_context = super().prepare_answer_context(
+                payload["query"],
+                payload["context_chunks"],
+                payload["llm_service"],
+                payload.get("debug"),
+            )
+            return {**payload, "answer_context": answer_context}
 
     def _answer_step(self, payload: dict) -> str:
-        self._record_stage(payload, "answer")
-        return payload["llm_service"].answer(
-            question=payload["query"],
-            context_chunks=payload["answer_context"],
-        )
+        with self._measure_stage(payload, "answer"):
+            return payload["llm_service"].answer(
+                question=payload["query"],
+                context_chunks=payload["answer_context"],
+            )
 
     def _record_stage(self, payload: dict, stage: str) -> None:
         debug = payload.get("debug")
         if debug is not None:
             debug.setdefault("langchain_stages", []).append(stage)
+
+    @contextmanager
+    def _measure_stage(self, payload: dict, stage: str):
+        self._record_stage(payload, stage)
+        started = perf_counter()
+        try:
+            yield
+        finally:
+            debug = payload.get("debug")
+            if debug is not None:
+                debug.setdefault("langchain_timings_ms", {})[stage] = round(
+                    (perf_counter() - started) * 1000,
+                    2,
+                )

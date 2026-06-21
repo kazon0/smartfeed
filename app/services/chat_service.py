@@ -1,5 +1,6 @@
 import re
 from collections.abc import Callable
+from time import perf_counter
 
 from app.core.config import websocket_fast_path_enabled
 from app.services.llm_service import LLMService
@@ -52,61 +53,72 @@ class ChatService:
         mode: str = "global",
         history: list[dict[str, str]] | None = None,
     ) -> dict:
+        request_started = perf_counter()
         history_context = self._history_context(history or [])
         contextual_query = self._contextual_query(query, history_context)
+        intent_started = perf_counter()
         intent = self.intent_service_factory().classify(
             query,
             has_url=bool(url),
         )
         debug = self._new_debug(query, url, mode, intent)
+        debug["timings_ms"] = {
+            "intent": round((perf_counter() - intent_started) * 1000, 2),
+        }
         debug["rag_pipeline"] = self.rag_pipeline.__class__.__name__
         debug["history_count"] = len(history or [])
         debug["history_used"] = bool(history_context)
 
-        if intent["retrieval_scope"] == "none":
-            return self._no_retrieval_response(intent, debug)
+        try:
+            if intent["retrieval_scope"] == "none":
+                return self._no_retrieval_response(intent, debug)
 
-        vector_store = self.vector_store_factory()
-        if url:
-            return self._chat_with_current_page(
-                query,
+            vector_store = self.vector_store_factory()
+            if url:
+                return self._chat_with_current_page(
+                    query,
+                    contextual_query,
+                    url,
+                    intent,
+                    vector_store,
+                    debug,
+                )
+
+            pipeline_result = self.rag_pipeline.run(
                 contextual_query,
-                url,
-                intent,
                 vector_store,
+                rerank_query=query,
+                all_chunks=self.rag_pipeline.get_all_chunks(vector_store),
+                scope="global",
+                relevance_threshold=self.RELEVANCE_THRESHOLD,
+                debug=debug,
+                use_llm_preprocessing=not self.fast_streaming_enabled,
+            )
+            global_chunks = pipeline_result["retrieved_chunks"]
+            relevant_chunks = pipeline_result["relevant_chunks"]
+            answer, source_type, selected_chunks = self._answer_with_policy(
+                contextual_query,
+                intent["fallback_policy"],
+                relevant_chunks,
+                [],
+                global_chunks,
                 debug,
             )
+            debug["selected_chunks"] = self._debug_chunk_refs(selected_chunks)
 
-        pipeline_result = self.rag_pipeline.run(
-            contextual_query,
-            vector_store,
-            rerank_query=query,
-            all_chunks=self.rag_pipeline.get_all_chunks(vector_store),
-            scope="global",
-            relevance_threshold=self.RELEVANCE_THRESHOLD,
-            debug=debug,
-            use_llm_preprocessing=not self.fast_streaming_enabled,
-        )
-        global_chunks = pipeline_result["retrieved_chunks"]
-        relevant_chunks = pipeline_result["relevant_chunks"]
-        answer, source_type, selected_chunks = self._answer_with_policy(
-            contextual_query,
-            intent["fallback_policy"],
-            relevant_chunks,
-            [],
-            global_chunks,
-            debug,
-        )
-        debug["selected_chunks"] = self._debug_chunk_refs(selected_chunks)
-
-        return self._chat_response(
-            answer=answer,
-            sources=self._build_sources(selected_chunks, query),
-            source_type=source_type,
-            intent=intent,
-            retrieval_scope=intent["retrieval_scope"],
-            debug=debug,
-        )
+            return self._chat_response(
+                answer=answer,
+                sources=self._build_sources(selected_chunks, query),
+                source_type=source_type,
+                intent=intent,
+                retrieval_scope=intent["retrieval_scope"],
+                debug=debug,
+            )
+        finally:
+            debug["timings_ms"]["total"] = round(
+                (perf_counter() - request_started) * 1000,
+                2,
+            )
 
     def _chat_with_current_page(
         self,

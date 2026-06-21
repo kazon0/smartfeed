@@ -172,9 +172,9 @@ Coordinator 在同一 Flow 中接入 HTTP fallback，ViewModel 直接 collect �
 
 ## 当前执行顺序
 
-1. 将线上环境切换为 `SMARTFEED_RAG_PIPELINE=langchain` 并通过 `/chat.debug` 验证。
-2. 发布中文网页标题编码修复，重新导入受影响文章。
+1. 推送并部署当前中文网页编码、性能诊断和 Android 更新。
+2. 重新导入受乱码影响的文章。
 3. 真机验收来源降噪、流式消息、自动滚动、键盘避让和返回手势。
 4. 在真机进行 WebSocket 弱网、网络切换和 HTTP fallback 验证。
-5. 增加可复现的 TTFT、检索耗时和知识库规模基准；没有数据前不写 `500ms` 或“百万字秒级”。
+5. 使用有真实文章和 chunks 的演示账号运行至少三轮性能基准，保存 TTFT、完整回答、LangChain 阶段耗时和知识库规模结果；没有数据前不写 `500ms` 或“百万字秒级”。
 6. 完成 README、架构图、APK、截图、演示视频和固定演示脚本。

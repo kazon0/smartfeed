@@ -225,6 +225,16 @@ venv/bin/python -m compileall app tests
 venv/bin/python -m pytest tests/test_mvp.py -q
 ```
 
+Run a deployed HTTP/WebSocket performance benchmark with a dedicated account:
+
+```bash
+SMARTFEED_BENCH_EMAIL='benchmark@example.com' \
+SMARTFEED_BENCH_PASSWORD='replace-with-password' \
+venv/bin/python scripts/benchmark_chat.py --runs 3
+```
+
+See `docs/performance.md` for metric definitions and reporting constraints.
+
 ## Project Status
 
 SmartFeed is beyond a minimal MVP and now has a working RAG loop:

@@ -783,6 +783,14 @@ def test_langchain_pipeline_run_records_runnable_stages():
         "rank",
         "rerank",
     ]
+    assert set(debug["langchain_timings_ms"]) == {
+        "rewrite",
+        "multi_query",
+        "retrieve",
+        "rank",
+        "rerank",
+    }
+    assert all(value >= 0 for value in debug["langchain_timings_ms"].values())
     assert result["rewritten_query"] == "Kotlin 协程"
     assert result["relevant_chunks"]
 
@@ -817,6 +825,8 @@ def test_langchain_pipeline_runs_compression_and_answer_stages():
         "answer",
     ]
     assert debug["context"]["compressed"] is True
+    assert debug["langchain_timings_ms"]["compress"] >= 0
+    assert debug["langchain_timings_ms"]["answer"] >= 0
 
 
 def test_langchain_pipeline_run_falls_back_to_classic_on_chain_error():
@@ -1333,6 +1343,8 @@ def test_chat_article_reference_without_url_does_not_search(monkeypatch):
     assert data["source_type"] == "need_page_context"
     assert data["sources"] == []
     assert data["answer"] == "我无法确定你指的是哪篇文章，请先分享网页，或提供文章链接/标题。"
+    assert data["debug"]["timings_ms"]["intent"] >= 0
+    assert data["debug"]["timings_ms"]["total"] >= 0
 
 
 def test_chat_general_query_searches_first_then_llm(monkeypatch):
