@@ -62,7 +62,8 @@ DEEPSEEK_API_KEY=your_api_key_here
 DATABASE_URL=postgresql+psycopg://smartfeed:smartfeed@localhost:5432/smartfeed
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_ACCESS_TOKEN_MINUTES=60
-SMARTFEED_RAG_PIPELINE=classic
+SMARTFEED_RAG_PIPELINE=langchain
+SMARTFEED_WS_FAST_PATH=0
 CHROMA_PERSIST_DIR=chroma_db
 CORS_ALLOW_ORIGINS=
 ```
@@ -70,6 +71,11 @@ CORS_ALLOW_ORIGINS=
 For production, set `CHROMA_PERSIST_DIR` to a mounted persistent volume and set
 `CORS_ALLOW_ORIGINS` to comma-separated HTTPS origins if a browser client is
 served from a different domain.
+
+`SMARTFEED_RAG_PIPELINE=langchain` enables the LangChain Core Runnable RAG
+pipeline. `SMARTFEED_WS_FAST_PATH=0` makes WebSocket chat use the same full
+rewrite, multi-query retrieval, rerank, compression, and answer path instead of
+the lower-latency streaming shortcut.
 
 Create or upgrade the cloud metadata schema:
 

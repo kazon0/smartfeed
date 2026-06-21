@@ -118,8 +118,8 @@
 ## 6. WebSocket 流式交互
 
 状态：后端 `/ws/chat` 已支持 JWT 鉴权、用户隔离、阶段事件、答案 delta 和最终完整回答；后端 `/ws/upload` 已支持上传阶段事件和文章总结 delta；Android 已接入聊天和上传 WebSocket，并保留 HTTP fallback。
-WebSocket 聊天当前使用低延迟检索路径，优先减少首字等待；普通 `POST /chat` 继续使用完整 RAG 质量路径。
-低延迟路径可通过 `SMARTFEED_WS_FAST_PATH=0` 关闭；Android 端已增加 delta 缓冲和打字机节奏，避免模型分片过快导致“瞬间整段出现”。
+WebSocket 聊天默认可以使用低延迟检索路径，优先减少首字等待；简历演示和线上质量验证建议配置 `SMARTFEED_RAG_PIPELINE=langchain` 与 `SMARTFEED_WS_FAST_PATH=0`，让 `/chat` 和 `/ws/chat` 都走完整 rewrite、multi-query retrieval、rerank、compression 和 answer 编排。
+Android 端已增加 delta 缓冲和打字机节奏，避免模型分片过快导致“瞬间整段出现”。
 
 目标：提供简历可展示的实时回答和长任务状态推送。
 

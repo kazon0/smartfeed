@@ -28,7 +28,8 @@ DEEPSEEK_API_KEY=...
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/database
 JWT_SECRET=replace_with_at_least_32_random_characters
 JWT_ACCESS_TOKEN_MINUTES=60
-SMARTFEED_RAG_PIPELINE=classic
+SMARTFEED_RAG_PIPELINE=langchain
+SMARTFEED_WS_FAST_PATH=0
 CHROMA_PERSIST_DIR=/data/chroma_db
 CORS_ALLOW_ORIGINS=
 RUN_MIGRATIONS=1
@@ -39,6 +40,10 @@ Notes:
 - `DATABASE_URL` also accepts `postgres://` and `postgresql://`; the app
   normalizes both to the psycopg driver URL.
 - `JWT_SECRET` must be at least 32 characters.
+- `SMARTFEED_RAG_PIPELINE=langchain` enables the LangChain Core Runnable RAG
+  pipeline for `/chat`.
+- `SMARTFEED_WS_FAST_PATH=0` makes `/ws/chat` use the same full LangChain/RAG
+  path as `/chat`; set it to `1` only when prioritizing first-token latency.
 - `CHROMA_PERSIST_DIR` must point to a persistent mount in production.
 - `RUN_MIGRATIONS=1` runs `alembic upgrade head` before starting the server.
 - Set `CORS_ALLOW_ORIGINS` only when serving a browser client from another
