@@ -2249,10 +2249,9 @@ def test_chat_page_wide_query_uses_page_context_even_without_high_score(monkeypa
 
     assert response.status_code == 200
     assert data["source_type"] == "page"
-    assert len(data["sources"]) == 3
-    assert data["sources"][0]["section_title"] == "排序算法"
-    assert data["sources"][1]["section_title"] == "动态规划"
-    assert data["sources"][2]["section_title"] == "贪心算法"
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["section_title"] == "排序算法、动态规划、贪心算法"
+    assert data["sources"][0]["chunk_indexes"] == [0, 1, 2]
     assert data["sources"][0]["source_summary"] == "这段来源包含算法方法列表。"
     assert "section_title: 排序算法" in "\n".join(captured_context)
     assert "方法1" in "\n".join(captured_context)

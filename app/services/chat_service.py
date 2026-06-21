@@ -960,11 +960,8 @@ class ChatService:
         return sources
 
     def _group_source_chunks(self, chunks: list[dict]) -> list[dict]:
-        sources = []
-        current_source = None
-        previous_key = None
-        previous_index = None
-
+        sources_by_url: dict[str, dict] = {}
+        ordered_keys: list[str] = []
         for chunk in chunks:
             metadata = chunk.get("metadata", {})
             url = metadata.get("url", "")
@@ -972,23 +969,18 @@ class ChatService:
             section_title = metadata.get("section_title", "")
             section_index = metadata.get("section_index")
             chunk_index = metadata.get("chunk_index")
-            source_key = (url, title, section_index, section_title)
-            is_contiguous = (
-                current_source is not None
-                and source_key == previous_key
-                and isinstance(chunk_index, int)
-                and isinstance(previous_index, int)
-                and chunk_index == previous_index + 1
-            )
+            source_key = url or title or f"chunk:{len(ordered_keys)}"
 
-            if not is_contiguous:
+            if source_key not in sources_by_url:
                 display_title = self._display_title(title, url)
-                current_source = {
+                sources_by_url[source_key] = {
                     "url": url,
                     "title": title,
                     "display_title": display_title,
                     "section_title": section_title,
+                    "section_titles": [],
                     "section_index": section_index,
+                    "section_indexes": [],
                     "chunk_index": chunk_index,
                     "chunk_indexes": [],
                     "score": chunk.get("score", 0),
@@ -996,22 +988,39 @@ class ChatService:
                     "source_summary": "",
                     "_content_parts": [],
                 }
-                sources.append(current_source)
+                ordered_keys.append(source_key)
 
+            current_source = sources_by_url[source_key]
             current_source["score"] = max(
                 current_source.get("score") or 0,
                 chunk.get("score", 0) or 0,
             )
+            if not current_source.get("title") and title:
+                current_source["title"] = title
+                current_source["display_title"] = self._display_title(title, url)
+            if section_title and section_title not in current_source["section_titles"]:
+                current_source["section_titles"].append(section_title)
+            if section_index is not None and section_index not in current_source["section_indexes"]:
+                current_source["section_indexes"].append(section_index)
             if chunk_index is not None:
                 current_source["chunk_indexes"].append(chunk_index)
             current_source["_content_parts"].append(chunk.get("content", ""))
 
-            previous_key = source_key
-            previous_index = chunk_index
-
+        sources = [sources_by_url[key] for key in ordered_keys]
         for source in sources:
             content = "\n\n".join(part.strip() for part in source["_content_parts"] if part.strip())
             source["content_preview"] = self._readable_preview(content)
+            section_titles = source.get("section_titles", [])
+            if section_titles:
+                source["section_title"] = "、".join(section_titles[:3])
+                if len(section_titles) > 3:
+                    source["section_title"] += "等"
+            chunk_indexes = source.get("chunk_indexes", [])
+            if chunk_indexes:
+                source["chunk_indexes"] = sorted(
+                    chunk_indexes,
+                    key=lambda value: value if isinstance(value, int) else 10**9,
+                )
             del source["_content_parts"]
 
         return sources

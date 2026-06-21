@@ -776,8 +776,10 @@ Follow-up chat with optional recent local history:
       "url": "https://example.com",
       "title": "Example Domain",
       "display_title": "Example Domain",
-      "section_title": "Section title",
+      "section_title": "Section title、Another section",
+      "section_titles": ["Section title", "Another section"],
       "section_index": 0,
+      "section_indexes": [0, 1],
       "chunk_index": 0,
       "chunk_indexes": [0, 1, 2],
       "score": 0.82,
@@ -829,7 +831,7 @@ Stable fields for Android MVP:
 - `error_code`: `null` when answerable, otherwise one of the stable error codes below
 - `message`: user-readable explanation for failed states, empty when `status` is `ok`
 - `answer`: answer text or fallback explanation
-- `sources`: source cards for UI display
+- `sources`: article-level source cards for UI display
 - `source_type`: where the answer came from
 - `intent`: classified query intent
 - `retrieval_scope`: retrieval scope selected by backend
@@ -901,8 +903,8 @@ When `url` is provided, SmartFeed treats the request as current-page chat:
 - Page-wide questions such as `这篇文章讲了什么`、`总结一下`、`十种算法有哪些`、`有哪些方法` use quality-filtered page context from the ingested chunks for that URL. Link-heavy, author-card, ad, related-article, footer, and navigation-like chunks are deprioritized.
 - More specific current-page questions use lightweight hybrid retrieval: vector results are merged with keyword matches from the uploaded page chunks, then expanded to the matched article section when section metadata exists. If old chunks do not have section metadata, SmartFeed falls back to neighboring chunks.
 - If the URL has no ingested chunks, SmartFeed does not use unrelated global chunks to answer that page. It returns `source_type: "page_not_found_with_suggestions"` and lists saved article suggestions.
-- `sources` are display-oriented citation blocks. Consecutive chunks from the same article section are merged, `section_title` identifies the article section, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
-- `/chat` limits returned sources to the most useful display sources. The current limit is 3.
+- `sources` are display-oriented citation blocks. Chunks from the same article URL are merged into one article-level source card, `section_title` summarizes up to the first three matching sections, `section_titles` / `section_indexes` preserve the grouped section metadata, `chunk_indexes` records the included chunk indexes, `display_title` is for UI display, and `source_summary` / `source_note` is added when LLM source description is available.
+- `/chat` limits returned sources to the most useful article-level sources. The current limit is 3 distinct articles.
 - `content_preview` is display-cleaned: Markdown links are removed, and preview text is truncated before visible noise such as author picks, related recommendations, and copyright/original-declaration blocks. It is still best used as expandable evidence text, not the default main UI text.
 
 When `url` is not provided, SmartFeed searches the global knowledge base with lightweight hybrid retrieval:

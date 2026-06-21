@@ -136,7 +136,7 @@ Expected result:
 - `source_type` should be `page` if the URL has uploaded chunks.
 - The system should use current-page context instead of relying only on a few vector topK chunks.
 - `sources` should include merged citation blocks from the same URL.
-- `sources` should be grouped by article section when section metadata is available.
+- `sources` should be grouped by article URL; matching section metadata should be preserved in `section_title`, `section_titles`, `section_index`, and `section_indexes`.
 - `answer` should try to organize the methods, algorithms, steps, or list items found in the page context.
 - The answer should naturally reference the current page or article title instead of exposing raw source numbers to users.
 

@@ -182,10 +182,10 @@
     - compression 输入会在候选 chunks 间均衡分配长度预算；压缩输出遗漏跨 section 或跨 URL 依据时回退原始 context。
     - context compression 不可用或返回空时，回退使用原始候选 chunks。
     - 无高相关 chunks 且允许 LLM 兜底时调用 `LLMService.answer_without_context()`。
-    - 返回 sources 时会合并同一 URL、同一 section 下连续 chunks，形成更适合前端展示的引用块。
+    - 返回 sources 时会按同一 URL 聚合 chunks，形成更适合前端展示的文章级引用块。
     - sources 的 `content_preview` 会做展示层清洗，去除 Markdown 链接，并在原创声明、相关推荐、作者精选等展示噪声前截断。
     - sources 包含 `display_title`，用于前端展示更干净的文章标题。
-    - sources 包含 `section_title` 和 `section_index`，用于展示来源章节。
+    - sources 包含 `section_title`、`section_titles`、`section_index` 和 `section_indexes`，用于展示和追踪匹配到的来源章节。
     - sources 可包含 `source_summary` / `source_note`，用于说明该来源与问题的关系。
     - sources 保留 `content_preview`，用于调试或展开查看依据，不作为默认主展示内容。
     - sources 当前最多返回 3 个展示来源。
@@ -515,9 +515,9 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - chat policy-based fallback 已实现。
 - chat 回答 prompt 已要求综合相关片段上下文后解释，避免机械拼接 chunk 摘要。
 - chat sources 返回已实现。
-- chat sources 连续 chunk 合并展示已实现。
+- chat sources 按文章 URL 聚合展示已实现。
 - chat sources 返回 `display_title` 已实现。
-- chat sources 返回 `section_title` 和 `section_index` 已实现。
+- chat sources 返回 `section_title`、`section_titles`、`section_index` 和 `section_indexes` 已实现。
 - chat sources 返回 `source_summary` 已实现。
 - chat sources 返回 `content_preview` 已实现，当前长度最多为前 1200 字。
 - chat sources `content_preview` 展示层清洗已实现，会去除链接并截断推荐、原创声明等噪声。
