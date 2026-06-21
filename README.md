@@ -179,17 +179,26 @@ automatic Bearer authentication, a real Profile screen, owner-scoped Room
 conversation storage, and cloud conversation/message sync with timestamp-based
 merge.
 
-The Android client currently uses:
+The Android client uses the deployed Sealos backend by default:
 
 ```text
-http://10.0.2.2:8000
+https://lxfxyunzhlxi.sealoshzh.site
 ```
 
-as the default backend base URL for the emulator. Build against a deployed
-backend with:
+Android Studio can therefore run the app directly without an extra Gradle
+property. From the repository root, build, install, and launch on the first
+connected real device with:
 
 ```bash
-./gradlew assembleDebug -PsmartfeedBaseUrl=https://your-api.example.com/
+./scripts/install_android.sh
+```
+
+To target a specific device, pass its ADB serial. To use a local emulator
+backend, override the URL only for that invocation:
+
+```bash
+./scripts/install_android.sh emulator-5554
+SMARTFEED_BASE_URL=http://10.0.2.2:8000/ ./scripts/install_android.sh emulator-5554
 ```
 
 Build check:

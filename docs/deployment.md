@@ -128,15 +128,21 @@ curl http://127.0.0.1:8000/health
 
 ## Android Production Build
 
-Build the Android app against the deployed HTTPS backend:
+The checked-in debug default points to the deployed HTTPS backend, so Android
+Studio Run requires no extra base URL configuration. From the repository root,
+the convenience script finds Android Studio's Java runtime, finds ADB, prefers a
+connected real device, builds, installs, and launches the app:
 
 ```bash
-cd android/SmartFeedAndroid
-./gradlew assembleDebug -PsmartfeedBaseUrl=https://your-api.example.com/
+./scripts/install_android.sh
 ```
 
-The URL must be HTTPS for a real device demo unless the Android network security
-config is explicitly changed.
+Pass an ADB serial when multiple devices are connected. Set
+`SMARTFEED_BASE_URL` only when overriding the checked-in backend, for example:
+
+```bash
+SMARTFEED_BASE_URL=http://10.0.2.2:8000/ ./scripts/install_android.sh emulator-5554
+```
 
 ## Release Verification
 
