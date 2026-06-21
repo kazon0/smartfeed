@@ -43,10 +43,10 @@ internal fun ChatBubble(message: ChatMessage) {
 }
 
 @Composable
-internal fun ThinkingBubble() {
+internal fun ThinkingBubble(text: String = "") {
     AssistantBubble(
         title = stringResource(R.string.app_name),
-        text = stringResource(R.string.thinking)
+        text = text.ifBlank { stringResource(R.string.thinking) }
     )
 }
 

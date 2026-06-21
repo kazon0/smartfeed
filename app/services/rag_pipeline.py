@@ -81,6 +81,24 @@ class RAGPipeline:
         )
         return llm_service.answer(question=query, context_chunks=answer_context)
 
+    def answer_with_context_stream(
+        self,
+        query: str,
+        context_chunks: list[str],
+        llm_service: LLMService,
+        debug: dict | None = None,
+    ):
+        answer_context = self.prepare_answer_context(
+            query,
+            context_chunks,
+            llm_service,
+            debug,
+        )
+        yield from llm_service.answer_stream(
+            question=query,
+            context_chunks=answer_context,
+        )
+
     def prepare_answer_context(
         self,
         query: str,

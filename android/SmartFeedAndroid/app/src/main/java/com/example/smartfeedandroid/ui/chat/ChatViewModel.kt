@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smartfeedandroid.data.repository.ChatStreamStatus
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.ui.model.ChatMessage
 import kotlinx.coroutines.launch
@@ -33,7 +34,9 @@ class ChatViewModel : ViewModel() {
         val context = prepareUserMessage(cleanQuery) ?: return
         uiState = uiState.copy(
             query = "",
-            isAsking = true
+            isAsking = true,
+            streamStatusText = "正在连接实时回答...",
+            streamAnswerText = ""
         )
 
         viewModelScope.launch {
@@ -41,7 +44,19 @@ class ChatViewModel : ViewModel() {
                 val result = chatCoordinator.ask(
                     query = cleanQuery,
                     activeUrl = context.activeUrl,
-                    messages = context.historyMessages
+                    messages = context.historyMessages,
+                    onStatus = { status ->
+                        viewModelScope.launch {
+                            uiState = uiState.copy(streamStatusText = status.displayText())
+                        }
+                    },
+                    onDelta = { delta ->
+                        viewModelScope.launch {
+                            uiState = uiState.copy(
+                                streamAnswerText = uiState.streamAnswerText + delta
+                            )
+                        }
+                    }
                 )
             ) {
                 is ChatResult.Answer -> {
@@ -58,7 +73,21 @@ class ChatViewModel : ViewModel() {
                 }
             }
 
-            uiState = uiState.copy(isAsking = false)
+            uiState = uiState.copy(
+                isAsking = false,
+                streamStatusText = "",
+                streamAnswerText = ""
+            )
         }
+    }
+}
+
+private fun ChatStreamStatus.displayText(): String {
+    return when (this) {
+        ChatStreamStatus.Connecting -> "正在连接实时回答..."
+        ChatStreamStatus.Authenticated -> "连接成功，正在准备问题..."
+        ChatStreamStatus.Retrieving -> "正在检索相关文章..."
+        ChatStreamStatus.Answering -> "正在生成回答..."
+        ChatStreamStatus.Fallback -> "实时连接失败，正在切换普通回答..."
     }
 }

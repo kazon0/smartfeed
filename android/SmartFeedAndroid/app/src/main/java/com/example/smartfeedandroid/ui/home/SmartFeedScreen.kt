@@ -152,6 +152,8 @@ private fun SmartFeedContent(
                             activeUrl = uiState.activeUrl,
                             activeTitle = activeConversation?.title.orEmpty(),
                             isAsking = chatUiState.isAsking,
+                            streamStatusText = chatUiState.streamStatusText,
+                            streamAnswerText = chatUiState.streamAnswerText,
                             onAsk = onAsk,
                             onBack = onBackToConversations,
                             modifier = Modifier.padding(innerPadding)

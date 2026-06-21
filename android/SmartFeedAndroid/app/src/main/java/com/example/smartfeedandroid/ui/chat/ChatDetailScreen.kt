@@ -56,6 +56,8 @@ fun ChatDetailScreen(
     activeUrl: String,
     activeTitle: String,
     isAsking: Boolean,
+    streamStatusText: String,
+    streamAnswerText: String,
     onAsk: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -73,6 +75,8 @@ fun ChatDetailScreen(
         MessageList(
             messages = messages,
             isAsking = isAsking,
+            streamStatusText = streamStatusText,
+            streamAnswerText = streamAnswerText,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp)
@@ -168,6 +172,8 @@ private fun ChatHeader(
 private fun MessageList(
     messages: List<ChatMessage>,
     isAsking: Boolean,
+    streamStatusText: String,
+    streamAnswerText: String,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -195,7 +201,7 @@ private fun MessageList(
             }
             if (isAsking) {
                 item {
-                    ThinkingBubble()
+                    ThinkingBubble(text = streamAnswerText.ifBlank { streamStatusText })
                 }
             }
         }
@@ -275,6 +281,8 @@ private fun ChatDetailScreenPreview() {
         activeUrl = "https://example.com/article",
         activeTitle = "程序员应该知道的十个基础算法",
         isAsking = true,
+        streamStatusText = "正在检索相关文章...",
+        streamAnswerText = "",
         onAsk = {},
         onBack = {}
     )

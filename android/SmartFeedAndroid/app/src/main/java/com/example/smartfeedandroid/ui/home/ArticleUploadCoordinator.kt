@@ -4,6 +4,7 @@ import com.example.smartfeedandroid.data.remote.ArticleStatusResponse
 import com.example.smartfeedandroid.data.remote.UploadResponse
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
+import com.example.smartfeedandroid.data.repository.UploadStreamStatus
 import com.example.smartfeedandroid.ui.state.UploadProgress
 
 class ArticleUploadCoordinator(
@@ -12,7 +13,9 @@ class ArticleUploadCoordinator(
 ) {
     suspend fun openOrUpload(
         url: String,
-        onProgress: (UploadProgress) -> Unit
+        onProgress: (UploadProgress) -> Unit,
+        onStreamStatus: (UploadStreamStatus) -> Unit = {},
+        onSummaryDelta: (String) -> Unit = {}
     ): ArticleUploadResult {
         onProgress(UploadProgress.CheckingStatus)
 
@@ -26,7 +29,19 @@ class ArticleUploadCoordinator(
         }
 
         onProgress(UploadProgress.UploadingNewArticle)
-        return uploadRepository.upload(url).fold(
+        val streamingResult = uploadRepository.uploadStreaming(
+            url = url,
+            onStatus = onStreamStatus,
+            onSummaryDelta = onSummaryDelta
+        )
+        val result = if (streamingResult.isSuccess) {
+            streamingResult
+        } else {
+            onStreamStatus(UploadStreamStatus.Fallback)
+            uploadRepository.upload(url)
+        }
+
+        return result.fold(
             onSuccess = { ArticleUploadResult.Uploaded(it) },
             onFailure = {
                 ArticleUploadResult.Failed(it.message ?: "保存失败。")

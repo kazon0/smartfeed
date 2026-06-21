@@ -641,7 +641,8 @@ browser page → calls `/upload` and `/chat` → displays parser, chunks, summar
 - stats chunks 主题分类当前仍是关键词规则，不是 LLM 分类、embedding 聚类或人工标签。
 - 已保存文章 topic 当前优先使用 DeepSeek 单标签分类，不是多标签、embedding 聚类或人工标签。
 - Android 当前本地持久化使用 Room。
-- 后端已实现 `/ws/chat` 第一版，支持 JWT 鉴权、阶段事件和最终完整 `/chat` 响应；Android 当前还没有 WebSocket 接入。
+- 后端已实现 `/ws/chat`，支持 JWT 鉴权、阶段事件、答案 delta 和最终完整 `/chat` 响应；Android 已接入 OkHttp WebSocket 聊天，并保留 `POST /chat` fallback。
+- 后端已实现 `/ws/upload`，支持 JWT 鉴权、上传阶段事件、文章总结 delta 和最终完整 `/upload` 响应；Android 导入文章时会优先展示流式总结，并保留 `POST /upload` fallback。
 - PostgreSQL schema、JWT 鉴权、文章 metadata repository、Chroma `user_id` 隔离、conversation/message 云 API、Android 认证和 Android Room/云端同步已接入。
 - 后端已通过 GHCR 镜像部署到 Sealos 公网环境，地址为 `https://lxfxyunzhlxi.sealoshzh.site`。
 - Sealos 环境已使用 PostgreSQL、`/data` 持久化 ChromaDB、`GET /health`、`CHROMA_PERSIST_DIR` 和 Android 生产 base URL 完成第一版验证。

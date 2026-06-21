@@ -105,6 +105,20 @@ class LangChainRAGPipeline(RAGPipeline):
                 debug,
             )
 
+    def answer_with_context_stream(
+        self,
+        query: str,
+        context_chunks: list[str],
+        llm_service: LLMService,
+        debug: dict | None = None,
+    ):
+        yield from super().answer_with_context_stream(
+            query,
+            context_chunks,
+            llm_service,
+            debug,
+        )
+
     def _rewrite_step(self, payload: dict) -> dict:
         self._record_stage(payload, "rewrite")
         return {

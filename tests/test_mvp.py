@@ -163,6 +163,10 @@ def test_websocket_chat_streams_status_and_final_response(monkeypatch):
         def answer_without_context(self, question, reason):
             return f"{reason}。websocket answer"
 
+        def answer_without_context_stream(self, question, reason):
+            yield f"{reason}。"
+            yield "websocket answer"
+
     monkeypatch.setenv("JWT_SECRET", "test-secret-with-at-least-32-characters")
     monkeypatch.setattr("app.routes.ws.VectorStoreService", FakeVectorStoreService)
     monkeypatch.setattr("app.routes.ws.LLMService", FakeLLMService)
@@ -203,12 +207,117 @@ def test_websocket_chat_streams_status_and_final_response(monkeypatch):
 
             assert websocket.receive_json()["stage"] == "retrieving"
             assert websocket.receive_json()["stage"] == "answering"
+            first_delta = websocket.receive_json()
+            second_delta = websocket.receive_json()
             completed = websocket.receive_json()
 
+        assert first_delta == {"type": "delta", "text": "知识库中未找到足够相关内容，以下是通用回答。"}
+        assert second_delta == {"type": "delta", "text": "websocket answer"}
         assert completed["type"] == "completed"
         assert completed["stage"] == "completed"
         assert completed["response"]["status"] == "ok"
         assert completed["response"]["answer"].endswith("websocket answer")
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: TEST_USER
+        app.dependency_overrides[get_db] = empty_db_override
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+def test_websocket_upload_streams_summary_and_final_response(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.db.base import Base
+
+    class FakeWebParserService:
+        def prepare(self, url):
+            return {
+                "url": url,
+                "title": "Streaming Upload",
+                "content": "article content",
+                "chunks": ["article chunk"],
+                "chunk_metadata": [{"chunk_index": 0}],
+                "metadata": {"parser": "fake", "length": 15},
+            }
+
+    class FakeLLMService:
+        def summarize_stream(self, text):
+            yield "summary "
+            yield "delta"
+
+        def classify_topic(self, title, url, summary, content):
+            return {
+                "topic": "科技",
+                "confidence": 0.9,
+                "reason": "fake",
+                "source": "llm",
+            }
+
+    class FakeVectorStoreService:
+        def __init__(self):
+            self.user_id = None
+
+        def delete_by_url(self, url):
+            assert self.user_id
+
+        def add_chunks(self, chunks, metadata, chunk_metadata=None):
+            assert self.user_id
+            return len(chunks)
+
+    monkeypatch.setenv("JWT_SECRET", "test-secret-with-at-least-32-characters")
+    monkeypatch.setattr("app.routes.ws.WebParserService", FakeWebParserService)
+    monkeypatch.setattr("app.routes.ws.LLMService", FakeLLMService)
+    monkeypatch.setattr("app.routes.ws.VectorStoreService", FakeVectorStoreService)
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def override_get_db():
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "email": "ws-upload@example.com",
+                "password": "strong-password",
+                "display_name": "Upload User",
+            },
+        )
+        access_token = register_response.json()["access_token"]
+
+        with client.websocket_connect(f"/ws/upload?token={access_token}") as websocket:
+            assert websocket.receive_json()["stage"] == "connected"
+            assert websocket.receive_json()["stage"] == "authenticated"
+
+            websocket.send_json({"url": "https://example.com/article"})
+
+            events = [websocket.receive_json() for _ in range(7)]
+
+        assert [event.get("stage") for event in (events[0], events[1], events[4], events[5])] == [
+            "parsing",
+            "summarizing",
+            "classifying",
+            "storing",
+        ]
+        assert events[2] == {"type": "delta", "target": "summary", "text": "summary "}
+        assert events[3] == {"type": "delta", "target": "summary", "text": "delta"}
+        assert events[6]["type"] == "completed"
+        assert events[6]["response"]["summary"] == "summary delta"
+        assert events[6]["response"]["stored_chunks"] == 1
     finally:
         app.dependency_overrides[get_current_user] = lambda: TEST_USER
         app.dependency_overrides[get_db] = empty_db_override

@@ -13,6 +13,8 @@ data class HomeUiState(
     val isChatOpen: Boolean = false,
     val isUploading: Boolean = false,
     val uploadProgress: UploadProgress? = null,
+    val uploadStatusText: String = "",
+    val uploadSummaryText: String = "",
     val uploadResponse: UploadResponse? = null,
     val errorMessage: String? = null,
     val lastSharedUrl: String? = null,

@@ -117,24 +117,26 @@
 
 ## 6. WebSocket 流式交互
 
-状态：后端 `/ws/chat` 第一版已完成，支持 JWT 鉴权、用户隔离、阶段事件和最终完整回答；Android WebSocket 接入和 token-by-token delta 仍待完成。
+状态：后端 `/ws/chat` 已支持 JWT 鉴权、用户隔离、阶段事件、答案 delta 和最终完整回答；后端 `/ws/upload` 已支持上传阶段事件和文章总结 delta；Android 已接入聊天和上传 WebSocket，并保留 HTTP fallback。
 
 目标：提供简历可展示的实时回答和长任务状态推送。
 
 范围：
 
 - FastAPI WebSocket chat endpoint。
+- FastAPI WebSocket upload endpoint。
 - WebSocket 握手鉴权和用户隔离。
-- 定义稳定事件协议，例如 `status: connected/authenticated/retrieving/answering`、`completed` 和 `error`。
-- Android 使用 OkHttp WebSocket 展示流式回答和阶段状态。
-- 断线、超时和协议错误时回退现有 `POST /chat`。
+- 定义稳定事件协议，例如 `status`、`delta`、`completed` 和 `error`。
+- Android 使用 OkHttp WebSocket 展示流式回答、上传总结和阶段状态。
+- 断线、超时和协议错误时回退现有 `POST /chat` / `POST /upload`。
 - 不在这一阶段引入通用 Agent 或任意工具调用。
 
 完成标准：
 
 - Android 能逐步展示回答内容。
+- Android 导入文章时能逐步展示总结内容。
 - WebSocket 断开不会丢失最终消息或破坏本地 conversation。
-- WebSocket 与 `POST /chat` 使用同一 RAG 和权限边界。
+- WebSocket 与 `POST /chat` / `POST /upload` 使用同一权限边界。
 
 ## 7. 产品收尾
 

@@ -556,8 +556,8 @@ user. Returns `status: "not_found"` for missing or foreign conversations.
 ## WebSocket /ws/chat
 
 Runs authenticated chat over WebSocket while keeping `POST /chat` as the stable
-fallback. The first version emits stage events plus the final full `/chat`
-response; it does not yet stream token-by-token answer deltas.
+fallback. It emits stage events, answer delta events, and the final full
+`/chat` response.
 
 ### Connect
 
@@ -601,6 +601,13 @@ Per-message status:
 {"type":"status","stage":"answering"}
 ```
 
+Answer streaming:
+
+```json
+{"type":"delta","text":"根据当前网页，"}
+{"type":"delta","text":"这篇文章主要讨论..."}
+```
+
 Final response:
 
 ```json
@@ -630,6 +637,72 @@ Current `error_code` values:
 - `UNAUTHORIZED`
 - `INVALID_REQUEST`
 - `CHAT_FAILED`
+
+## WebSocket /ws/upload
+
+Runs authenticated article upload over WebSocket while keeping `POST /upload`
+as the stable fallback. It streams long-running upload stages and summary text
+while preserving the final `UploadResponse` shape.
+
+### Connect
+
+```text
+wss://your-api.example.com/ws/upload?token=$ACCESS_TOKEN
+```
+
+### Client Message
+
+```json
+{"url":"https://example.com/article"}
+```
+
+### Server Events
+
+Connection and auth status:
+
+```json
+{"type":"status","stage":"connected"}
+{"type":"status","stage":"authenticated"}
+```
+
+Upload status:
+
+```json
+{"type":"status","stage":"parsing"}
+{"type":"status","stage":"summarizing"}
+{"type":"status","stage":"classifying"}
+{"type":"status","stage":"storing"}
+```
+
+Summary streaming:
+
+```json
+{"type":"delta","target":"summary","text":"这篇文章主要介绍..."}
+```
+
+Final response:
+
+```json
+{
+  "type": "completed",
+  "stage": "completed",
+  "response": {
+    "status": "received",
+    "stored_chunks": 12,
+    "summary": "...",
+    "data": {
+      "url": "https://example.com/article",
+      "title": "Article title"
+    }
+  }
+}
+```
+
+Current `error_code` values:
+
+- `UNAUTHORIZED`
+- `INVALID_REQUEST`
+- `UPLOAD_FAILED`
 
 ## POST /chat
 

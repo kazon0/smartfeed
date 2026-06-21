@@ -6,6 +6,7 @@ import com.example.smartfeedandroid.data.auth.AuthSession
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -16,12 +17,12 @@ object SmartFeedNetwork {
         AuthSession.initialize(context.applicationContext)
     }
 
-    private val json = Json {
+    val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
+    val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
@@ -56,5 +57,24 @@ object SmartFeedNetwork {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(SmartFeedApi::class.java)
+    }
+
+    fun chatWebSocketUrl(token: String): String {
+        return webSocketUrl("ws/chat", token)
+    }
+
+    fun uploadWebSocketUrl(token: String): String {
+        return webSocketUrl("ws/upload", token)
+    }
+
+    private fun webSocketUrl(path: String, token: String): String {
+        val httpUrl = BuildConfig.SMARTFEED_BASE_URL.toHttpUrl()
+        val scheme = if (httpUrl.isHttps) "wss" else "ws"
+        return httpUrl.newBuilder()
+            .scheme(scheme)
+            .encodedPath("/$path")
+            .addQueryParameter("token", token)
+            .build()
+            .toString()
     }
 }

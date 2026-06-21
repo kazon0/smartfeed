@@ -20,12 +20,20 @@ class LLMService:
         if not content:
             return ""
 
-        prompt = (
+        return self._chat(self._summary_prompt(content))
+
+    def summarize_stream(self, text: str):
+        content = text.strip()
+        if not content:
+            return
+        yield from self._chat_stream(self._summary_prompt(content))
+
+    def _summary_prompt(self, content: str) -> str:
+        return (
             "请用中文总结以下网页内容，控制在100到200字之间。"
             "总结应准确、简洁，覆盖核心信息。\n\n"
             f"{content[:8000]}"
         )
-        return self._chat(prompt)
 
     def classify_topic(
         self,
@@ -86,8 +94,14 @@ class LLMService:
         }
 
     def answer(self, question: str, context_chunks: list[str]) -> str:
+        return self._chat(self._answer_prompt(question, context_chunks))
+
+    def answer_stream(self, question: str, context_chunks: list[str]):
+        yield from self._chat_stream(self._answer_prompt(question, context_chunks))
+
+    def _answer_prompt(self, question: str, context_chunks: list[str]) -> str:
         context = "\n\n".join(chunk.strip() for chunk in context_chunks if chunk.strip())
-        prompt = (
+        return (
             "你是 SmartFeed 的知识库问答助手。"
             "下面的 context 是向量检索返回的知识库片段，可能包含噪声。"
             "每个片段都有内部来源编号、title、url 和 chunk_index。"
@@ -108,15 +122,19 @@ class LLMService:
             f"context:\n{context}\n\n"
             f"question:\n{question.strip()}"
         )
-        return self._chat(prompt)
 
     def answer_without_context(self, question: str, reason: str) -> str:
-        prompt = (
+        return self._chat(self._answer_without_context_prompt(question, reason))
+
+    def answer_without_context_stream(self, question: str, reason: str):
+        yield from self._chat_stream(self._answer_without_context_prompt(question, reason))
+
+    def _answer_without_context_prompt(self, question: str, reason: str) -> str:
+        return (
             f"请先明确说明：{reason}。"
             "然后可以使用通用知识回答用户问题，回答应简洁、准确。\n\n"
             f"question:\n{question.strip()}"
         )
-        return self._chat(prompt)
 
     def rewrite_query(self, question: str, *, url: str | None = None) -> dict:
         query = question.strip()
@@ -466,3 +484,50 @@ class LLMService:
             return data["choices"][0]["message"]["content"].strip()
         except (requests.RequestException, KeyError, IndexError) as exc:
             return f"LLM unavailable: {exc}"
+
+    def _chat_stream(self, user_prompt: str):
+        if not self.api_key:
+            yield "LLM unavailable: DEEPSEEK_API_KEY is not set."
+            return
+
+        try:
+            response = requests.post(
+                self.API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "你是一个严谨的中文知识库助手。",
+                        },
+                        {
+                            "role": "user",
+                            "content": user_prompt,
+                        },
+                    ],
+                    "temperature": 0.2,
+                    "stream": True,
+                },
+                timeout=60,
+                stream=True,
+            )
+            response.raise_for_status()
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line.removeprefix("data:").strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    data = json.loads(payload)
+                    content = data["choices"][0].get("delta", {}).get("content", "")
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    continue
+                if content:
+                    yield content
+        except requests.RequestException as exc:
+            yield f"LLM unavailable: {exc}"

@@ -10,6 +10,7 @@ import com.example.smartfeedandroid.data.remote.SavedArticle
 import com.example.smartfeedandroid.data.auth.AuthSession
 import com.example.smartfeedandroid.data.repository.ArticleRepository
 import com.example.smartfeedandroid.data.repository.UploadRepository
+import com.example.smartfeedandroid.data.repository.UploadStreamStatus
 import com.example.smartfeedandroid.ui.chat.ChatSendContext
 import com.example.smartfeedandroid.ui.state.HomeUiState
 import com.example.smartfeedandroid.ui.state.UploadProgress
@@ -126,15 +127,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         uiState = uiState.copy(
             isUploading = true,
             uploadProgress = UploadProgress.CheckingStatus,
+            uploadStatusText = "",
+            uploadSummaryText = "",
             errorMessage = null,
             uploadResponse = null
         )
 
         viewModelScope.launch {
             when (
-                val result = articleUploadCoordinator.openOrUpload(cleanUrl) { progress ->
-                    uiState = uiState.copy(uploadProgress = progress)
-                }
+                val result = articleUploadCoordinator.openOrUpload(
+                    url = cleanUrl,
+                    onProgress = { progress ->
+                        uiState = uiState.copy(uploadProgress = progress)
+                    },
+                    onStreamStatus = { status ->
+                        viewModelScope.launch {
+                            uiState = uiState.copy(uploadStatusText = status.displayText())
+                        }
+                    },
+                    onSummaryDelta = { delta ->
+                        viewModelScope.launch {
+                            uiState = uiState.copy(
+                                uploadSummaryText = uiState.uploadSummaryText + delta
+                            )
+                        }
+                    }
+                )
             ) {
                 is ArticleUploadResult.ExistingArticle -> {
                     val article = result.article
@@ -147,6 +165,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     uiState = uiState.copy(
                         uploadProgress = null,
+                        uploadStatusText = "",
+                        uploadSummaryText = "",
                         isUploading = false
                     )
                     persistConversations(uiState.conversations)
@@ -171,14 +191,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 is ArticleUploadResult.Failed -> {
                     uiState = uiState.copy(
                         errorMessage = result.message,
-                        uploadProgress = null
+                        uploadProgress = null,
+                        uploadStatusText = "",
+                        uploadSummaryText = ""
                     )
                 }
             }
 
             uiState = uiState.copy(
                 isUploading = false,
-                uploadProgress = null
+                uploadProgress = null,
+                uploadStatusText = "",
+                uploadSummaryText = ""
             )
         }
     }
@@ -233,4 +257,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+}
+
+private fun UploadStreamStatus.displayText(): String {
+    return when (this) {
+        UploadStreamStatus.Connecting -> "正在连接实时上传..."
+        UploadStreamStatus.Authenticated -> "连接成功，正在准备解析..."
+        UploadStreamStatus.Parsing -> "正在解析网页正文..."
+        UploadStreamStatus.Summarizing -> "正在生成文章总结..."
+        UploadStreamStatus.Classifying -> "正在识别文章主题..."
+        UploadStreamStatus.Storing -> "正在写入知识库..."
+        UploadStreamStatus.Fallback -> "实时上传失败，正在切换普通上传..."
+    }
 }

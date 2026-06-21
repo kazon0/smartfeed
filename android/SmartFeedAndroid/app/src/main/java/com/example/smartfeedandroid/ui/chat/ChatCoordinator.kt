@@ -1,6 +1,7 @@
 package com.example.smartfeedandroid.ui.chat
 
 import com.example.smartfeedandroid.data.remote.ChatHistoryItem
+import com.example.smartfeedandroid.data.repository.ChatStreamStatus
 import com.example.smartfeedandroid.data.repository.ChatRepository
 import com.example.smartfeedandroid.ui.model.ChatMessage
 
@@ -10,9 +11,23 @@ class ChatCoordinator(
     suspend fun ask(
         query: String,
         activeUrl: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        onStatus: (ChatStreamStatus) -> Unit = {},
+        onDelta: (String) -> Unit = {}
     ): ChatResult {
         val history = chatHistoryFrom(messages)
+        val streamingResult = chatRepository.askStreaming(
+            query = query,
+            url = activeUrl,
+            history = history,
+            onStatus = onStatus,
+            onDelta = onDelta
+        )
+        if (streamingResult.isSuccess) {
+            return ChatResult.Answer(streamingResult.getOrThrow())
+        }
+
+        onStatus(ChatStreamStatus.Fallback)
         return chatRepository.ask(query, activeUrl, history).fold(
             onSuccess = { ChatResult.Answer(it) },
             onFailure = {

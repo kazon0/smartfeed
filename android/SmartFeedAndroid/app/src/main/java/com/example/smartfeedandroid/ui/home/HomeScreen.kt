@@ -114,7 +114,13 @@ fun HomeScreen(
                     }
                 }
             )
-            UploadProgressText(uploadProgress = uiState.uploadProgress)
+            UploadProgressText(
+                uploadProgress = uiState.uploadProgress,
+                uploadStatusText = uiState.uploadStatusText
+            )
+            if (uiState.uploadSummaryText.isNotBlank()) {
+                UploadStreamingSummary(summary = uiState.uploadSummaryText)
+            }
             uiState.uploadResponse?.let {
                 UploadResult(response = it)
             }
@@ -150,12 +156,19 @@ private fun UploadResult(response: UploadResponse) {
 }
 
 @Composable
-private fun UploadProgressText(uploadProgress: UploadProgress?) {
-    val text = when (uploadProgress) {
+private fun UploadProgressText(
+    uploadProgress: UploadProgress?,
+    uploadStatusText: String
+) {
+    val fallbackText = when (uploadProgress) {
         UploadProgress.CheckingStatus -> stringResource(R.string.upload_progress_checking)
         UploadProgress.OpeningSavedArticle -> stringResource(R.string.upload_progress_opening_saved)
         UploadProgress.UploadingNewArticle -> stringResource(R.string.upload_progress_uploading_new)
-        null -> return
+        null -> ""
+    }
+    val text = uploadStatusText.ifBlank { fallbackText }
+    if (text.isBlank()) {
+        return
     }
 
     Text(
@@ -164,6 +177,16 @@ private fun UploadProgressText(uploadProgress: UploadProgress?) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 4.dp)
     )
+}
+
+@Composable
+private fun UploadStreamingSummary(summary: String) {
+    ResultCard(title = stringResource(R.string.summary)) {
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
 }
 
 @Preview(showBackground = true)

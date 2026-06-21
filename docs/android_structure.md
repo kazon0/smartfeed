@@ -67,6 +67,7 @@ android/SmartFeedAndroid/app/src/main/java/com/example/smartfeedandroid/
 - Repository：`data/repository/*`，其中 `ConversationSyncRepository.kt` 对接 `GET/PUT/DELETE /conversations`，并按 `updatedAtMillis` 合并本地与云端会话。
 - Network DTO：`data/remote/SmartFeedApi.kt`
 - Authentication：`data/auth/AuthSession.kt` 保存认证状态，`SecureTokenStore.kt` 使用 Android Keystore AES-GCM 加密 access token，OkHttp 自动附加 Bearer header。
+- WebSocket：`ChatRepository` 和 `UploadRepository` 使用 OkHttp WebSocket 接入 `/ws/chat` 与 `/ws/upload`，实时展示回答 delta、上传阶段和文章总结 delta；失败时回退 Retrofit 的 `POST /chat` / `POST /upload`。
 - Local persistence：
   - `data/local/ConversationStore.kt`：本地 conversation 加载、保存和 legacy SharedPreferences 迁移。
   - `data/local/StoredConversation.kt`：本地持久化 DTO。

@@ -28,10 +28,12 @@ class ChatService:
         llm_service_factory: Callable[[], LLMService] = LLMService,
         intent_service_factory: Callable[[], QueryIntentService] = QueryIntentService,
         rag_pipeline_factory: Callable[[], RAGPipeline] | None = None,
+        answer_delta_callback: Callable[[str], None] | None = None,
     ):
         self.vector_store_factory = vector_store_factory
         self.llm_service_factory = llm_service_factory
         self.intent_service_factory = intent_service_factory
+        self.answer_delta_callback = answer_delta_callback
         self.rag_pipeline = (
             rag_pipeline_factory()
             if rag_pipeline_factory
@@ -323,6 +325,7 @@ class ChatService:
             prefix = ""
             if fallback_policy == "no_guess_realtime":
                 prefix = "以下回答基于知识库中已保存内容，可能不是实时最新。\n\n"
+                self._emit_answer_delta(prefix)
             return prefix + self._build_context_answer(query, relevant_chunks, debug), source_type, relevant_chunks
 
         if fallback_policy == "llm_allowed":
@@ -842,10 +845,21 @@ class ChatService:
 
     def _build_general_answer(self, query: str, reason: str) -> str:
         try:
-            answer = self.llm_service_factory().answer_without_context(
-                question=query,
-                reason=reason,
-            )
+            llm_service = self.llm_service_factory()
+            if self.answer_delta_callback and hasattr(llm_service, "answer_without_context_stream"):
+                parts = []
+                for delta in llm_service.answer_without_context_stream(
+                    question=query,
+                    reason=reason,
+                ):
+                    parts.append(delta)
+                    self._emit_answer_delta(delta)
+                answer = "".join(parts)
+            else:
+                answer = llm_service.answer_without_context(
+                    question=query,
+                    reason=reason,
+                )
             if answer.startswith("LLM unavailable"):
                 return "LLM unavailable"
             return answer
@@ -864,17 +878,37 @@ class ChatService:
                 self._format_context_chunk(index, chunk)
                 for index, chunk in enumerate(chunks)
             ]
-            answer = self.rag_pipeline.answer_with_context(
-                query,
-                context_chunks,
-                llm_service,
-                debug,
-            )
+            if (
+                self.answer_delta_callback
+                and hasattr(self.rag_pipeline, "answer_with_context_stream")
+                and hasattr(llm_service, "answer_stream")
+            ):
+                parts = []
+                for delta in self.rag_pipeline.answer_with_context_stream(
+                    query,
+                    context_chunks,
+                    llm_service,
+                    debug,
+                ):
+                    parts.append(delta)
+                    self._emit_answer_delta(delta)
+                answer = "".join(parts)
+            else:
+                answer = self.rag_pipeline.answer_with_context(
+                    query,
+                    context_chunks,
+                    llm_service,
+                    debug,
+                )
             if answer.startswith("LLM unavailable"):
                 return "LLM unavailable"
             return answer
         except Exception:
             return "LLM unavailable"
+
+    def _emit_answer_delta(self, text: str) -> None:
+        if self.answer_delta_callback and text:
+            self.answer_delta_callback(text)
 
     def _format_context_chunk(self, index: int, chunk: dict) -> str:
         metadata = chunk.get("metadata", {})
