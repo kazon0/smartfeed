@@ -26,6 +26,7 @@ import com.example.smartfeedandroid.ui.articles.ArticleManagerViewModel
 import com.example.smartfeedandroid.ui.chat.ChatDetailScreen
 import com.example.smartfeedandroid.ui.chat.ChatUiState
 import com.example.smartfeedandroid.ui.chat.ChatViewModel
+import com.example.smartfeedandroid.ui.common.JournalPaper
 import com.example.smartfeedandroid.ui.navigation.AppBottomBar
 import com.example.smartfeedandroid.ui.profile.AuthScreen
 import com.example.smartfeedandroid.ui.profile.AuthViewModel
@@ -136,9 +137,12 @@ private fun SmartFeedContent(
         onSelectTab(AppTab.Home)
     }
 
-    Surface(modifier = modifier.fillMaxSize()) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = JournalPaper
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold { innerPadding ->
+            Scaffold(containerColor = JournalPaper) { innerPadding ->
             uiState.errorMessage?.let { errorMessage ->
                 AlertDialog(
                     onDismissRequest = onDismissError,

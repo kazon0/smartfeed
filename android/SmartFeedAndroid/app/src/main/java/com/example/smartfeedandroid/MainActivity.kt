@@ -2,6 +2,7 @@ package com.example.smartfeedandroid
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,10 +11,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smartfeedandroid.ui.home.HomeViewModel
 import com.example.smartfeedandroid.data.remote.SmartFeedNetwork
 import com.example.smartfeedandroid.data.auth.AuthSession
+import com.example.smartfeedandroid.ui.common.JournalPaper
 import com.example.smartfeedandroid.ui.home.SmartFeedScreen
 import com.example.smartfeedandroid.ui.theme.SmartFeedAndroidTheme
 
@@ -24,7 +27,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SmartFeedNetwork.initialize(applicationContext)
-        enableEdgeToEdge()
+        val paperColor = JournalPaper.toArgb()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(paperColor, paperColor),
+            navigationBarStyle = SystemBarStyle.light(paperColor, paperColor)
+        )
         pendingSharedUrl = extractSharedUrl(intent)
         setContent {
             SmartFeedAndroidTheme {
